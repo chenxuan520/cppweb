@@ -5,7 +5,9 @@
 #include"./sql.h"
 class DealAsk{
 public:
-    bool dealGetAsk(ServerTcpIp& server,DealHttp& http);
-    bool dealPostAsk(ServerTcpIp& server,DealHttp& http);
+    bool dealGetAsk(ServerTcpIp&,DealHttp&,void*,void*);
+    bool dealPostAsk(ServerTcpIp&,DealHttp&,void*,void*);
+    void dealClientIn(ServerTcpIp&,DealHttp&,void*,void*,int);
+    void dealClientOut(ServerTcpIp&,DealHttp&,void*,void*,int);
 };
 #endif

@@ -4,7 +4,7 @@
 using namespace std;
 DealHttp::DealHttp()
 {
-    for(int i=0;i<200;i++)
+    for(int i=0;i<256;i++)
         ask[i]=0;
     pfind=NULL;
     pfile=NULL;

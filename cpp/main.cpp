@@ -5,6 +5,7 @@
 #include<stdio.h>
 #include<string.h>
 char indexName[100]="index.html";
+int memory=0;
 int funcTwo(int thing,int num,void* pget,void* sen,ServerTcpIp& server)//main deal func
 {
 	char ask[200]={0};
@@ -14,7 +15,7 @@ int funcTwo(int thing,int num,void* pget,void* sen,ServerTcpIp& server)//main de
     int flag=0;
 	if(sen==NULL)
 		return -1;
-	 memset(sen,0,sizeof(char)*10000000);
+	memset(sen,0,sizeof(char)*memory*1024*1024);
 	// if(false==DealAttack::dealAttack(thing,num,200))
 	// {
 	// 	DealAttack::attackLog(port,server.getPeerIp(num,&port),"./rec/attackLog.txt");
@@ -22,19 +23,19 @@ int funcTwo(int thing,int num,void* pget,void* sen,ServerTcpIp& server)//main de
 	// 	return 0;
 	// }
 	if(thing==0)
-		printf("%d is out\n",num);
+		dealAsk.dealClientOut(server,http,pget,sen,num);
 	if(thing==1)
-		printf("%s in %d\n",(char*)pget,num);
+		dealAsk.dealClientIn(server,http,pget,sen,num);
 	if(thing==2)
 	{
-		if(true==dealAsk.dealPostAsk(server,http))
+		if(true==dealAsk.dealPostAsk(server,http,pget,sen))
 			return 0;
 		if(false==http.cutLineAsk((char*)pget,"GET"))
 			return 0;
 		printf("ask:%s\n",(char*)pget);
 		printf("http:%s\n",http.analysisHttpAsk(pget));
 		strcpy(ask,http.analysisHttpAsk(pget));
-        if(false==dealAsk.dealGetAsk(server,http))
+        if(false==dealAsk.dealGetAsk(server,http,pget,sen))
         {
 			flag=http.autoAnalysisGet((char*)pget,(char*)sen,indexName,&len);
 			if(0==flag)
@@ -70,6 +71,9 @@ void chooseModel(unsigned int* port,bool* pflag)
 	printf("please input if run in background(default no)y/n:");
 	fflush(stdin);
 	scanf("%s",temp);
+    printf("please input memory(M):");
+    fflush(stdin);
+    scanf("%d",&memory);
 	if(strchr(temp,'y')!=NULL)
 		*pflag=true;
 	else 
@@ -92,7 +96,7 @@ void serverHttp()
 	ServerTcpIp server(port,100);
 	int thing=0,num=0;
 	char get[2048]={0};
-	char* sen=(char*)malloc(sizeof(char)*10000000);
+	char* sen=(char*)malloc(sizeof(char)*memory*1024*1024);
 	if(sen==NULL)
 		printf("memory wrong\n");
 	if(false==server.bondhost())

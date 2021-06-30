@@ -14,7 +14,7 @@ struct CliLog{
 };
 class DealHttp{
 private:
-	char ask[200];
+	char ask[256];
 	char* pfind;
 	char* pfile;
 public:
