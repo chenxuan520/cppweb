@@ -79,11 +79,28 @@ void chooseModel(unsigned int* port,bool* pflag)
 	else 
 		*pflag=false;
 }
-void serverHttp()
+void serverHttp(int argc,char** argv)
 {
 	unsigned int port=80;
 	bool is_back=false;
-	chooseModel(&port,&is_back);
+    if(argc!=5)
+	    chooseModel(&port,&is_back);
+    else
+    {
+        if(sscanf(argv[1],"%d",&port)!=1)
+        {
+            printf("init wrong\n");
+            return;
+        }
+        sscanf(argv[2],"%s",indexName);
+        if(sscanf(argv[3],"%d",&memory)!=1)
+        {
+            printf("memory wrong\n");
+            return;
+        }
+        if(strchr(argv[4],'y')!=NULL)
+            is_back=true;
+    }
 	if(is_back)
 	{
 		int pid=0;
@@ -114,6 +131,6 @@ void serverHttp()
 }
 int main(int argc, char** argv) 
 {
-	serverHttp();
+	serverHttp(argc,argv);
 	return 0;
 }
