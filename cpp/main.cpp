@@ -79,13 +79,45 @@ void chooseModel(unsigned int* port,bool* pflag)
 	else 
 		*pflag=false;
 }
+void ifChoose(bool* pb,unsigned int* pport,bool* is_back)
+{
+    FILE* fp=fopen("my.ini","r+");
+    if(fp==NULL)
+    {
+        *pb=false;
+        return;
+    }
+    if(fscanf(fp,"%u",pport)!=1)
+    {
+        *pb=false;
+        printf("port=%u\n",*pport);
+        return;
+    }
+    if(fscanf(fp,"%s",indexName)!=1)
+    {
+        *pb=false;
+        printf("name:%s\n",indexName);
+        return;
+    }
+    if(fscanf(fp,"%d",&memory)!=1)
+    {
+        *pb=false;
+        printf("memory=%d\n",memory);
+        return;
+    }
+    *pb=true;
+    *is_back=true;
+    fclose(fp);
+    return;
+}
 void serverHttp(int argc,char** argv)
 {
 	unsigned int port=80;
-	bool is_back=false;
-    if(argc!=5)
+	bool is_back=false,is_choose=false;
+    ifChoose(&is_choose,&port,&is_back);
+    if(argc!=5&&is_choose==false)
 	    chooseModel(&port,&is_back);
-    else
+    else if(argc==5)
     {
         if(sscanf(argv[1],"%d",&port)!=1)
         {
