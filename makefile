@@ -1,3 +1,9 @@
+all:main init
+
+init:init.o
+	g++ init.o -o init
+init.o:./cpp/init.cpp
+	g++ -c ./cpp/init.cpp -o init.o
 main:main.o sql.o server.o http.o dealask.o
 	g++ main.o sql.o server.o http.o dealask.o -o main -lmysqlclient
 main.o:./cpp/main.cpp 
