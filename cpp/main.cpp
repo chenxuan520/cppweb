@@ -81,6 +81,7 @@ void chooseModel(unsigned int* port,bool* pflag)
 }
 void ifChoose(bool* pb,unsigned int* pport,bool* is_back)
 {
+	char temp[10]={0};
     FILE* fp=fopen("my.ini","r+");
     if(fp==NULL)
     {
@@ -105,34 +106,46 @@ void ifChoose(bool* pb,unsigned int* pport,bool* is_back)
         printf("memory=%d\n",memory);
         return;
     }
+    if(fscanf(fp,"%s",temp)!=1)
+    {
+		*pb=false;
+		printf("is back wrong\n");
+		return;
+	}
+	if(strchr(temp,'y')!=NULL)
+		*is_back=true;
+	else
+		*is_back=false;
     *pb=true;
-    *is_back=true;
     fclose(fp);
     return;
+}
+bool ifArgc(int argc,char** argv,bool* pis_back,unsigned int* pport)
+{
+	if(argc!=5)
+		return false;
+	if(sscanf(argv[1],"%d",pport)!=1)
+    {
+        printf("init wrong\n");
+        return false;
+    }
+    sscanf(argv[2],"%s",indexName);
+    if(sscanf(argv[3],"%d",&memory)!=1)
+    {
+        printf("memory wrong\n");
+        return false;
+    }
+    if(strchr(argv[4],'y')!=NULL)
+        *pis_back=true;
+    return true;
 }
 void serverHttp(int argc,char** argv)
 {
 	unsigned int port=80;
 	bool is_back=false,is_choose=false;
     ifChoose(&is_choose,&port,&is_back);
-    if(argc!=5&&is_choose==false)
+    if(ifArgc(argc,argv,&is_back,&port)==false&&is_choose==false)
 	    chooseModel(&port,&is_back);
-    else if(argc==5)
-    {
-        if(sscanf(argv[1],"%d",&port)!=1)
-        {
-            printf("init wrong\n");
-            return;
-        }
-        sscanf(argv[2],"%s",indexName);
-        if(sscanf(argv[3],"%d",&memory)!=1)
-        {
-            printf("memory wrong\n");
-            return;
-        }
-        if(strchr(argv[4],'y')!=NULL)
-            is_back=true;
-    }
 	if(is_back)
 	{
 		int pid=0;
