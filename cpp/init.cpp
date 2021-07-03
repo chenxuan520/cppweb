@@ -662,6 +662,7 @@ bool signIn(ServerTcpIp& server,DealHttp& http,void* sen,char* ask,int* plen)
 	if(sscanf(word,"%d",&memory)!=1)
 		printf("get memory wrong\n");
 	fprintf(fp,"%d\n",memory);
+	fprintf(fp,"y\n");
 	remove("rec/index.html");
     rename("rec/ini.html","rec/index.html");
 	sprintf(portArray,"%d",port);
