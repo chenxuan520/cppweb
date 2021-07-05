@@ -1,3 +1,8 @@
+/********************************
+	author:chenxuan
+	date:2021.7.5
+	funtion:this is main cpp for static web
+*********************************/
 #include"../hpp/sql.h"
 #include"../hpp/server.h"
 #include"../hpp/http.h"
@@ -6,6 +11,11 @@
 #include<string.h>
 char indexName[100]="index.html";
 int memory=0;
+/********************************
+	author:chenxuan
+	date:2021.7.5
+	funtion:main function to deal ask
+*********************************/
 int funcTwo(int thing,int num,void* pget,void* sen,ServerTcpIp& server)//main deal func
 {
 	char ask[200]={0};
@@ -61,6 +71,11 @@ int funcTwo(int thing,int num,void* pget,void* sen,ServerTcpIp& server)//main de
 	}
 	return 0;
 }
+/********************************
+	author:chenxuan
+	date:2021.7.5
+	funtion:if no argc an file use it to init
+*********************************/
 void chooseModel(unsigned int* port,bool* pflag)
 {
 	char temp[10]={0};
@@ -79,6 +94,11 @@ void chooseModel(unsigned int* port,bool* pflag)
 	else 
 		*pflag=false;
 }
+/********************************
+	author:chenxuan
+	date:2021.7.5
+	funtion:from file init server
+*********************************/
 void ifChoose(bool* pb,unsigned int* pport,bool* is_back)
 {
 	char temp[10]={0};
@@ -120,6 +140,11 @@ void ifChoose(bool* pb,unsigned int* pport,bool* is_back)
     fclose(fp);
     return;
 }
+/********************************
+	author:chenxuan
+	date:2021.7.5
+	funtion:from argv to init server
+*********************************/
 bool ifArgc(int argc,char** argv,bool* pis_back,unsigned int* pport)
 {
 	if(argc!=5)
@@ -139,6 +164,11 @@ bool ifArgc(int argc,char** argv,bool* pis_back,unsigned int* pport)
         *pis_back=true;
     return true;
 }
+/********************************
+	author:chenxuan
+	date:2021.7.5
+	funtion:server begin
+*********************************/
 void serverHttp(int argc,char** argv)
 {
 	unsigned int port=80;
