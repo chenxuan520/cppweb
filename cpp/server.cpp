@@ -1,3 +1,8 @@
+/********************************
+	author:chenxuan
+	date:2021.7.5
+	funtion:do not change this file 
+*********************************/
 #include"../hpp/server.h"
 #include<netinet/in.h>
 #include<arpa/inet.h>
