@@ -1,6 +1,6 @@
 /********************************
 	author:chenxuan
-	date:2021.7.4
+	date:2021.7.14
 	funtion:this file is a try for thead poll
 *********************************/
 #include<pthread.h>
@@ -9,7 +9,12 @@
 #include<queue>
 #include<unistd.h>
 using namespace std;
-class ThreadPoll{
+/********************************
+	author:chenxuan
+	date:2021.7.17
+	funtion:this is a class for thread pool
+*********************************/
+class ThreadPool{
 public:
 	struct Task{
 		void* (*ptask)(void*);
@@ -29,7 +34,7 @@ private:
 private:
 	static void* worker(void* arg)
 	{
-		ThreadPoll* poll=(ThreadPoll*)arg;
+		ThreadPool* poll=(ThreadPool*)arg;
 		while(1)
 		{
 			pthread_mutex_lock(&poll->lockPoll);
@@ -45,7 +50,7 @@ private:
 				pthread_mutex_lock(&poll->lockBusy);
 				poll->busyThread++;
 				pthread_mutex_unlock(&poll->lockBusy);
-				ThreadPoll::Task task=poll->thingWork.front();
+				ThreadPool::Task task=poll->thingWork.front();
 				poll->thingWork.pop();
 				pthread_mutex_unlock(&poll->lockPoll);
 				task.ptask(task.arg);
@@ -61,7 +66,7 @@ private:
 		return NULL;
 	}
 public:
-	ThreadPoll(unsigned int threadNum=10)
+	ThreadPool(unsigned int threadNum=10)
 	{
 		if(threadNum<=1)
 			threadNum=10;
@@ -77,15 +82,16 @@ public:
 		liveThread=threadNum;
 		isContinue=true;
 		busyThread=0;
+		pthread_create(&threadManager,NULL,manager,this);
 		for(unsigned int i=0;i<threadNum;i++)
 			pthread_create(&thread[i],NULL,worker,this);
 	}
-	~ThreadPoll()
+	~ThreadPool()
 	{
 		if(isContinue==false)
 			return;
 		isContinue=false;
-//		pthread_join(threadManager,NULL);
+		pthread_join(threadManager,NULL);
 		for(unsigned int i=0;i<liveThread;i++)
 			pthread_cond_signal(&condition);
 		for(unsigned int i=0;i<liveThread;i++)
@@ -109,15 +115,17 @@ public:
 	}
 	void addTask(Task task)
 	{
+		if(isContinue==false)
+			return;
 		pthread_mutex_lock(&this->lockPoll);
 		this->thingWork.push(task);
 		pthread_mutex_unlock(&this->lockPoll);
 		pthread_cond_signal(&this->condition);
 	}
-	void endPoll()
+	void endPool()
 	{
 		isContinue=false;
-//		pthread_join(threadManager,NULL);
+		pthread_join(threadManager,NULL);
 		for(unsigned int i=0;i<liveThread;i++)
 			pthread_cond_signal(&condition);
 		for(unsigned int i=0;i<liveThread;i++)
@@ -152,13 +160,13 @@ void* print(void*)
 	temp++;
 //	cout<<pid<<":"<<temp<<endl;
 	printf("%u:%d ing\n",pid,temp);
-	usleep(15);
+	usleep(3);
 	return NULL;
 }
 int main()
 {
-	ThreadPoll poll(10);
-	ThreadPoll::Task task{print,NULL};
+	ThreadPool poll(10);
+	ThreadPool::Task task{print,NULL};
 	unsigned int thread=0;
 	unsigned int busy=0;
 	for(unsigned int i=0;i<100;i++)
@@ -167,7 +175,7 @@ int main()
 	{
 		poll.getBusyAndTask(&thread,&busy);
 		printf("%u busy %u task\n",thread,busy);
-		usleep(10);
+		usleep(7);
 	}
 	sleep(5);
 	return 0;
