@@ -25,8 +25,8 @@ ServerTcpIp::ServerTcpIp(unsigned short port,int epollNum,int wait,int maxClient
     sizeAddr=sizeof(sockaddr);
     backwait=wait;
     numClient=0;
-    hostip=(char*)malloc(sizeof(char)*20);
-    memset(hostip,0,sizeof(char)*20);
+    hostip=(char*)malloc(sizeof(char)*200);
+    memset(hostip,0,sizeof(char)*200);
     hostname=(char*)malloc(sizeof(char)*30);
     memset(hostname,0,sizeof(char)*30);
     FD_ZERO(&fdClients);//clean fdClients;
@@ -296,7 +296,7 @@ char* ServerTcpIp::getHostIp()
     in_addr addr;
     char* p=phost->h_addr_list[0];
     memcpy(&addr.s_addr,p,phost->h_length);
-    memset(hostip,0,sizeof(char)*20);
+    memset(hostip,0,sizeof(char)*200);
     memcpy(hostip,inet_ntoa(addr),strlen(inet_ntoa(addr)));
     return hostip;
 }
