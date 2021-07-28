@@ -198,7 +198,7 @@ void serverHttp(int argc,char** argv)
 	}
 	if(false==server.setlisten())
 		exit(0);
-	printf("server ip is:%s\nthe server is ok\n",server.getHostIp());
+	printf("the server is ok\n");
 	while(1)
 		if(false==server.epollModel(&thing,&num,get,2048,sen,funcTwo))
 			break;
