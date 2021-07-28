@@ -7,7 +7,7 @@
 #include"../hpp/dealask.h"
 #include"../hpp/http.h"
 #include"../hpp/server.h"
-#include"../hpp/sql.h"
+//#include"../hpp/sql.h"
 /********************************
 	author:chenxuan
 	date:2021.7.5
