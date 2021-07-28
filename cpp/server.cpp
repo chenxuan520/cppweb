@@ -290,8 +290,8 @@ char* ServerTcpIp::getHostName()
 }
 char* ServerTcpIp::getHostIp()
 {
-    char name[30]={0};
-    gethostname(name,30);
+    char name[300]={0};
+    gethostname(name,300);
     hostent* phost=gethostbyname(name);
     in_addr addr;
     char* p=phost->h_addr_list[0];
