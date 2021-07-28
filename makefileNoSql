@@ -1,0 +1,18 @@
+all:main init
+
+init:init.o
+	g++ init.o -o init
+init.o:./cpp/init.cpp
+	g++ -c ./cpp/init.cpp -o init.o
+main:main.o server.o http.o dealask.o
+	g++ main.o server.o http.o dealask.o -o main
+main.o:./cpp/main.cpp 
+	g++ -c ./cpp/main.cpp -o main.o
+server.o:./cpp/server.cpp
+	g++ -c ./cpp/server.cpp -o server.o
+http.o:./cpp/http.cpp
+	g++ -c ./cpp/http.cpp -o http.o
+dealask.o:./cpp/dealask.cpp
+	g++ -c ./cpp/dealask.cpp -o dealask.o
+clean:
+	rm -f *.o 

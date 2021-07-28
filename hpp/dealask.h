@@ -2,7 +2,7 @@
 #define _DEALASK_H_
 #include"./http.h"
 #include"./server.h"
-#include"./sql.h"
+//#include"./sql.h"
 class DealAsk{
 public:
     bool dealGetAsk(ServerTcpIp&,DealHttp&,void*,void*);
