@@ -3,7 +3,7 @@
 	date:2021.7.5
 	funtion:this is main cpp for static web
 *********************************/
-#include"../hpp/sql.h"
+//#include"../hpp/sql.h"
 #include"../hpp/server.h"
 #include"../hpp/http.h"
 #include"../hpp/dealask.h"
