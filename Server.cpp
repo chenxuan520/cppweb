@@ -13,6 +13,11 @@
 #include<pthread.h>
 #include<queue>
 using namespace std;
+/********************************
+	author:chenxuan
+	date:2021.8.1
+	funtion:this file is all class and zhushi
+*********************************/
 class ServerTcpIp{
 private:
 	int sizeAddr;//sizeof(sockaddr_in) connect with addr_in;
@@ -27,7 +32,7 @@ private:
 	int* psockClients;//client[];
 	int sockC;//file descriptor to sign every client;
 	epoll_event nowEvent;//a temp event to get event
-    epoll_event* pevent;//all the event
+	epoll_event* pevent;//all the event
 	sockaddr_in addr;//IPv4 of host;
 	sockaddr_in client;//IPv4 of client;
 	fd_set  fdClients;//file descriptor
@@ -35,7 +40,7 @@ protected:
     int* pfdn;//pointer if file descriptor
     int fdNumNow;//num of fd now
     int fdMax;//fd max num
-    bool addFd(int addsoc)
+    bool addFd(int addsoc)//add file des criptor
     {
         bool flag=false;
         for(int i=0;i<fdNumNow;i++)
@@ -43,17 +48,17 @@ protected:
             if(pfdn[i]==0)
             {
                 pfdn[i]=addsoc;
-                flag=true;
+                flag=true;//has free room
                 break;
             }
         }
-        if(flag==false)
+        if(flag==false)//no free room
         {
             if(fdNumNow>=fdMax)
             {
-                pfdn=(int*)realloc(pfdn,sizeof(int)*fdMax+32);
+                pfdn=(int*)realloc(pfdn,sizeof(int)*fdMax+32);//try to realloc
                 if(pfdn==NULL)
-                    exit(0);
+                	return false;
                 fdMax+=10;
             }
             pfdn[fdNumNow]=addsoc;
@@ -61,7 +66,7 @@ protected:
         }
         return true;
     }
-    bool deleteFd(int clisoc)
+    bool deleteFd(int clisoc)//delete
     {
         for(int i=0;i<fdNumNow;i++)
         {
@@ -86,17 +91,17 @@ public:
 		numClient=0;
 		hostip=(char*)malloc(sizeof(char)*200);
 		memset(hostip,0,sizeof(char)*200);
-		hostname=(char*)malloc(sizeof(char)*30);
-		memset(hostname,0,sizeof(char)*30);
+		hostname=(char*)malloc(sizeof(char)*300);
+		memset(hostname,0,sizeof(char)*300);
 		FD_ZERO(&fdClients);//clean fdClients;
 		epfd=epoll_create(epollNum);
 		if((pevent=(epoll_event*)malloc(512*sizeof(epoll_event)))==NULL)
-			exit(0);
+			throw NULL;
 		memset(pevent,0,sizeof(epoll_event)*512);
 		memset(&nowEvent,0,sizeof(epoll_event));
         pfdn=(int*)malloc(sizeof(int)*64);
         if(pfdn==NULL)
-            exit(0);
+            throw NULL;
         memset(pfdn,0,sizeof(int)*64);
         fdNumNow=0;
         fdMax=64;
@@ -106,7 +111,7 @@ public:
 		{
 			psockClients=(int*)malloc(sizeof(int)*maxClient);
 			if(psockClients==NULL)
-				exit(0);
+				throw NULL;
 			max=maxClient;
 		}
 	}
@@ -184,7 +189,7 @@ public:
 		}
 	}
 	bool selectModelMysql(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int ,int ,int,void* ,void*,ServerTcpIp& ))
-	{//0 out,1 in,2 say
+	{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
 		fd_set temp=fdClients;
 		int sign=select(0,&temp,NULL,NULL,NULL);
 		if(sign>0)
@@ -404,12 +409,12 @@ private:
 	char ip[100];//server Ip
 	char* hostip;//host ip
 	char* hostname;//host name
-	char selfIp[30];
+	char selfIp[100];
 public:
 	ClientTcpIp(const char* hostIp,unsigned short port)
 	{
 		memset(ip,0,100);
-		memset(selfIp,0,30);
+		memset(selfIp,0,100);
 		hostip=(char*)malloc(sizeof(char)*50);
 		memset(hostip,0,sizeof(char)*50);
 		hostname=(char*)malloc(sizeof(char)*50);
@@ -459,21 +464,21 @@ public:
 	}
 	char* getSelfIp()
 	{
-		char name[30]={0};
-		gethostname(name,30);
+		char name[300]={0};
+		gethostname(name,300);
 		hostent* phost=gethostbyname(name);
 		in_addr addr;
 		char* p=phost->h_addr_list[0];
 		memcpy(&addr.s_addr,p,phost->h_length);
-		memset(selfIp,0,sizeof(char)*30);
+		memset(selfIp,0,sizeof(char)*100);
 		memcpy(selfIp,inet_ntoa(addr),strlen(inet_ntoa(addr)));
 		return selfIp;
 	}
 	char* getHostName(char* hostname)
 	{
-		char name[30]={0};
-		gethostname(name,30);
-		memcpy(hostname,name,30);
+		char name[300]={0};
+		gethostname(name,300);
+		memcpy(hostname,name,strlen(name));
 		return hostname;
 	}
 };
@@ -568,7 +573,7 @@ public:
 				"Content-Length:%d\r\n\r\n",fileLen);
 				break;
 			case 4:
-				*topLen=sprintf(ptop,"HTTP/1.1 404 Not Fount\r\n"
+				*topLen=sprintf(ptop,"HTTP/1.1 404 Not Found\r\n"
 				"Server LCserver/1.1\r\n"
 				"Connection: keep-alive\r\n");
 				break;
@@ -1013,6 +1018,7 @@ int funcTwo(int thing,int num,int,void* pget,void* sen,ServerTcpIp& server)//mai
 	DealHttp http;
 	int len=0;
 	int port=0;
+	int flag=0;
 	if(sen==NULL)
 		return -1;
 	memset(sen,0,sizeof(char)*10000000);
@@ -1033,10 +1039,23 @@ int funcTwo(int thing,int num,int,void* pget,void* sen,ServerTcpIp& server)//mai
 		printf("ask:%s\n",(char*)pget);
 		printf("http:%s\n",http.analysisHttpAsk(pget));
 		strcpy(ask,http.analysisHttpAsk(pget));
-		if(false==http.autoAnalysisGet((char*)pget,(char*)sen,"./rec/index.html",&len))
+		flag=http.autoAnalysisGet((char*)pget,(char*)sen,"./index.html",&len);
+		if(0==flag)
 			printf("some thing wrong %s\n",(char*)sen);
-		else
+		else if(flag==1)
 			printf("create auto success\n");
+        else if(flag==2)
+        {
+            FILE* fp=fopen("wrong.txt","a+");
+            if(fp==NULL)
+                fp=fopen("wrong.txt","w+");
+            if(fp==NULL)
+                return 0;
+            fprintf(fp,"can not open file %s\n",ask);
+            printf("cannot open file %s\n",ask);
+            fclose(fp);
+        }
+		
 		if(false==server.sendSocketAllModel(num,sen,len))
 			printf("send wrong\n");
 		else
@@ -1047,19 +1066,22 @@ int funcTwo(int thing,int num,int,void* pget,void* sen,ServerTcpIp& server)//mai
 void serverHttp()
 {
 	int pid=0;
-	if((pid=fork())!=0)
-	{
-		printf("pid=%d",pid);
-		return;
-	}
-	ServerTcpIp server(100,5201);
+//	if((pid=fork())!=0)
+//	{
+//		printf("pid=%d",pid);
+//		return;
+//	}
+	ServerTcpIp server(5201,100);
 	int thing=0,num=0;
 	char get[2048]={0};
 	char* sen=(char*)malloc(sizeof(char)*10000000);
 	if(sen==NULL)
 		printf("memory wrong\n");
 	if(false==server.bondhost())
-		exit(0);
+	{
+		printf("bound wrong\n");
+		return;
+	}
 	if(false==server.setlisten())
 		exit(0);
 	printf("server ip is:%s\nthe server is ok\n",server.getHostIp());
