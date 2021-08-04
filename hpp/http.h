@@ -17,6 +17,7 @@ private:
 	char ask[256];
 	char* pfind;
 	char* pfile;
+	int lastLen;
 public:
 	DealHttp();
 	~DealHttp();
