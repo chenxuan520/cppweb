@@ -8,6 +8,7 @@ DealHttp::DealHttp()
         ask[i]=0;
     pfind=NULL;
     pfile=NULL;
+    lastLen=0;
 }
 DealHttp::~DealHttp()
 {
@@ -168,12 +169,16 @@ char* DealHttp::findFileMsg(const char* pname,int* plen)
         return NULL;
     fseek(fp,0,SEEK_END);
     flen=ftell(fp);
-    if(pfile!=NULL)
-        free(pfile);
-    pfile=(char*)malloc(sizeof(char)*flen+10);
-    if(pfile==NULL)
-        return NULL;
-    memset(pfile,0,sizeof(char)*flen+10);
+    if(flen>lastLen)
+	{		
+		if(pfile!=NULL)
+			free(pfile);
+		pfile=(char*)malloc(sizeof(char)*flen+10);
+		lastLen=sizeof(char)*flen+10;
+		memset(pfile,0,sizeof(char)*flen+10);
+	}
+	if(pfile==NULL)
+		return NULL;
     fseek(fp,0,SEEK_SET);
     for(i=0;i<flen;i++)
         pfile[i]=fgetc(fp);
