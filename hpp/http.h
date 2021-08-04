@@ -19,6 +19,10 @@ private:
 	char* pfile;
 	int lastLen;
 public:
+	enum FileKind{
+		UNKNOWN=0,HTML=1,EXE=2,IMAGE=3,NOFOUND=4,CSS=5,JS=6,ZIP7=7
+	};
+public:
 	DealHttp();
 	~DealHttp();
 	bool cutLineAsk(char* pask,const char* pcutIn);
@@ -29,8 +33,8 @@ public:
 	}
     int getFileLen(const char* pname);
 	char* findBackString(char* ps,int len,char* word);
-	void createTop(int kind,char* ptop,int* topLen,int fileLen);
-	bool createSendMsg(int kind,char* pask,const char* pfile,int* plong);
+	void createTop(FileKind kind,char* ptop,int* topLen,int fileLen);
+	bool createSendMsg(FileKind kind,char* pask,const char* pfile,int* plong);
 	char* findFileMsg(const char* pname,int* plen);
 	int autoAnalysisGet(const char* pask,char* psend,const char* pfirstFile,int* plen);
 };

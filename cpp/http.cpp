@@ -52,114 +52,82 @@ char* DealHttp::findBackString(char* ps,int len,char* word)
     word[i]=0;
     return word;
 }
-void DealHttp::createTop(int kind,char* ptop,int* topLen,int fileLen)//1:http 2:down 3:pic
+void DealHttp::createTop(FileKind kind,char* ptop,int* topLen,int fileLen)//1:http 2:down 3:pic
 {
-    switch (kind)
-    {
-        case 0:
-            *topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
-            "Server LCserver/1.1\r\n"
-            "Connection: keep-alive\r\n"
-            "Content-Length:%d\r\n\r\n",fileLen);
-            break;
-        case 1:
-            *topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
-            "Server LCserver/1.1\r\n"
-            "Connection: keep-alive\r\n"
-            "Content-Type:text/html\r\n"
-            "Content-Length:%d\r\n\r\n",fileLen);
-            break;
-        case 2:
-            *topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
-            "Server LCserver/1.1\r\n"
-            "Connection: keep-alive\r\n"
-            "Content-Type:application/octet-stream\r\n"
-            "Content-Length:%d\r\n\r\n",fileLen);
-            break;
-        case 3:
-            *topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
-            "Server LCserver/1.1\r\n"
-            "Connection: keep-alive\r\n"
-            "Content-Type:image\r\n"
-            "Content-Length:%d\r\n\r\n",fileLen);
-            break;
-        case 4:
-            *topLen=sprintf(ptop,"HTTP/1.1 404 Not Fount\r\n"
-            "Server LCserver/1.1\r\n"
-            "Connection: keep-alive\r\n");
-            break;
-        case 5:
-            *topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
-            "Server LCserver/1.1\r\n"
-            "Connection: keep-alive\r\n"
-            "Content-Type:text/css\r\n"
-            "Content-Length:%d\r\n\r\n",fileLen);
-            break;
-        case 6:
-            *topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
-            "Server LCserver/1.1\r\n"
-            "Connection: keep-alive\r\n"
-            "Content-Type:text/javascript\r\n"
-            "Content-Length:%d\r\n\r\n",fileLen);
-            break;
-    }
+	switch (kind)
+	{
+		case UNKNOWN:
+			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
+			"Server LCserver/1.1\r\n"
+			"Connection: keep-alive\r\n"
+			"Content-Length:%d\r\n\r\n",fileLen);
+			break;
+		case HTML:
+			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
+			"Server LCserver/1.1\r\n"
+			"Connection: keep-alive\r\n"
+			"Content-Type:text/html\r\n"
+			"Content-Length:%d\r\n\r\n",fileLen);
+			break;
+		case EXE:
+			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
+			"Server LCserver/1.1\r\n"
+			"Connection: keep-alive\r\n"
+			"Content-Type:application/octet-stream\r\n"
+			"Content-Length:%d\r\n\r\n",fileLen);
+			break;
+		case IMAGE:
+			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
+			"Server LCserver/1.1\r\n"
+			"Connection: keep-alive\r\n"
+			"Content-Type:image\r\n"
+			"Content-Length:%d\r\n\r\n",fileLen);
+			break;
+		case NOFOUND:
+			*topLen=sprintf(ptop,"HTTP/1.1 404 Not Found\r\n"
+			"Server LCserver/1.1\r\n"
+			"Connection: keep-alive\r\n");
+			break;
+		case CSS:
+			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
+			"Server LCserver/1.1\r\n"
+			"Connection: keep-alive\r\n"
+			"Content-Type:text/css\r\n"
+			"Content-Length:%d\r\n\r\n",fileLen);
+			break;
+		case JS:
+			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
+			"Server LCserver/1.1\r\n"
+			"Connection: keep-alive\r\n"
+			"Content-Type:text/javascript\r\n"
+			"Content-Length:%d\r\n\r\n",fileLen);
+			break;
+		case ZIP7:
+			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
+			"Server LCserver/1.1\r\n"
+			"Connection: keep-alive\r\n"
+			"Content-Type:application/x-7z-compressed\r\n"
+			"Content-Length:%d\r\n\r\n",fileLen);
+			break;
+	}
 }
-bool DealHttp::createSendMsg(int kind,char* pask,const char* pfile,int* plong)
+bool DealHttp::createSendMsg(FileKind kind,char* pask,const char* pfile,int* plong)
 {
-    int temp=0;
-    int len=0,noUse=0;
-    switch (kind)
-    {
-    case 0:
-        len=this->getFileLen(pfile);
-        if(len==0)
-            return false;
-        this->createTop(0,pask,&temp,len);
-        memcpy(pask+temp,this->findFileMsg(pfile,&noUse),len+3);
-        break;
-    case 1:
-        len=this->getFileLen(pfile);
-        if(len==0)
-            return false;
-        this->createTop(1,pask,&temp,len);
-        memcpy(pask+temp,this->findFileMsg(pfile,&noUse),len+3);
-        break;
-    case 2:
-        len=this->getFileLen(pfile);
-        if(len==0)
-            return false;
-        this->createTop(2,pask,&temp,len);
-        memcpy(pask+temp,this->findFileMsg(pfile,&noUse),len+3);
-        break;
-    case 3:
-        len=this->getFileLen(pfile);
-        if(len==0)
-            return false;
-        this->createTop(3,pask,&temp,len);
-        memcpy(pask+temp,this->findFileMsg(pfile,&noUse),len+3);
-        break;
-    case 4:
-        this->createTop(4,pask,&temp,len);
-        break;
-    case 5:
-        len=this->getFileLen(pfile);
-        if(len==0)
-            return false;
-        this->createTop(5,pask,&temp,len);
-        memcpy(pask+temp,this->findFileMsg(pfile,&noUse),len+3);
-        break;
-    case 6:
-        len=this->getFileLen(pfile);
-        if(len==0)
-            return false;
-        this->createTop(6,pask,&temp,len);
-        memcpy(pask+temp,this->findFileMsg(pfile,&noUse),len+3);
-        break;
-    default:
-        break;
-    }
-    *plong=len+temp+10;
-    return true;
+	int temp=0;
+	int len=0,noUse=0;
+	if(kind==NOFOUND)
+	{
+		this->createTop(kind,pask,&temp,len);
+		*plong=len+temp+10;
+		return true;
+	}
+	len=this->getFileLen(pfile);
+	if(len==0)
+		return false;
+	this->createTop(kind,pask,&temp,len);
+	memcpy(pask+temp,this->findFileMsg(pfile,&noUse),len+3);
+	*plong=len+temp+10;
+	return true;
 }
 char* DealHttp::findFileMsg(const char* pname,int* plen)
 {
@@ -202,59 +170,59 @@ int DealHttp::autoAnalysisGet(const char* pask,char* psend,const char* pfirstFil
 {
     if(NULL==this->analysisHttpAsk((void*)pask))
         return 0;
-    if(strcmp(ask,"HTTP/1.1")==0)
+    if(strcmp(ask,"HTTP/1.1")==0||strcmp(ask,"HTTP/1.0")==0)
     {
-        if(false==this->createSendMsg(1,psend,pfirstFile,plen))
+        if(false==this->createSendMsg(HTML,psend,pfirstFile,plen))
         {
-            if(false==this->createSendMsg(4,psend,pfirstFile,plen))
+            if(false==this->createSendMsg(NOFOUND,psend,pfirstFile,plen))
                 return 0;
-            else 
+            else  
                 return 2;
         }
     }
     else if(strstr(ask,".html"))
     {
-        if(false==this->createSendMsg(1,psend,ask,plen))
-            if(false==this->createSendMsg(4,psend,ask,plen))
+        if(false==this->createSendMsg(HTML,psend,ask,plen))
+            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
                 return 0;
             else 
                 return 2;
     }
     else if(strstr(ask,".exe"))
     {
-        if(false==this->createSendMsg(2,psend,ask,plen))
-            if(false==this->createSendMsg(4,psend,ask,plen))
+        if(false==this->createSendMsg(EXE,psend,ask,plen))
+            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
                 return 0;
             else 
                 return 2;
     }
-    else if(strstr(ask,".PNG")||strstr(ask,".jpg"))
+    else if(strstr(ask,".png")||strstr(ask,".PNG")||strstr(ask,".jpg")||strstr(ask,".jpeg"))
     {
-        if(false==this->createSendMsg(3,psend,ask,plen))
-            if(false==this->createSendMsg(4,psend,ask,plen))
+        if(false==this->createSendMsg(IMAGE,psend,ask,plen))
+            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
                 return 0;
             else 
                 return 2;
     }
     else if(strstr(ask,".css"))
     {
-        if(false==this->createSendMsg(5,psend,ask,plen))
-            if(false==this->createSendMsg(4,psend,ask,plen))
+        if(false==this->createSendMsg(CSS,psend,ask,plen))
+            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
                 return 0;
             else 
                 return 2;
     }
     else if(strstr(ask,".js"))
     {
-        if(false==this->createSendMsg(6,psend,ask,plen))
-            if(false==this->createSendMsg(4,psend,ask,plen))
+        if(false==this->createSendMsg(JS,psend,ask,plen))
+            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
                 return 0;
             else 
                 return 2;
     }
     else 
-        if(false==this->createSendMsg(0,psend,ask,plen))
-            if(false==this->createSendMsg(4,psend,ask,plen))
+        if(false==this->createSendMsg(UNKNOWN,psend,ask,plen))
+            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
                 return 0;
             else 
                 return 2;
