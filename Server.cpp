@@ -22,14 +22,12 @@ class ServerTcpIp{
 private:
 	int sizeAddr;//sizeof(sockaddr_in) connect with addr_in;
 	int backwait;//the most waiting clients ;
-	int numClient;//how many clients now; 
-	int max;//the most clients;
+	int numClient;//how many clients now;
 	int fd_count;//sum of clients in fd_set
 	int epfd;//file descriptor to ctrl epoll
 	char* hostip;//host IP 
 	char* hostname;//host name
 	int sock;//file descriptor of host;
-	int* psockClients;//client[];
 	int sockC;//file descriptor to sign every client;
 	epoll_event nowEvent;//a temp event to get event
 	epoll_event* pevent;//all the event
@@ -79,7 +77,7 @@ protected:
         return false;
     }
 public:
-	ServerTcpIp(unsigned short port=5200,int epollNum=0,int wait=5,int maxClient=0)
+	ServerTcpIp(unsigned short port=5200,int epollNum=0,int wait=5)
 	{
 		sock=socket(AF_INET,SOCK_STREAM,0);//AF=addr family internet
 		addr.sin_addr.s_addr=htonl(INADDR_ANY);//inaddr_any
@@ -105,20 +103,9 @@ public:
         memset(pfdn,0,sizeof(int)*64);
         fdNumNow=0;
         fdMax=64;
-		if(maxClient<=0||maxClient>100)
-			psockClients=NULL;
-		else 
-		{
-			psockClients=(int*)malloc(sizeof(int)*maxClient);
-			if(psockClients==NULL)
-				throw NULL;
-			max=maxClient;
-		}
 	}
 	~ServerTcpIp()//clean server
 	{
-		if(psockClients!=NULL)
-			free(psockClients);
 		close(sock);
 		close(sockC);
 		close(epfd);
@@ -149,44 +136,39 @@ public:
 		sockC=accept(sock,(sockaddr*)&client,(socklen_t*)&sizeAddr);
 		return true;
 	}
-	bool acceptClientsModelTwo(int cliNum)//model two
+	bool acceptClientsModelAll(int* pcliNum)//model two
 	{
-		if(cliNum<max)
-		{
-			psockClients[cliNum]=accept(sock,(sockaddr*)&client,(socklen_t*)&sizeAddr);
-			numClient++;
-		}	
-		else
-			return false;
-		return true;
+		*pcliNum=accept(sock,(sockaddr*)&client,(socklen_t*)&sizeAddr);
+		return this->addFd(*pcliNum);
 	}
 	inline int receiveMystl(void* pget,int len)//model one
 	{
 		return recv(sockC,(char*)pget,len,0);
 	}
-	int receiveSMystlModelTwo(void* prec,int cliNum,int len)//model two
+	int receiveAllModel(int clisoc,void* pget,int len)
 	{
-		int temp=recv(psockClients[cliNum],(char*)prec,len,0);
-		if(temp==-1)
-			psockClients[cliNum]=0;
-		return temp;
+		return recv(clisoc,(char*)pget,len,0);
 	}
 	inline int sendClientMystl(const void* ps,int len)//model one
 	{
 		return send(sockC,(char*)ps,len,0);
 	}
-	inline int sendClientSMystlModelTwo(const void* ps,int cliNum,int len)//model two
+	void sendEverySocket(void* ps,int len)
+    {
+        for(int i=0;i<fdNumNow;i++)
+            if(pfdn[i]!=0)
+                send(pfdn[i],ps,len,0);
+    }
+	inline int sendSocketAllModel(int socCli,const void* ps,int len)
 	{
-		return send(psockClients[cliNum],(char*)ps,len,0);
+		return send(socCli,(char*)ps,len,0);
 	}
-	void sendClientsEveryoneMystlTwo(const void* ps,int len)//model two
+	int sendSocketMystlSelect(int toClient,const void* ps,int len)
 	{
-		for(int i=0;i<numClient;i++)
-		{ 
-			if(psockClients[i]==0)
-				continue;
-			send(psockClients[i],(char*)ps,len,0);
-		}
+		for(int i=0;i<fd_count;i++)
+			if(toClient==fdClients.fds_bits[i])
+				return send(fdClients.fds_bits[i],(char*)ps,len,0);
+		return -1;
 	}
 	bool selectModelMysql(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int ,int ,int,void* ,void*,ServerTcpIp& ))
 	{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
@@ -289,23 +271,6 @@ public:
 			p[i]=pfdn[i];
 		return true;
 	}
-	int sendSocketMystlSelect(int toClient,const void* ps,int len)
-	{
-		for(int i=0;i<fd_count;i++)
-			if(toClient==fdClients.fds_bits[i])
-				return send(fdClients.fds_bits[i],(char*)ps,len,0);
-		return -1;
-	}
-    void sendEverySocket(void* ps,int len)
-    {
-        for(int i=0;i<fdNumNow;i++)
-            if(pfdn[i]!=0)
-                send(pfdn[i],ps,len,0);
-    }
-	inline int sendSocketAllModel(int socCli,const void* ps,int len)
-	{
-		return send(socCli,(char*)ps,len,0);
-	}
 	int findSocketSelsct(int i)
 	{
 		if(fdClients.fds_bits[i]!=0)
@@ -340,6 +305,15 @@ public:
 		memset(hostip,0,sizeof(char)*200);
 		memcpy(hostip,inet_ntoa(addr),strlen(inet_ntoa(addr)));
 		return hostip;
+	}
+	char* getPeerIp(int cliSoc,int* pcliPort)
+	{
+		sockaddr_in cliAddr={0};
+		int len=sizeof(cliAddr);
+		if(-1==getpeername(cliSoc,(sockaddr*)&cliAddr,(socklen_t*)&len))
+			return NULL;
+		*pcliPort=cliAddr.sin_port;
+		return inet_ntoa(cliAddr.sin_addr); 
 	}
 	bool epollModel(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int ,int ,int ,void* ,void*,ServerTcpIp& ))
 	{
@@ -386,15 +360,6 @@ public:
 			}
 		}
 		return true;
-	}
-	char* getPeerIp(int cliSoc,int* pcliPort)
-	{
-		sockaddr_in cliAddr={0};
-		int len=sizeof(cliAddr);
-		if(-1==getpeername(cliSoc,(sockaddr*)&cliAddr,(socklen_t*)&len))
-			return NULL;
-		*pcliPort=cliAddr.sin_port;
-		return inet_ntoa(cliAddr.sin_addr); 
 	}
 	bool disconnectSocketEpoll(int clisock)
     {
@@ -969,6 +934,398 @@ public:
 	inline void mutexUnlock()//user to lock ctrl
 	{
 		pthread_mutex_unlock(&this->lockTask);
+	}
+};
+class ServerTcpIpThreadPool{
+private:
+	int sizeAddr;//sizeof(sockaddr_in) connect with addr_in;
+	int backwait;//the most waiting clients ;
+	int numClient;//how many clients now; 
+	int fd_count;//sum of clients in fd_set
+	int epfd;//file descriptor to ctrl epoll
+	char* hostip;//host IP 
+	char* hostname;//host name
+	int sock;//file descriptor of host;
+	int sockC;//file descriptor to sign every client;
+	epoll_event nowEvent;//a temp event to get event
+	epoll_event* pevent;//all the event
+	sockaddr_in addr;//IPv4 of host;
+	sockaddr_in client;//IPv4 of client;
+	fd_set  fdClients;//file descriptor
+	ThreadPool* pool;
+	pthread_mutex_t mutex;
+protected:
+    int* pfdn;//pointer if file descriptor
+    int fdNumNow;//num of fd now
+    int fdMax;//fd max num
+    bool addFd(int addsoc)//add file des criptor
+    {
+        bool flag=false;
+        for(int i=0;i<fdNumNow;i++)
+        {
+            if(pfdn[i]==0)
+            {
+                pfdn[i]=addsoc;
+                flag=true;//has free room
+                break;
+            }
+        }
+        if(flag==false)//no free room
+        {
+            if(fdNumNow>=fdMax)
+            {
+                pfdn=(int*)realloc(pfdn,sizeof(int)*fdMax+32);//try to realloc
+                if(pfdn==NULL)
+                	return false;
+                fdMax+=10;
+            }
+            pfdn[fdNumNow]=addsoc;
+            fdNumNow++;
+        }
+        return true;
+    }
+    bool deleteFd(int clisoc)//delete
+    {
+        for(int i=0;i<fdNumNow;i++)
+        {
+            if(pfdn[i]==clisoc)
+            {
+                pfdn[i]=0;
+                return true;
+            }
+        }
+        return false;
+    }
+public:
+	struct ArgvSer{
+		ServerTcpIpThreadPool& server;
+		int soc;
+		void* pneed;
+	};
+public:
+	ServerTcpIpThreadPool(unsigned short port=5200,int epollNum=0,int wait=5,unsigned int threadNum=0)
+	{
+		sock=socket(AF_INET,SOCK_STREAM,0);//AF=addr family internet
+		addr.sin_addr.s_addr=htonl(INADDR_ANY);//inaddr_any
+		addr.sin_family=AF_INET;//af_intt IPv4
+		addr.sin_port=htons(port);//host to net short
+		fd_count=0;// select model
+		sizeAddr=sizeof(sockaddr);
+		backwait=wait;
+		numClient=0;
+		hostip=(char*)malloc(sizeof(char)*200);
+		memset(hostip,0,sizeof(char)*200);
+		hostname=(char*)malloc(sizeof(char)*300);
+		memset(hostname,0,sizeof(char)*300);
+		FD_ZERO(&fdClients);//clean fdClients;
+		epfd=epoll_create(epollNum);
+		if((pevent=(epoll_event*)malloc(512*sizeof(epoll_event)))==NULL)
+			throw NULL;
+		memset(pevent,0,sizeof(epoll_event)*512);
+		memset(&nowEvent,0,sizeof(epoll_event));
+        pfdn=(int*)malloc(sizeof(int)*64);
+        if(pfdn==NULL)
+            throw NULL;
+        memset(pfdn,0,sizeof(int)*64);
+        fdNumNow=0;
+        fdMax=64;
+		if(threadNum>0)
+		{	
+			pool=new ThreadPool(threadNum);
+			if(pool==NULL)
+				throw NULL;
+		}
+		pthread_mutex_init(&mutex,NULL);
+	}
+	~ServerTcpIpThreadPool()//clean server
+	{
+		close(sock);
+		close(sockC);
+		close(epfd);
+		free(hostip);
+		free(hostname);
+		free(pevent);
+        free(pfdn);
+        free(pool);
+        pthread_mutex_destroy(&mutex);
+	}
+	void mutexLock()
+	{
+		pthread_mutex_lock(&mutex);
+	}
+	void mutexUnlock()
+	{
+		pthread_mutex_unlock(&mutex);
+	}
+	bool bondhost()//bond myself first
+	{
+		if(bind(sock,(sockaddr*)&addr,sizeof(addr))==-1)
+			return false;
+		return true;
+	}
+	bool setlisten()//set listem to accept second
+	{
+		if(listen(sock,backwait)==-1)
+			return false;
+		FD_SET(sock,&fdClients);
+		nowEvent.events=EPOLLIN;
+		nowEvent.data.fd=sock;
+		epoll_ctl(epfd,EPOLL_CTL_ADD,sock,&nowEvent);
+		fd_count++;
+		return true;
+	}
+	bool acceptClient()//wait until success model one
+	{
+		sockC=accept(sock,(sockaddr*)&client,(socklen_t*)&sizeAddr);
+		return true;
+	}
+	bool acceptClientsModelAll(int* pcliSoc)//model two
+	{
+		*pcliSoc=accept(sock,(sockaddr*)&client,(socklen_t*)&sizeAddr);
+		return this->addFd(*pcliSoc);
+	}
+	inline int receiveMystl(void* pget,int len)//model one
+	{
+		return recv(sockC,(char*)pget,len,0);
+	}
+	inline int receiveMysqlAllModel(int clisoc,void* pget,int len)
+	{
+		return recv(clisoc,(char*)pget,len,0);
+	}
+	inline int sendClientMystl(const void* ps,int len)//model one
+	{
+		return send(sockC,(char*)ps,len,0);
+	}
+	bool selectModelMysql(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int ,int ,int,void* ,void*,ServerTcpIpThreadPool& ))
+	{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
+		fd_set temp=fdClients;
+		int sign=select(0,&temp,NULL,NULL,NULL);
+		if(sign>0)
+		{
+			for(int i=0;i<(int)fd_count;i++)
+			{
+				if(FD_ISSET(fdClients.fds_bits[i],&temp))
+				{
+					if(fdClients.fds_bits[i]==sock)
+					{
+						if(fd_count<FD_SETSIZE)
+						{
+							sockaddr_in newaddr={0};
+							int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
+							FD_SET(newClient,&fdClients);
+							this->addFd(newClient);
+							fd_count++;
+							for(int j=0;j<(int)fd_count;j++)
+							{
+								if(newClient==fdClients.fds_bits[j])
+								{
+									*pnum=j;
+									break;
+								}
+							}
+							*pthing=1;
+							strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
+							if(pfunc!=NULL)
+							{
+								if(pfunc(*pthing,*pnum,0,pget,pneed,*this))
+									return false;
+							}
+						}
+						else
+							continue;
+					}
+					else
+					{
+						int sRec=recv(fdClients.fds_bits[i],(char*)pget,len,0);
+						*pnum=i;
+						if(sRec>0)
+						{
+							*pthing=2;
+						}
+						if(sRec<=0)
+						{
+							close(fdClients.fds_bits[i]);
+							this->deleteFd(fdClients.fds_bits[i]);
+							FD_CLR(fdClients.fds_bits[i],&fdClients);
+							fd_count--;
+							*(char*) pget=0;
+							*pthing=0;
+						}
+						if(pfunc!=NULL)
+						{
+							if(pfunc(*pthing,*pnum,sRec,pget,pneed,*this))
+								return false;
+						}
+					}
+				}
+			}
+		}
+		else
+			return false;
+		return true;
+	}
+	inline int selectSendMystl(const void* ps,int cliNum,int len)//select model yo send
+	{
+		return send(fdClients.fds_bits[cliNum],(char*)ps,len,0);
+	}
+	void selectSendEveryoneMystl(void* ps,int len)//select model to send everyone
+	{
+		for(int i=0;i<fd_count;i++)
+		{ 
+			int clientSent=fdClients.fds_bits[i];
+			if(clientSent!=0)
+				send(fdClients.fds_bits[i],(char*)ps,len,0);
+		}
+	}
+	bool updateSocketSelect(int* p,int* pcount)//get select array
+	{
+		if(fd_count!=0)
+			*pcount=fd_count;
+		else
+			return false;
+		for(int i=0;i<fd_count;i++)
+			p[i]=fdClients.fds_bits[i];
+		return true;
+	}
+	bool updateSocketEpoll(int* p,int* pcount)//get epoll array
+	{
+		if(fdNumNow!=0)
+			*pcount=fdNumNow;
+		else
+			return false;
+		for(int i=0;i<fdNumNow;i++)
+			p[i]=pfdn[i];
+		return true;
+	}
+	int sendSocketMystlSelect(int toClient,const void* ps,int len)
+	{
+		for(int i=0;i<fd_count;i++)
+			if(toClient==fdClients.fds_bits[i])
+				return send(fdClients.fds_bits[i],(char*)ps,len,0);
+		return -1;
+	}
+    void sendEverySocket(void* ps,int len)
+    {
+        for(int i=0;i<fdNumNow;i++)
+            if(pfdn[i]!=0)
+                send(pfdn[i],ps,len,0);
+    }
+	inline int sendSocketAllModel(int socCli,const void* ps,int len)
+	{
+		return send(socCli,(char*)ps,len,0);
+	}
+	int findSocketSelsct(int i)
+	{
+		if(fdClients.fds_bits[i]!=0)
+			return fdClients.fds_bits[i];
+		else
+			return -1;
+	}
+	bool findSocketEpoll(int cliSoc)
+	{
+		for(int i=0;i<fdNumNow;i++)
+		{
+			if(pfdn[i]==cliSoc)
+				return true;
+		}
+		return false;
+	}
+	char* getHostName()
+	{
+		char name[30]={0};
+		gethostname(name,30);
+		memcpy(hostname,name,30);
+		return hostname;
+	}
+	char* getHostIp()
+	{
+		char name[300]={0};
+		gethostname(name,300);
+		hostent* phost=gethostbyname(name);
+		in_addr addr;
+		char* p=phost->h_addr_list[0];
+		memcpy(&addr.s_addr,p,phost->h_length);
+		memset(hostip,0,sizeof(char)*200);
+		memcpy(hostip,inet_ntoa(addr),strlen(inet_ntoa(addr)));
+		return hostip;
+	}
+	bool epollModel(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int ,int ,int ,void* ,void*,ServerTcpIpThreadPool& ))
+	{
+		int eventNum=epoll_wait(epfd,pevent,512,-1);
+		for(int i=0;i<eventNum;i++)
+		{
+			epoll_event temp=pevent[i];
+			if(temp.data.fd==sock)
+			{
+				sockaddr_in newaddr={0};
+				int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
+                this->addFd(newClient);
+				nowEvent.data.fd=newClient;
+				nowEvent.events=EPOLLIN;
+				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
+				*pthing=1;
+				*pnum=newClient;
+				strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
+				if(pfunc!=NULL)
+				{
+					if(pfunc(*pthing,*pnum,0,pget,pneed,*this))
+						return false;
+				}
+			}
+			else
+			{
+				int getNum=recv(temp.data.fd,(char*)pget,len,0);
+				*pnum=temp.data.fd;
+				if(getNum>0)
+					*pthing=2;
+				else
+				{
+					*(char*)pget=0;
+					*pthing=0;
+                    this->deleteFd(temp.data.fd);
+					epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
+					close(temp.data.fd);
+				}
+				if(pfunc!=NULL)
+				{
+					if(pfunc(*pthing,*pnum,getNum,pget,pneed,*this))
+						return false;
+				}
+			}
+		}
+		return true;
+	}
+	char* getPeerIp(int cliSoc,int* pcliPort)
+	{
+		sockaddr_in cliAddr={0};
+		int len=sizeof(cliAddr);
+		if(-1==getpeername(cliSoc,(sockaddr*)&cliAddr,(socklen_t*)&len))
+			return NULL;
+		*pcliPort=cliAddr.sin_port;
+		return inet_ntoa(cliAddr.sin_addr); 
+	}
+	bool disconnectSocketEpoll(int clisock)
+    {
+        close(clisock);
+        return this->deleteFd(clisock);
+    }
+    void threadModel(void* pneed,void* (*pfunc)(void*))
+    {
+    	while(1)
+    	{
+			sockaddr_in newaddr={0};
+			int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
+			if(newClient==-1)
+				continue;
+			this->addFd(newClient);
+			ServerTcpIpThreadPool::ArgvSer argv{*this,newClient,pneed};
+			ThreadPool::Task task={pfunc,&argv};
+			pool->addTask(task);
+		}
+	}
+	inline bool threadDeleteSoc(int clisoc)
+	{
+		return this->deleteFd(clisoc);
 	}
 };
 struct CliMsg{ 
