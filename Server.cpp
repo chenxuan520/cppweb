@@ -170,7 +170,7 @@ public:
 				return send(fdClients.fds_bits[i],(char*)ps,len,0);
 		return -1;
 	}
-	bool selectModelMysql(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int ,int ,int,void* ,void*,ServerTcpIp& ))
+	bool selectModelMystl(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int ,int ,int,void* ,void*,ServerTcpIp& ))
 	{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
 		fd_set temp=fdClients;
 		int sign=select(0,&temp,NULL,NULL,NULL);
@@ -1057,6 +1057,13 @@ public:
 	{
 		pthread_mutex_unlock(&mutex);
 	}
+	bool mutexTryLock()
+	{
+		if(0==pthread_mutex_trylock(&mutex))
+			return true;
+		else
+			return false;
+	}
 	bool bondhost()//bond myself first
 	{
 		if(bind(sock,(sockaddr*)&addr,sizeof(addr))==-1)
@@ -1096,7 +1103,7 @@ public:
 	{
 		return send(sockC,(char*)ps,len,0);
 	}
-	bool selectModelMysql(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int ,int ,int,void* ,void*,ServerTcpIpThreadPool& ))
+	bool selectModelMystl(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int ,int ,int,void* ,void*,ServerTcpIpThreadPool& ))
 	{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
 		fd_set temp=fdClients;
 		int sign=select(0,&temp,NULL,NULL,NULL);
@@ -1325,6 +1332,7 @@ public:
 	}
 	inline bool threadDeleteSoc(int clisoc)
 	{
+		close(clisoc);
 		return this->deleteFd(clisoc);
 	}
 };
