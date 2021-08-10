@@ -271,14 +271,14 @@ public:
 			p[i]=pfdn[i];
 		return true;
 	}
-	int findSocketSelsct(int i)
+	int findSocketSelsct(int i)//find the socket of select
 	{
 		if(fdClients.fds_bits[i]!=0)
 			return fdClients.fds_bits[i];
 		else
 			return -1;
 	}
-	bool findSocketEpoll(int cliSoc)
+	bool findSocketEpoll(int cliSoc)//find if socket is connect
 	{
 		for(int i=0;i<fdNumNow;i++)
 		{
@@ -287,14 +287,14 @@ public:
 		}
 		return false;
 	}
-	char* getHostName()
+	char* getHostName()//get self name
 	{
 		char name[300]={0};
 		gethostname(name,300);
 		memcpy(hostname,name,300);
 		return hostname;
 	}
-	char* getHostIp()
+	char* getHostIp()//get self ip
 	{
 		char name[300]={0};
 		gethostname(name,300);
@@ -306,7 +306,7 @@ public:
 		memcpy(hostip,inet_ntoa(addr),strlen(inet_ntoa(addr)));
 		return hostip;
 	}
-	char* getPeerIp(int cliSoc,int* pcliPort)
+	char* getPeerIp(int cliSoc,int* pcliPort)//get ip and port by socket
 	{
 		sockaddr_in cliAddr={0};
 		int len=sizeof(cliAddr);
@@ -316,7 +316,7 @@ public:
 		return inet_ntoa(cliAddr.sin_addr); 
 	}
 	bool epollModel(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int ,int ,int ,void* ,void*,ServerTcpIp& ))
-	{
+	{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
 		int eventNum=epoll_wait(epfd,pevent,512,-1);
 		for(int i=0;i<eventNum;i++)
 		{
@@ -361,12 +361,17 @@ public:
 		}
 		return true;
 	}
-	bool disconnectSocketEpoll(int clisock)
+	bool disconnectSocketEpoll(int clisock)//disconnect from socket
     {
         close(clisock);
         return this->deleteFd(clisock);
     }
 };
+/********************************
+	author:chenxuan
+	date:2021/8/10
+	funtion:class for client linux
+*********************************/
 class ClientTcpIp{
 private:
 	int sock;//myself
@@ -439,7 +444,7 @@ public:
 		memcpy(selfIp,inet_ntoa(addr),strlen(inet_ntoa(addr)));
 		return selfIp;
 	}
-	char* getHostName(char* hostname)
+	char* getSelfName(char* hostname)
 	{
 		char name[300]={0};
 		gethostname(name,300);
@@ -447,6 +452,11 @@ public:
 		return hostname;
 	}
 };
+/********************************
+	author:chenxuan
+	date:2021/8/10
+	funtion:class to deal easy http ask(get)
+*********************************/
 class DealHttp{
 private:
 	char ask[256];
@@ -690,6 +700,11 @@ public:
 	    return 1;
 	}
 };
+/********************************
+	author:chenxuan
+	date:2021/8/10
+	funtion:class for deal Mysql ask
+*********************************/
 class MySql{
 private:
     MYSQL* mysql;
@@ -750,6 +765,11 @@ public:
         return mysql_fetch_row(results);
     }
 };
+/********************************
+	author:chenxuan
+	date:2021/8/10
+	funtion:class to deal ddos
+*********************************/
 class DealAttack{
 public:
 	struct CliLog{
@@ -797,6 +817,11 @@ public:
 		return true;
 	}
 };
+/********************************
+	author:chenxuan
+	date:2021/8/10
+	funtion:class thread pool
+*********************************/
 class ThreadPool{
 public://a struct for you to add task
 	struct Task{
@@ -936,6 +961,11 @@ public:
 		pthread_mutex_unlock(&this->lockTask);
 	}
 };
+/********************************
+	author:chenxuan
+	date:2021/8/10
+	funtion:connect servertcpip and thread pool
+*********************************/
 class ServerTcpIpThreadPool{
 private:
 	int sizeAddr;//sizeof(sockaddr_in) connect with addr_in;
