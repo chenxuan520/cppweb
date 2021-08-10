@@ -147,13 +147,13 @@ public:
 			return false;
 		return true;
 	}
-	bool receiveMystl(void* pget,int len)//model one
+	bool receiveOne(void* pget,int len)//model one
 	{
 		if(recv(sockC,(char*)pget,len,0)==SOCKET_ERROR)
 			return false;
 		return true;
 	}
-	bool receiveSMystlTwo(void* prec,int i,int len)//model two
+	bool receiveSTwo(void* prec,int i,int len)//model two
 	{
 		if(recv(psockClients[i],(char*)prec,len,0)==SOCKET_ERROR)
 		{
@@ -162,19 +162,19 @@ public:
 		}
 		return true;
 	}
-	bool sendClientMystl(const void* ps,int len)//model one
+	bool sendClient(const void* ps,int len)//model one
 	{
 		if(send(sockC,(char*)ps,len,0)==SOCKET_ERROR)
 			return false;
 		return true;
 	}
-	bool sendClientSMystlTwo(const void* ps,int i,int len)//model two
+	bool sendClientSTwo(const void* ps,int i,int len)//model two
 	{
 		if(send(psockClients[i],(char*)ps,len,0)==SOCKET_ERROR)
 			return false;
 		return true;
 	}
-	bool sendClientsEveryoneMystlTwo(const void* ps,int len)//model two
+	bool sendClientsEveryoneTwo(const void* ps,int len)//model two
 	{
 		for(int i=0;i<numClient;i++)
 		{ 
@@ -184,7 +184,7 @@ public:
 		}
 		return true;
 	}
-	bool selectModelMysql(int* pthing,int* pnum,void* pget,void* pneed,int len,int (*pfunc)(int ,int ,void* ,void*,ServerTcpIp& ))
+	bool selectModel(int* pthing,int* pnum,void* pget,void* pneed,int len,int (*pfunc)(int ,int ,void* ,void*,ServerTcpIp& ))
 	{//0 out,1 in,2 say
 		fd_set temp=fdClients;
 		int sign=select(0,&temp,NULL,NULL,NULL);
@@ -248,14 +248,14 @@ public:
 			return false;
 		return true;
 	}
-	bool selectSendMystl(const void* ps,int num,int len)
+	bool selectSend(const void* ps,int num,int len)
 	{
 		SOCKET clientSent=fdClients.fd_array[num];
 		if(send(fdClients.fd_array[num],(char*)ps,len,0)==SOCKET_ERROR)
 			return false;
 		return true;
 	}
-	bool selectSendEveryoneMystl(void* ps,int len)
+	bool selectSendEveryone(void* ps,int len)
 	{
 		for(int i=0;i<fdClients.fd_count;i++)
 		{ 
@@ -275,7 +275,7 @@ public:
 			p[i]=fdClients.fd_array[i];
 		return true;
 	}
-	bool sendSocketMystlSelect(SOCKET toClient,const void* ps,int len)
+	bool sendSocketSelect(SOCKET toClient,const void* ps,int len)
 	{
 		for(int i=0;i<fdClients.fd_count;i++)
 		{
@@ -836,7 +836,7 @@ int funcTwo(int thing,int num,void* pget,void* sen,ServerTcpIp& server)
 			printf("some thing wrong %s\n",sen);
 		else
 			printf("create auto success\n");
-		if(false==server.selectSendMystl(sen,num,len))
+		if(false==server.selectSend(sen,num,len))
 			printf("send wrong\n");
 		else
 			printf("send success\n");
@@ -861,7 +861,7 @@ void serverHttp()
 		exit(0);
 	printf("server ip is:%s\nthe server is ok\n",server.getHustIp());
 	while(1)
-		if(false==server.selectModelMysql(&thing,&num,get,sen,2048,funcTwo))
+		if(false==server.selectModel(&thing,&num,get,sen,2048,funcTwo))
 			break;
 	free(sen);
 }

@@ -131,25 +131,25 @@ public:
 		fd_count++;
 		return true;
 	}
-	bool acceptClient()//wait until success model one
+	int acceptClient()//wait until success model one
 	{
 		sockC=accept(sock,(sockaddr*)&client,(socklen_t*)&sizeAddr);
-		return true;
+		return sockC;
 	}
 	bool acceptClientsModelAll(int* pcliNum)//model two
 	{
 		*pcliNum=accept(sock,(sockaddr*)&client,(socklen_t*)&sizeAddr);
 		return this->addFd(*pcliNum);
 	}
-	inline int receiveMystl(void* pget,int len)//model one
+	inline int receiveOne(void* pget,int len)//model one
 	{
 		return recv(sockC,(char*)pget,len,0);
 	}
-	int receiveAllModel(int clisoc,void* pget,int len)
+	inline int receiveAllModel(int clisoc,void* pget,int len)
 	{
 		return recv(clisoc,(char*)pget,len,0);
 	}
-	inline int sendClientMystl(const void* ps,int len)//model one
+	inline int sendClientOne(const void* ps,int len)//model one
 	{
 		return send(sockC,(char*)ps,len,0);
 	}
@@ -163,14 +163,14 @@ public:
 	{
 		return send(socCli,(char*)ps,len,0);
 	}
-	int sendSocketMystlSelect(int toClient,const void* ps,int len)
+	int sendSocketSelect(int toClient,const void* ps,int len)
 	{
 		for(int i=0;i<fd_count;i++)
 			if(toClient==fdClients.fds_bits[i])
 				return send(fdClients.fds_bits[i],(char*)ps,len,0);
 		return -1;
 	}
-	bool selectModelMystl(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int ,int ,int,void* ,void*,ServerTcpIp& ))
+	bool selectModel(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int ,int ,int,void* ,void*,ServerTcpIp& ))
 	{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
 		fd_set temp=fdClients;
 		int sign=select(0,&temp,NULL,NULL,NULL);
@@ -238,11 +238,11 @@ public:
 			return false;
 		return true;
 	}
-	inline int selectSendMystl(const void* ps,int cliNum,int len)//select model yo send
+	inline int selectSend(const void* ps,int cliNum,int len)//select model yo send
 	{
 		return send(fdClients.fds_bits[cliNum],(char*)ps,len,0);
 	}
-	void selectSendEveryoneMystl(void* ps,int len)//select model to send everyone
+	void selectSendEveryone(void* ps,int len)//select model to send everyone
 	{
 		for(int i=0;i<fd_count;i++)
 		{ 
@@ -289,9 +289,9 @@ public:
 	}
 	char* getHostName()
 	{
-		char name[30]={0};
-		gethostname(name,30);
-		memcpy(hostname,name,30);
+		char name[300]={0};
+		gethostname(name,300);
+		memcpy(hostname,name,300);
 		return hostname;
 	}
 	char* getHostIp()
@@ -411,11 +411,11 @@ public:
 			return false;
 		return true;
 	}
-	inline int receiveMystl(void* prec,int len)
+	inline int receiveHost(void* prec,int len)
 	{
 		return recv(sock,(char*)prec,len,0);
 	}
-	int sendHostMystl(const void* ps,int len)
+	int sendHost(const void* ps,int len)
 	{
 		return send(sock,(char*)ps,len,0);
 	}
@@ -1091,19 +1091,19 @@ public:
 		*pcliSoc=accept(sock,(sockaddr*)&client,(socklen_t*)&sizeAddr);
 		return this->addFd(*pcliSoc);
 	}
-	inline int receiveMystl(void* pget,int len)//model one
+	inline int receiveOne(void* pget,int len)//model one
 	{
 		return recv(sockC,(char*)pget,len,0);
 	}
-	inline int receiveMysqlAllModel(int clisoc,void* pget,int len)
+	inline int receiveAllModel(int clisoc,void* pget,int len)
 	{
 		return recv(clisoc,(char*)pget,len,0);
 	}
-	inline int sendClientMystl(const void* ps,int len)//model one
+	inline int sendClientOne(const void* ps,int len)//model one
 	{
 		return send(sockC,(char*)ps,len,0);
 	}
-	bool selectModelMystl(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int ,int ,int,void* ,void*,ServerTcpIpThreadPool& ))
+	bool selectModel(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int ,int ,int,void* ,void*,ServerTcpIpThreadPool& ))
 	{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
 		fd_set temp=fdClients;
 		int sign=select(0,&temp,NULL,NULL,NULL);
@@ -1171,11 +1171,11 @@ public:
 			return false;
 		return true;
 	}
-	inline int selectSendMystl(const void* ps,int cliNum,int len)//select model yo send
+	inline int selectSend(const void* ps,int cliNum,int len)//select model yo send
 	{
 		return send(fdClients.fds_bits[cliNum],(char*)ps,len,0);
 	}
-	void selectSendEveryoneMystl(void* ps,int len)//select model to send everyone
+	void selectSendEveryone(void* ps,int len)//select model to send everyone
 	{
 		for(int i=0;i<fd_count;i++)
 		{ 
@@ -1204,7 +1204,7 @@ public:
 			p[i]=pfdn[i];
 		return true;
 	}
-	int sendSocketMystlSelect(int toClient,const void* ps,int len)
+	int sendSocketSelect(int toClient,const void* ps,int len)
 	{
 		for(int i=0;i<fd_count;i++)
 			if(toClient==fdClients.fds_bits[i])
@@ -1239,9 +1239,9 @@ public:
 	}
 	char* getHostName()
 	{
-		char name[30]={0};
-		gethostname(name,30);
-		memcpy(hostname,name,30);
+		char name[300]={0};
+		gethostname(name,300);
+		memcpy(hostname,name,300);
 		return hostname;
 	}
 	char* getHostIp()
