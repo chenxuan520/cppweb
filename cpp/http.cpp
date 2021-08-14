@@ -267,3 +267,22 @@ bool DealAttack::attackLog(int port,const char* ip,const char* pfileName)//log a
     fclose(fp);
     return true;
 }
+const char* DealHttp::getKeyValue(const void* message,const char* key,char* value)
+{
+	char* temp=strstr((char*)message,key);
+	if(temp==NULL)
+		return NULL;
+	return this->findBackString(temp,strlen(key),value);
+}
+const char* DealHttp::getKeyLine(const void* message,const char* key,char* line)
+{
+	int i=0;
+	char* ptemp=strstr((char*)message,key);
+	ptemp+=strlen(key);
+	if(ptemp==NULL)
+		return NULL;
+	while(*(ptemp++)!='\n')
+		line[i++]=*ptemp;
+	line[i]=0;
+	return line;
+}
