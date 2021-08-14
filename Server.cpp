@@ -149,25 +149,25 @@ public:
 	{
 		return recv(clisoc,(char*)pget,len,0);
 	}
-	inline int sendClientOne(const void* ps,int len)//model one
+	inline int sendClientOne(const void* psen,int len)//model one
 	{
-		return send(sockC,(char*)ps,len,0);
+		return send(sockC,(char*)psen,len,0);
 	}
-	void sendEverySocket(void* ps,int len)
+	void sendEverySocket(void* psen,int len)
     {
         for(int i=0;i<fdNumNow;i++)
             if(pfdn[i]!=0)
-                send(pfdn[i],ps,len,0);
+                send(pfdn[i],psen,len,0);
     }
-	inline int sendSocketAllModel(int socCli,const void* ps,int len)
+	inline int sendSocketAllModel(int socCli,const void* psen,int len)
 	{
-		return send(socCli,(char*)ps,len,0);
+		return send(socCli,(char*)psen,len,0);
 	}
-	int sendSocketSelect(int toClient,const void* ps,int len)
+	int sendSocketSelect(int toClient,const void* psen,int len)
 	{
 		for(int i=0;i<fd_count;i++)
 			if(toClient==fdClients.fds_bits[i])
-				return send(fdClients.fds_bits[i],(char*)ps,len,0);
+				return send(fdClients.fds_bits[i],(char*)psen,len,0);
 		return -1;
 	}
 	bool selectModel(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int ,int ,int,void* ,void*,ServerTcpIp& ))
@@ -238,43 +238,43 @@ public:
 			return false;
 		return true;
 	}
-	inline int selectSend(const void* ps,int cliNum,int len)//select model yo send
+	inline int selectSend(const void* psen,int cliNum,int len)//select model yo send
 	{
-		return send(fdClients.fds_bits[cliNum],(char*)ps,len,0);
+		return send(fdClients.fds_bits[cliNum],(char*)psen,len,0);
 	}
-	void selectSendEveryone(void* ps,int len)//select model to send everyone
+	void selectSendEveryone(void* psen,int len)//select model to send everyone
 	{
 		for(int i=0;i<fd_count;i++)
 		{ 
 			int clientSent=fdClients.fds_bits[i];
 			if(clientSent!=0)
-				send(fdClients.fds_bits[i],(char*)ps,len,0);
+				send(fdClients.fds_bits[i],(char*)psen,len,0);
 		}
 	}
-	bool updateSocketSelect(int* p,int* pcount)//get select array
+	bool updateSocketSelect(int* array,int* pcount)//get select array
 	{
 		if(fd_count!=0)
 			*pcount=fd_count;
 		else
 			return false;
 		for(int i=0;i<fd_count;i++)
-			p[i]=fdClients.fds_bits[i];
+			array[i]=fdClients.fds_bits[i];
 		return true;
 	}
-	bool updateSocketEpoll(int* p,int* pcount)//get epoll array
+	bool updateSocketEpoll(int* array,int* pcount)//get epoll array
 	{
 		if(fdNumNow!=0)
 			*pcount=fdNumNow;
 		else
 			return false;
 		for(int i=0;i<fdNumNow;i++)
-			p[i]=pfdn[i];
+			array[i]=pfdn[i];
 		return true;
 	}
-	int findSocketSelsct(int i)//find the socket of select
+	int findSocketSelsct(int cliSoc)//find the socket of select
 	{
-		if(fdClients.fds_bits[i]!=0)
-			return fdClients.fds_bits[i];
+		if(fdClients.fds_bits[cliSoc]!=0)
+			return fdClients.fds_bits[cliSoc];
 		else
 			return -1;
 	}
@@ -501,10 +501,10 @@ public:
 	{
 		return strstr((char*)pask,ptofind);
 	}
-	char* findBackString(char* ps,int len,char* word)
+	char* findBackString(char* local,int len,char* word)
 	{
 		int i=0;
-		char* ptemp=ps+len+1;
+		char* ptemp=local+len+1;
 		char* pend=NULL;
 		while(1)
 			if((*ptemp>47&&*ptemp<58)||(*ptemp>96&&*ptemp<123)||(*ptemp>64&&*ptemp<91)||*ptemp==95)
@@ -698,6 +698,25 @@ public:
 	            else 
 	                return 2;
 	    return 1;
+	}
+	const char* getKeyValue(const void* message,const char* key,char* value)
+	{
+		char* temp=strstr((char*)message,key);
+		if(temp==NULL)
+			return NULL;
+		return this->findBackString(temp,strlen(key),value);
+	}
+	const char* getKeyLine(const void* message,const char* key,char* line)
+	{
+		int i=0;
+		char* ptemp=strstr((char*)message,key);
+		ptemp+=strlen(key);
+		if(ptemp==NULL)
+			return NULL;
+		while(*(ptemp++)!='\n')
+			line[i++]=*ptemp;
+		line[i]=0;
+		return line;
 	}
 };
 /********************************
@@ -1395,6 +1414,8 @@ int funcTwo(int thing,int num,int,void* pget,void* sen,ServerTcpIp& server)//mai
 		printf("%s in %d\n",(char*)pget,num);
 	if(thing==2)
 	{
+		if(http.getKeyLine(pget,"Accept-Language",ask)!=NULL)
+			printf("\n%s\n",ask);
 		if(false==http.cutLineAsk((char*)pget,"GET"))
 			return 0;
 		printf("ask:%s\n",(char*)pget);

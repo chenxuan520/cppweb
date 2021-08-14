@@ -37,6 +37,8 @@ public:
 	bool createSendMsg(FileKind kind,char* pask,const char* pfile,int* plong);
 	char* findFileMsg(const char* pname,int* plen);
 	int autoAnalysisGet(const char* pask,char* psend,const char* pfirstFile,int* plen);
+	const char* getKeyValue(const void* message,const char* key,char* value);
+	const char* getKeyLine(const void* message,const char* key,char* line);
 };
 class DealAttack{
 public:
