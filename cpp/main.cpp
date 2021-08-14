@@ -38,32 +38,40 @@ int funcTwo(int thing,int num,void* pget,void* sen,ServerTcpIp& server)//main de
 		dealAsk.dealClientIn(server,http,pget,sen,num);
 	if(thing==2)
 	{
-		if(true==dealAsk.dealPostAsk(server,http,pget,sen))
-			return 0;
-		if(false==http.cutLineAsk((char*)pget,"GET"))
-			return 0;
-		printf("ask:%s\n",(char*)pget);
-		printf("http:%s\n",http.analysisHttpAsk(pget));
-		strcpy(ask,http.analysisHttpAsk(pget));
-        if(false==dealAsk.dealGetAsk(server,http,pget,sen))
-        {
-			flag=http.autoAnalysisGet((char*)pget,(char*)sen,indexName,&len);
-			if(0==flag)
-				printf("some thing wrong %s\n",(char*)sen);
-			else if(flag==1)
-				printf("create auto success\n");
-	        else if(flag==2)
-	        {
-                FILE* fp=fopen("wrong.txt","a+");
-                if(fp==NULL)
-                    fp=fopen("wrong.txt","w+");
-                if(fp==NULL)
-                    return 0;
-                fprintf(fp,"can not open file %s\n",ask);
-                printf("cannot open file %s\n",ask);
-                fclose(fp);
-            }
+		if(http.findFirst(pget,"POST")!=NULL)
+		{	
+			if(false==dealAsk.dealPostAsk(server,http,pget,sen,num))
+				return 0;
 		}
+		else if(http.findFirst(pget,"GET")!=NULL)
+		{
+			if(false==http.cutLineAsk((char*)pget,"GET"))
+				return 0;
+			printf("ask:%s\n",(char*)pget);
+			printf("http:%s\n",http.analysisHttpAsk(pget));
+			strcpy(ask,http.analysisHttpAsk(pget));
+	        if(false==dealAsk.dealGetAsk(server,http,pget,sen,num))
+	        {
+				flag=http.autoAnalysisGet((char*)pget,(char*)sen,indexName,&len);
+				if(0==flag)
+					printf("some thing wrong %s\n",(char*)sen);
+				else if(flag==1)
+					printf("create auto success\n");
+		        else if(flag==2)
+		        {
+	                FILE* fp=fopen("wrong.txt","a+");
+	                if(fp==NULL)
+	                    fp=fopen("wrong.txt","w+");
+	                if(fp==NULL)
+	                    return 0;
+	                fprintf(fp,"can not open file %s\n",ask);
+	                printf("cannot open file %s\n",ask);
+	                fclose(fp);
+	            }
+			}
+		}
+		else 
+			return 0;
 		if(false==server.sendSocketAll(num,sen,len))
 			printf("send wrong\n");
 		else

@@ -14,7 +14,7 @@
 	funtion:this function is to deal get you can
 	add hpp and add funtion there
 *********************************/
-bool DealAsk::dealGetAsk(ServerTcpIp& server,DealHttp& http,void* pget,void* sen)
+bool DealAsk::dealGetAsk(ServerTcpIp& server,DealHttp& http,void* pget,void* sen,int soc)
 {
 	return false;
 }
@@ -23,9 +23,9 @@ bool DealAsk::dealGetAsk(ServerTcpIp& server,DealHttp& http,void* pget,void* sen
 	date:2021.7.5
 	funtion:deal post ask there
 *********************************/
-bool DealAsk::dealPostAsk(ServerTcpIp& server,DealHttp& http,void* pget,void* sen)
+bool DealAsk::dealPostAsk(ServerTcpIp& server,DealHttp& http,void* pget,void* sen,int soc)
 {
-	return false;
+	return true;
 }
 void DealAsk::dealClientIn(ServerTcpIp& server,DealHttp& http,void* pget,void* sen,int soc)
 {
