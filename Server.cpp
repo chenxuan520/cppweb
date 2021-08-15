@@ -1,5 +1,6 @@
 #include<iostream>
 #include<cstdlib>
+#include<stdio.h>
 #include<netinet/in.h>
 #include<arpa/inet.h>
 #include<sys/socket.h>
@@ -24,6 +25,7 @@ private:
 	int backwait;//the most waiting clients ;
 	int numClient;//how many clients now;
 	int fd_count;//sum of clients in fd_set
+	int last_count;//last fd_count
 	int epfd;//file descriptor to ctrl epoll
 	char* hostip;//host IP 
 	char* hostname;//host name
@@ -84,6 +86,7 @@ public:
 		addr.sin_family=AF_INET;//af_intt IPv4
 		addr.sin_port=htons(port);//host to net short
 		fd_count=0;// select model
+		last_count=fd_count;
 		sizeAddr=sizeof(sockaddr);
 		backwait=wait;
 		numClient=0;
@@ -128,7 +131,7 @@ public:
 		nowEvent.events=EPOLLIN;
 		nowEvent.data.fd=sock;
 		epoll_ctl(epfd,EPOLL_CTL_ADD,sock,&nowEvent);
-		fd_count++;
+		fd_count=sock;
 		return true;
 	}
 	int acceptClient()//wait until success model one
@@ -136,7 +139,7 @@ public:
 		sockC=accept(sock,(sockaddr*)&client,(socklen_t*)&sizeAddr);
 		return sockC;
 	}
-	bool acceptClientsModelAll(int* pcliNum)//model two
+	bool acceptClients(int* pcliNum)//model two
 	{
 		*pcliNum=accept(sock,(sockaddr*)&client,(socklen_t*)&sizeAddr);
 		return this->addFd(*pcliNum);
@@ -145,7 +148,7 @@ public:
 	{
 		return recv(sockC,(char*)pget,len,0);
 	}
-	inline int receiveAllModel(int clisoc,void* pget,int len)
+	inline int receiveSocket(int clisoc,void* pget,int len)
 	{
 		return recv(clisoc,(char*)pget,len,0);
 	}
@@ -159,44 +162,34 @@ public:
             if(pfdn[i]!=0)
                 send(pfdn[i],psen,len,0);
     }
-	inline int sendSocketAllModel(int socCli,const void* psen,int len)
+	inline int sendSocket(int socCli,const void* psen,int len)
 	{
 		return send(socCli,(char*)psen,len,0);
-	}
-	int sendSocketSelect(int toClient,const void* psen,int len)
-	{
-		for(int i=0;i<fd_count;i++)
-			if(toClient==fdClients.fds_bits[i])
-				return send(fdClients.fds_bits[i],(char*)psen,len,0);
-		return -1;
 	}
 	bool selectModel(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int ,int ,int,void* ,void*,ServerTcpIp& ))
 	{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
 		fd_set temp=fdClients;
-		int sign=select(0,&temp,NULL,NULL,NULL);
+		int sign=select(fd_count+1,&temp,NULL,NULL,NULL);
 		if(sign>0)
 		{
-			for(int i=0;i<(int)fd_count;i++)
+			for(int i=3;i<fd_count+1;i++)
 			{
-				if(FD_ISSET(fdClients.fds_bits[i],&temp))
+				if(FD_ISSET(i,&temp))
 				{
-					if(fdClients.fds_bits[i]==sock)
+					if(i==sock)
 					{
-						if(fd_count<FD_SETSIZE)
+						if(fd_count<1024)
 						{
 							sockaddr_in newaddr={0};
 							int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
 							FD_SET(newClient,&fdClients);
 							this->addFd(newClient);
-							fd_count++;
-							for(int j=0;j<(int)fd_count;j++)
+							if(newClient>fd_count)
 							{
-								if(newClient==fdClients.fds_bits[j])
-								{
-									*pnum=j;
-									break;
-								}
+								last_count=fd_count;
+								fd_count=newClient;
 							}
+							*pnum=newClient;
 							*pthing=1;
 							strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
 							if(pfunc!=NULL)
@@ -210,7 +203,7 @@ public:
 					}
 					else
 					{
-						int sRec=recv(fdClients.fds_bits[i],(char*)pget,len,0);
+						int sRec=recv(i,(char*)pget,len,0);
 						*pnum=i;
 						if(sRec>0)
 						{
@@ -218,10 +211,11 @@ public:
 						}
 						if(sRec<=0)
 						{
-							close(fdClients.fds_bits[i]);
-							this->deleteFd(fdClients.fds_bits[i]);
-							FD_CLR(fdClients.fds_bits[i],&fdClients);
-							fd_count--;
+							close(i);
+							this->deleteFd(i);
+							FD_CLR(i,&fdClients);
+							if(i==fd_count)
+								fd_count=last_count;
 							*(char*) pget=0;
 							*pthing=0;
 						}
@@ -238,30 +232,7 @@ public:
 			return false;
 		return true;
 	}
-	inline int selectSend(const void* psen,int cliNum,int len)//select model yo send
-	{
-		return send(fdClients.fds_bits[cliNum],(char*)psen,len,0);
-	}
-	void selectSendEveryone(void* psen,int len)//select model to send everyone
-	{
-		for(int i=0;i<fd_count;i++)
-		{ 
-			int clientSent=fdClients.fds_bits[i];
-			if(clientSent!=0)
-				send(fdClients.fds_bits[i],(char*)psen,len,0);
-		}
-	}
-	bool updateSocketSelect(int* array,int* pcount)//get select array
-	{
-		if(fd_count!=0)
-			*pcount=fd_count;
-		else
-			return false;
-		for(int i=0;i<fd_count;i++)
-			array[i]=fdClients.fds_bits[i];
-		return true;
-	}
-	bool updateSocketEpoll(int* array,int* pcount)//get epoll array
+	bool updateSocket(int* array,int* pcount)//get epoll array
 	{
 		if(fdNumNow!=0)
 			*pcount=fdNumNow;
@@ -271,14 +242,7 @@ public:
 			array[i]=pfdn[i];
 		return true;
 	}
-	int findSocketSelsct(int cliSoc)//find the socket of select
-	{
-		if(fdClients.fds_bits[cliSoc]!=0)
-			return fdClients.fds_bits[cliSoc];
-		else
-			return -1;
-	}
-	bool findSocketEpoll(int cliSoc)//find if socket is connect
+	bool findSocket(int cliSoc)//find if socket is connect
 	{
 		for(int i=0;i<fdNumNow;i++)
 		{
@@ -361,7 +325,7 @@ public:
 		}
 		return true;
 	}
-	bool disconnectSocketEpoll(int clisock)//disconnect from socket
+	bool disconnectSocket(int clisock)//disconnect from socket
     {
         close(clisock);
         return this->deleteFd(clisock);
@@ -991,6 +955,7 @@ private:
 	int backwait;//the most waiting clients ;
 	int numClient;//how many clients now; 
 	int fd_count;//sum of clients in fd_set
+	int last_count;//last fd_count
 	int epfd;//file descriptor to ctrl epoll
 	char* hostip;//host IP 
 	char* hostname;//host name
@@ -1059,6 +1024,7 @@ public:
 		addr.sin_family=AF_INET;//af_intt IPv4
 		addr.sin_port=htons(port);//host to net short
 		fd_count=0;// select model
+		last_count=fd_count;
 		sizeAddr=sizeof(sockaddr);
 		backwait=wait;
 		numClient=0;
@@ -1135,7 +1101,7 @@ public:
 		sockC=accept(sock,(sockaddr*)&client,(socklen_t*)&sizeAddr);
 		return true;
 	}
-	bool acceptClientsModelAll(int* pcliSoc)//model two
+	bool acceptClients(int* pcliSoc)//model two
 	{
 		*pcliSoc=accept(sock,(sockaddr*)&client,(socklen_t*)&sizeAddr);
 		return this->addFd(*pcliSoc);
@@ -1144,7 +1110,7 @@ public:
 	{
 		return recv(sockC,(char*)pget,len,0);
 	}
-	inline int receiveAllModel(int clisoc,void* pget,int len)
+	inline int receiveSocket(int clisoc,void* pget,int len)
 	{
 		return recv(clisoc,(char*)pget,len,0);
 	}
@@ -1155,30 +1121,27 @@ public:
 	bool selectModel(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int ,int ,int,void* ,void*,ServerTcpIpThreadPool& ))
 	{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
 		fd_set temp=fdClients;
-		int sign=select(0,&temp,NULL,NULL,NULL);
+		int sign=select(fd_count+1,&temp,NULL,NULL,NULL);
 		if(sign>0)
 		{
-			for(int i=0;i<(int)fd_count;i++)
+			for(int i=3;i<fd_count+1;i++)
 			{
-				if(FD_ISSET(fdClients.fds_bits[i],&temp))
+				if(FD_ISSET(i,&temp))
 				{
-					if(fdClients.fds_bits[i]==sock)
+					if(i==sock)
 					{
-						if(fd_count<FD_SETSIZE)
+						if(fd_count<1024)
 						{
 							sockaddr_in newaddr={0};
 							int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
 							FD_SET(newClient,&fdClients);
 							this->addFd(newClient);
-							fd_count++;
-							for(int j=0;j<(int)fd_count;j++)
+							if(newClient>fd_count)
 							{
-								if(newClient==fdClients.fds_bits[j])
-								{
-									*pnum=j;
-									break;
-								}
+								last_count=fd_count;
+								fd_count=newClient;
 							}
+							*pnum=newClient;
 							*pthing=1;
 							strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
 							if(pfunc!=NULL)
@@ -1192,7 +1155,7 @@ public:
 					}
 					else
 					{
-						int sRec=recv(fdClients.fds_bits[i],(char*)pget,len,0);
+						int sRec=recv(i,(char*)pget,len,0);
 						*pnum=i;
 						if(sRec>0)
 						{
@@ -1200,10 +1163,11 @@ public:
 						}
 						if(sRec<=0)
 						{
-							close(fdClients.fds_bits[i]);
-							this->deleteFd(fdClients.fds_bits[i]);
-							FD_CLR(fdClients.fds_bits[i],&fdClients);
-							fd_count--;
+							close(i);
+							this->deleteFd(i);
+							FD_CLR(i,&fdClients);
+							if(i==fd_count)
+								fd_count=last_count;
 							*(char*) pget=0;
 							*pthing=0;
 						}
@@ -1220,30 +1184,7 @@ public:
 			return false;
 		return true;
 	}
-	inline int selectSend(const void* ps,int cliNum,int len)//select model yo send
-	{
-		return send(fdClients.fds_bits[cliNum],(char*)ps,len,0);
-	}
-	void selectSendEveryone(void* ps,int len)//select model to send everyone
-	{
-		for(int i=0;i<fd_count;i++)
-		{ 
-			int clientSent=fdClients.fds_bits[i];
-			if(clientSent!=0)
-				send(fdClients.fds_bits[i],(char*)ps,len,0);
-		}
-	}
-	bool updateSocketSelect(int* p,int* pcount)//get select array
-	{
-		if(fd_count!=0)
-			*pcount=fd_count;
-		else
-			return false;
-		for(int i=0;i<fd_count;i++)
-			p[i]=fdClients.fds_bits[i];
-		return true;
-	}
-	bool updateSocketEpoll(int* p,int* pcount)//get epoll array
+	bool updateSocket(int* p,int* pcount)//get epoll array
 	{
 		if(fdNumNow!=0)
 			*pcount=fdNumNow;
@@ -1253,31 +1194,17 @@ public:
 			p[i]=pfdn[i];
 		return true;
 	}
-	int sendSocketSelect(int toClient,const void* ps,int len)
-	{
-		for(int i=0;i<fd_count;i++)
-			if(toClient==fdClients.fds_bits[i])
-				return send(fdClients.fds_bits[i],(char*)ps,len,0);
-		return -1;
-	}
     void sendEverySocket(void* ps,int len)
     {
         for(int i=0;i<fdNumNow;i++)
             if(pfdn[i]!=0)
                 send(pfdn[i],ps,len,0);
     }
-	inline int sendSocketAllModel(int socCli,const void* ps,int len)
+	inline int sendSocket(int socCli,const void* ps,int len)
 	{
 		return send(socCli,(char*)ps,len,0);
 	}
-	int findSocketSelsct(int i)
-	{
-		if(fdClients.fds_bits[i]!=0)
-			return fdClients.fds_bits[i];
-		else
-			return -1;
-	}
-	bool findSocketEpoll(int cliSoc)
+	bool findSocket(int cliSoc)
 	{
 		for(int i=0;i<fdNumNow;i++)
 		{
@@ -1360,7 +1287,7 @@ public:
 		*pcliPort=cliAddr.sin_port;
 		return inet_ntoa(cliAddr.sin_addr); 
 	}
-	bool disconnectSocketEpoll(int clisock)
+	bool disconnectSocket(int clisock)
     {
         close(clisock);
         return this->deleteFd(clisock);
@@ -1405,7 +1332,7 @@ int funcTwo(int thing,int num,int,void* pget,void* sen,ServerTcpIp& server)//mai
 	if(false==DealAttack::dealAttack(thing,num,200))
 	{
 		DealAttack::attackLog(port,server.getPeerIp(num,&port),"./rec/attackLog.txt");
-		server.disconnectSocketEpoll(num);
+		server.disconnectSocket(num);
 		return 0;
 	}
 	if(thing==0)
@@ -1438,12 +1365,85 @@ int funcTwo(int thing,int num,int,void* pget,void* sen,ServerTcpIp& server)//mai
             fclose(fp);
         }
 		
-		if(false==server.sendSocketAllModel(num,sen,len))
+		if(false==server.sendSocket(num,sen,len))
 			printf("send wrong\n");
 		else
 			printf("send success\n");
 	}
 	return 0;
+} 
+int funcThree(int thing,int num,int,void* pget,void* sen,ServerTcpIp& server)//main deal func
+{
+	char ask[200]={0},*pask=NULL;
+	DealHttp http;
+	int len=0;
+	int port=0;
+	int flag=0;
+	if(sen==NULL)
+		return -1;
+	memset(sen,0,sizeof(char)*10000000);
+	if(false==DealAttack::dealAttack(thing,num,200))
+	{
+		DealAttack::attackLog(port,server.getPeerIp(num,&port),"./rec/attackLog.txt");
+		server.disconnectSocket(num);
+		return 0;
+	}
+	if(thing==0)
+		printf("%d is out\n",num);
+	if(thing==1)
+		printf("%s in %d\n",(char*)pget,num);
+	if(thing==2)
+	{
+		if(http.getKeyLine(pget,"Accept-Language",ask)!=NULL)
+			printf("\n%s\n",ask);
+		if(false==http.cutLineAsk((char*)pget,"GET"))
+			return 0;
+		printf("ask:%s\n",(char*)pget);
+		printf("http:%s\n",http.analysisHttpAsk(pget));
+		strcpy(ask,http.analysisHttpAsk(pget));
+		flag=http.autoAnalysisGet((char*)pget,(char*)sen,"./index.html",&len);
+		if(0==flag)
+			printf("some thing wrong %s\n",(char*)sen);
+		else if(flag==1)
+			printf("create auto success\n");
+        else if(flag==2)
+        {
+            FILE* fp=fopen("wrong.txt","a+");
+            if(fp==NULL)
+                fp=fopen("wrong.txt","w+");
+            if(fp==NULL)
+                return 0;
+            fprintf(fp,"can not open file %s\n",ask);
+            printf("cannot open file %s\n",ask);
+            fclose(fp);
+        }
+		if(false==server.sendSocket(num,sen,len))
+			printf("send erong\n");
+		else
+			printf("send success\n");
+		return 0;
+	}
+	return 0;
+}
+void selectTry()
+{
+	ServerTcpIp server(5201);
+	int thing=0,num=0;
+	char get[2048]={0};
+	char* sen=(char*)malloc(sizeof(char)*10000000);
+	if(sen==NULL)
+		printf("memory wrong\n");
+	if(false==server.bondhost())
+	{
+		printf("bound wrong\n");
+		return;
+	}
+	if(false==server.setlisten())
+		exit(0);
+	printf("server ip is:%s\nthe server is ok\n",server.getHostIp());
+	while(1)
+		server.selectModel(&thing,&num,get,2048,sen,funcThree);
+	free(sen);
 }
 void serverHttp()
 {
@@ -1474,6 +1474,6 @@ void serverHttp()
 }
 int main(int argc, char** argv) 
 {
-	serverHttp();
+	selectTry();
 	return 0;
 }
