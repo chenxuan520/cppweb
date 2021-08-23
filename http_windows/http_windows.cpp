@@ -250,14 +250,13 @@ public:
 	}
 	bool selectSend(const void* ps,int num,int len)
 	{
-		SOCKET clientSent=fdClients.fd_array[num];
 		if(send(fdClients.fd_array[num],(char*)ps,len,0)==SOCKET_ERROR)
 			return false;
 		return true;
 	}
 	bool selectSendEveryone(void* ps,int len)
 	{
-		for(int i=0;i<fdClients.fd_count;i++)
+		for(unsigned int i=0;i<fdClients.fd_count;i++)
 		{ 
 			SOCKET clientSent=fdClients.fd_array[i];
 			if(clientSent!=0)
@@ -394,13 +393,13 @@ public:
 			return false;
 		return true;
 	}
-	bool receiveMystl(void* prec,int len)
+	bool receive(void* prec,int len)
 	{
 		if(recv(sock,(char*)prec,len,0)==SOCKET_ERROR)
 			return false;
 		return true;
 	}
-	bool sendHostMystl(const void* ps,int len)
+	bool sendHost(const void* ps,int len)
 	{
 		if(send(sock,(char*)ps,len,0)==SOCKET_ERROR)
 			return false;
@@ -433,6 +432,20 @@ public:
 		memcpy(hostname,name,30);
 		return hostname;
 	}
+	static bool getDnsIp(const char* name,char* ip)
+	{
+		WSADATA wsa;
+		if(WSAStartup(MAKEWORD(2,2),&wsa)!=0)
+			return false;
+		hostent* phost=gethostbyname(name);
+		if(phost==NULL)
+			return false;
+		in_addr addr;
+		char* p=phost->h_addr_list[0];
+		memcpy(&addr.S_un.S_addr,p,phost->h_length);
+		strcpy(ip,inet_ntoa(addr));
+		return true;
+	} 
 };//D:/Dev-Cpp/MinGW64/x86_64-w64-mingw32/lib/libws2_32.a
 class DealHttp{
 private:
