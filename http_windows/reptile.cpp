@@ -5,6 +5,11 @@
 #include<winsock2.h>
 #include<urlmon.h>
 #include<wininet.h>//-lurlmon -lwininet -lwsock32
+/********************************
+	author:chenxuan
+	date:2021/8/23
+	funtion:main class for reptile has many functions
+*********************************/
 class DownloadFile{
 private:
 	char url[256];
@@ -24,7 +29,7 @@ public:
 		tend=0;
 	}
 	bool startDownload(const char* httpAdd,int* len,int* rate,const char* urlDownload,const char* toFileName=NULL)
-	{
+	{//first argc is to add in url top to make sure url ok,toFileName if no get form html
 		char* ptemp=NULL;
 		strcpy(url,urlDownload);
 		if(strstr(urlDownload,"http://")==NULL&&strstr(urlDownload,"https://")==NULL&&httpAdd!=NULL)
@@ -62,7 +67,7 @@ public:
 		return false;	
 	}	
 	void dealUrl(const char* url,char* urlTop,char* urlEnd)
-	{
+	{//deal url to get top and end
 		char* ptemp=NULL;
 		int len=0;
 		if((ptemp=strstr(url,"http://"))==NULL)
@@ -90,7 +95,7 @@ public:
 		}
 	}
 	void createAsk(const char* domain,char* pask)
-	{
+	{//create standard ask for server
 		dealUrl(domain,urlTop,urlEnd);
 		sprintf(pask,"GET %s HTTP/1.1\r\n"
 			"Host:%s\r\n"
@@ -102,7 +107,7 @@ public:
 		strcpy(end,urlEnd);
 	}
 	char* getUrl(const char* findFromFile,const char* findRec,char* url,const char* pbegin,const char* pend)
-	{
+	{//get useful url form finffrom
 		int i=0;
 		char* begin=NULL,*end=NULL,*ptemp=NULL;
 		const char* findFrom=findFromFile;
@@ -216,6 +221,11 @@ public:
 		return hostname;
 	}
 };
+/********************************
+	author:chenxuan
+	date:2021/8/23
+	funtion:get ipv4 by put domain in it
+*********************************/
 bool getDnsIp(const char* name,char* ip)
 {
 	WSADATA wsa;
