@@ -5,6 +5,11 @@
 #include<winsock2.h>
 #include<urlmon.h>
 #include<wininet.h>//-lurlmon -lwininet -lwsock32
+/********************************
+	author:chenxuan
+	date:2021/8/24
+	funtion:the main class of download can load url 
+*********************************/
 class DownloadFile{
 private:
 	char url[256];
@@ -139,6 +144,11 @@ public:
 			this->startDownload(urlTop,plen,prate,url);
 	}
 };
+/********************************
+	author:chenxuan
+	date:2021/8/24
+	funtion:client class for connect to server
+*********************************/
 class ClientTcpIp{
 private:
 	WSADATA wsa;//apply for api
@@ -216,6 +226,11 @@ public:
 		return hostname;
 	}
 };
+/********************************
+	author:chenxuan
+	date:2021/8/24
+	funtion:get ip by input domain
+*********************************/
 bool getDnsIp(const char* name,char* ip)
 {
 	WSADATA wsa;
@@ -228,12 +243,16 @@ bool getDnsIp(const char* name,char* ip)
 	char* p=phost->h_addr_list[0];
 	memcpy(&addr.S_un.S_addr,p,phost->h_length);
 	strcpy(ip,inet_ntoa(addr));
-//	memcpy(ip,inet_ntoa(addr),strlen(inet_ntoa(addr)));
 	return true;
 }
 enum Choice{
 	REPTILE=0,DOWN=1,FROMFILE=2,DOMAINFILE=3
 };
+/********************************
+	author:chenxuan
+	date:2021/8/24
+	funtion:user to choose mode
+*********************************/
 Choice chooseMode(int argc)
 {
 	int model=0;
@@ -254,6 +273,11 @@ Choice chooseMode(int argc)
 		return FROMFILE;
 	return REPTILE;
 }
+/********************************
+	author:chenxuan
+	date:2021/8/24
+	funtion:only download model
+*********************************/
 void downloadFile()
 {
 	char url[256]={0};
@@ -273,6 +297,11 @@ void downloadFile()
 			printf("file:%s ok,%d kb,%d kb/s\n",url,len,rate);
 	}
 }
+/********************************
+	author:chenxuan
+	date:2021/8/24
+	funtion:reptile web main class
+*********************************/
 void reptile()
 {
 	int temp=0,len=0,rate=0;
@@ -333,6 +362,11 @@ void reptile()
 	getchar();
 	return;
 }
+/********************************
+	author:chenxuan
+	date:2021/8/24
+	funtion:deal httpS download question
+*********************************/
 void downFile()
 {
 	int len=0,rate=0;
@@ -381,6 +415,11 @@ void downFile()
 	fflush(stdin);
 	getchar();
 }
+/********************************
+	author:chenxuan
+	date:2021/8/24
+	funtion:download from a file(all domain)
+*********************************/
 void domainFile(char** argv)
 {
 	int len=0,rate=0;
