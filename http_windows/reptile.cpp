@@ -5,11 +5,6 @@
 #include<winsock2.h>
 #include<urlmon.h>
 #include<wininet.h>//-lurlmon -lwininet -lwsock32
-/********************************
-	author:chenxuan
-	date:2021/8/23
-	funtion:main class for reptile has many functions
-*********************************/
 class DownloadFile{
 private:
 	char url[256];
@@ -29,7 +24,7 @@ public:
 		tend=0;
 	}
 	bool startDownload(const char* httpAdd,int* len,int* rate,const char* urlDownload,const char* toFileName=NULL)
-	{//first argc is to add in url top to make sure url ok,toFileName if no get form html
+	{
 		char* ptemp=NULL;
 		strcpy(url,urlDownload);
 		if(strstr(urlDownload,"http://")==NULL&&strstr(urlDownload,"https://")==NULL&&httpAdd!=NULL)
@@ -67,7 +62,7 @@ public:
 		return false;	
 	}	
 	void dealUrl(const char* url,char* urlTop,char* urlEnd)
-	{//deal url to get top and end
+	{
 		char* ptemp=NULL;
 		int len=0;
 		if((ptemp=strstr(url,"http://"))==NULL)
@@ -95,7 +90,7 @@ public:
 		}
 	}
 	void createAsk(const char* domain,char* pask)
-	{//create standard ask for server
+	{
 		dealUrl(domain,urlTop,urlEnd);
 		sprintf(pask,"GET %s HTTP/1.1\r\n"
 			"Host:%s\r\n"
@@ -107,7 +102,7 @@ public:
 		strcpy(end,urlEnd);
 	}
 	char* getUrl(const char* findFromFile,const char* findRec,char* url,const char* pbegin,const char* pend)
-	{//get useful url form finffrom
+	{
 		int i=0;
 		char* begin=NULL,*end=NULL,*ptemp=NULL;
 		const char* findFrom=findFromFile;
@@ -221,11 +216,6 @@ public:
 		return hostname;
 	}
 };
-/********************************
-	author:chenxuan
-	date:2021/8/23
-	funtion:get ipv4 by put domain in it
-*********************************/
 bool getDnsIp(const char* name,char* ip)
 {
 	WSADATA wsa;
@@ -242,13 +232,15 @@ bool getDnsIp(const char* name,char* ip)
 	return true;
 }
 enum Choice{
-	REPTILE=0,DOWN=1,FROMFILE=2
+	REPTILE=0,DOWN=1,FROMFILE=2,DOMAINFILE=3
 };
-Choice chooseMode()
+Choice chooseMode(int argc)
 {
 	int model=0;
+	if(argc>1)
+		return DOMAINFILE;
 	system("title Reptile");
-	printf("plaese choose model you wang to do reptile(0) or down(1) or fromfile(2):");
+	printf("please choose model you wang to do reptile(0) or down(1) or fromfile(2):");
 	while(scanf("%d",&model)!=1||(model!=0&&model!=1&&model!=2))
 	{
 		printf("input wrong,input again:");
@@ -389,18 +381,98 @@ void downFile()
 	fflush(stdin);
 	getchar();
 }
-int main()
+void domainFile(char** argv)
 {
-	switch(chooseMode())
+	int len=0,rate=0;
+	char kind[30]={0},url[256]={0},ask[256]={0},urlTop[100]={0},urlEnd[256]={0};
+	FILE* fp=fopen(argv[1],"r");
+	DownloadFile downer;
+	if(fp==NULL)
+	{
+		perror("open file");
+		fflush(stdin);
+		getchar();
+		return;
+	}
+	printf("please input kind you want to get:");
+	scanf("%s",kind);
+	char* pmemory=(char*)malloc(sizeof(char)*100000),*ptemp=NULL;
+	if(pmemory==NULL)
+	{
+		perror("malloc");
+		fflush(stdin);
+		getchar();
+		return;
+	}	
+	while(fscanf(fp,"%s",url)>0)
+	{
+		Sleep(500);
+		downer.createAsk(url,ask);
+		printf("%s",ask);
+		downer.getTopAndEnd(urlTop,urlEnd);
+		if(false==getDnsIp(urlTop,url))
+			perror("ip");
+		printf("ip:%s\n",url);
+		ClientTcpIp client(url,80);
+		if(pmemory==NULL)
+		{
+			fflush(stdin);
+			perror("connect");
+			getchar();		
+		}
+		memset(pmemory,0,sizeof(char)*100000);
+		if(false==client.tryConnect())
+		{
+			fflush(stdin);
+			perror("connect");
+			getchar();
+		}
+		if(false==client.sendHost(ask,strlen(ask)))
+		{
+			fflush(stdin);
+			perror("connect");
+			getchar();
+		}	
+		if(-1==client.receive(pmemory,sizeof(char)*100000))
+		{
+			fflush(stdin);
+			perror("connect");
+			getchar();
+		}	
+		ptemp=pmemory;
+		while((ptemp=downer.getUrl(ptemp,kind,url,pmemory,pmemory+strlen(pmemory)))!=NULL)
+		{
+			printf("%s\n",url);
+			if(false==downer.startDownload(urlTop,&len,&rate,url))
+				perror("catch wrong");
+			else 
+				printf(" down ok\n",url);
+		}
+	}
+	free(pmemory);
+	fclose(fp);
+	printf("task down\n");
+	fflush(stdin);
+	getchar();
+	return;
+}
+int main(int argc,char** argv)
+{
+	switch(chooseMode(argc))
 	{
 		case REPTILE:
-			reptile();
+			while(1)
+				reptile();
 			break;
 		case DOWN:
 			downloadFile();
 			break;
 		case FROMFILE:
 			downFile();
+			break;
+		case DOMAINFILE:
+			domainFile(argv);
+			break;
 	}
 	return 0;
 }
