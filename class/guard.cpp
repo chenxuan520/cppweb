@@ -4,11 +4,11 @@
 #include<stdio.h>
 #include<sys/types.h>
 #include<sys/stat.h>
-class guardProcess{
+class GuardProcess{
 private:
 	int pid;
 public:
-	guardProcess()
+	GuardProcess()
 	{
 		pid=0;
 		pid=fork();
@@ -43,6 +43,6 @@ int func(void*)
 }
 int main()
 {
-	guardProcess process;
+	GuardProcess process;
 	process.working(func,NULL);
 }
