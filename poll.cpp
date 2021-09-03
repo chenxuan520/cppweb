@@ -13,6 +13,7 @@
 #include<netdb.h>
 #include<pthread.h>
 #include<queue>
+#include<poll.h>
 using namespace std;
 /********************************
 	author:chenxuan
@@ -36,6 +37,8 @@ private:
 	sockaddr_in addr;//IPv4 of host;
 	sockaddr_in client;//IPv4 of client;
 	fd_set  fdClients;//file descriptor
+	pollfd* pollArray;//poll model array
+	int pollMax;// poll max client
 protected:
     int* pfdn;//pointer if file descriptor
     int fdNumNow;//num of fd now
@@ -79,7 +82,7 @@ protected:
         return false;
     }
 public:
-	ServerTcpIp(unsigned short port=5200,int epollNum=0,int wait=5)
+	ServerTcpIp(unsigned short port=5200,int epollNum=0,int wait=5,int pollNum=0)
 	{
 		sock=socket(AF_INET,SOCK_STREAM,0);//AF=addr family internet
 		addr.sin_addr.s_addr=htonl(INADDR_ANY);//inaddr_any
@@ -106,6 +109,17 @@ public:
         memset(pfdn,0,sizeof(int)*64);
         fdNumNow=0;
         fdMax=64;
+        pollArray=NULL;
+        pollMax=0;
+        if(pollNum>0)
+        {
+        	pollMax=pollNum;
+			pollArray=(pollfd*)malloc(sizeof(pollfd)*pollNum);
+			if(pollArray==NULL)
+				throw NULL;
+			for(int i=0;i<pollNum;i++)
+				pollArray[i].fd=-1;
+		}
 	}
 	~ServerTcpIp()//clean server
 	{
@@ -116,6 +130,8 @@ public:
 		free(hostname);
 		free(pevent);
         free(pfdn);
+        if(pollArray!=NULL)
+        	free(pollArray);
 	}
 	bool bondhost()//bond myself first
 	{
@@ -132,6 +148,11 @@ public:
 		nowEvent.data.fd=sock;
 		epoll_ctl(epfd,EPOLL_CTL_ADD,sock,&nowEvent);
 		fd_count=sock;
+		if(pollArray!=NULL)
+		{
+			pollArray[0].fd=sock;
+			pollArray[0].events=POLLIN;
+		}
 		return true;
 	}
 	int acceptClient()//wait until success model one
@@ -315,6 +336,64 @@ public:
                     this->deleteFd(temp.data.fd);
 					epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
 					close(temp.data.fd);
+				}
+				if(pfunc!=NULL)
+				{
+					if(pfunc(*pthing,*pnum,getNum,pget,pneed,*this))
+						return false;
+				}
+			}
+		}
+		return true;
+	}
+	bool pollModel(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int ,int ,int ,void* ,void*,ServerTcpIp& ))
+	{
+		static int maxNow=sock;
+		int temp=poll(pollArray,maxNow+1,-1);
+		if(temp<0)
+			return false;
+		if(pollArray[0].revents&POLLIN)
+		{
+			sockaddr_in newaddr={0};
+			int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
+            this->addFd(newClient);
+            if(newClient>maxNow)
+            	maxNow=newClient;
+            for(int j=1;j<pollMax;j++)
+            {
+				if(pollArray[j].fd<0)
+				{
+					pollArray[j].fd=newClient;
+					pollArray[j].events=POLLIN;
+					break;
+				}
+				if(j==pollMax-1)
+					return false;
+			}
+			*pthing=1;
+			*pnum=newClient;
+			strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
+			if(pfunc!=NULL)
+			{
+				if(pfunc(*pthing,*pnum,0,pget,pneed,*this))
+					return false;
+			}
+		}
+		for(int i=1;i<pollMax;i++)
+		{
+			if(pollArray[i].revents&POLLIN)
+			{
+				int getNum=recv(pollArray[i].fd,(char*)pget,len,0);
+				*pnum=pollArray[i].fd;
+				if(getNum>0)
+					*pthing=2;
+				else
+				{
+					*(char*)pget=0;
+					*pthing=0;
+                    this->deleteFd(pollArray[i].fd);
+					pollArray[i].fd=-1;
+					close(pollArray[i].fd);
 				}
 				if(pfunc!=NULL)
 				{
@@ -747,11 +826,6 @@ public:
             return NULL;
         return mysql_fetch_row(results);
     }
-    char* GetSqlLastError(char* errorSay)
-    {
-		strcpy(errorSay,mysql_error(this->mysql));
-		return errorSay;
-	}
 };
 /********************************
 	author:chenxuan
@@ -973,6 +1047,8 @@ private:
 	fd_set  fdClients;//file descriptor
 	ThreadPool* pool;
 	pthread_mutex_t mutex;
+	pollfd* pollArray;//poll model array
+	int pollMax;// poll max client
 protected:
     int* pfdn;//pointer if file descriptor
     int fdNumNow;//num of fd now
@@ -1030,7 +1106,7 @@ public:
 		void* pget;	
 	};
 public:
-	ServerTcpIpThreadPool(unsigned short port=5200,int epollNum=0,int wait=5,unsigned int threadNum=0)
+	ServerTcpIpThreadPool(unsigned short port=5200,int epollNum=0,int wait=5,unsigned int threadNum=0,int pollNum=0)
 	{
 		sock=socket(AF_INET,SOCK_STREAM,0);//AF=addr family internet
 		addr.sin_addr.s_addr=htonl(INADDR_ANY);//inaddr_any
@@ -1064,6 +1140,17 @@ public:
 				throw NULL;
 		}
 		pthread_mutex_init(&mutex,NULL);
+		pollArray=NULL;
+        pollMax=0;
+        if(pollNum>0)
+        {
+        	pollMax=pollNum;
+			pollArray=(pollfd*)malloc(sizeof(pollfd)*pollNum);
+			if(pollArray==NULL)
+				throw NULL;
+			for(int i=0;i<pollNum;i++)
+				pollArray[i].fd=-1;
+		}
 	}
 	~ServerTcpIpThreadPool()//clean server
 	{
@@ -1076,6 +1163,8 @@ public:
         free(pfdn);
         free(pool);
         pthread_mutex_destroy(&mutex);
+        if(pollArray!=NULL)
+	       	free(pollArray);
 	}
 	void mutexLock()
 	{
@@ -1107,6 +1196,11 @@ public:
 		nowEvent.data.fd=sock;
 		epoll_ctl(epfd,EPOLL_CTL_ADD,sock,&nowEvent);
 		fd_count++;
+		if(pollArray!=NULL)
+		{
+			pollArray[0].fd=sock;
+			pollArray[0].events=POLLIN;
+		}
 		return true;
 	}
 	bool acceptClient()//wait until success model one
@@ -1319,6 +1413,11 @@ public:
 			pool->addTask(task);
 		}
 	}
+	inline bool threadDeleteSoc(int clisoc)
+	{
+		close(clisoc);
+		return this->deleteFd(clisoc);
+	}
 	bool epollThread(int* pthing,int* pnum,void* pget,int len,void* pneed,void* (*pfunc)(void*))
 	{
 		int eventNum=epoll_wait(epfd,pevent,512,-1);
@@ -1366,10 +1465,63 @@ public:
 		}
 		return true;
 	}
-	inline bool threadDeleteSoc(int clisoc)
+	bool pollModel(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int ,int ,int ,void* ,void*,ServerTcpIpThreadPool& ))
 	{
-		close(clisoc);
-		return this->deleteFd(clisoc);
+		static int maxNow=sock;
+		int temp=poll(pollArray,maxNow+1,-1);
+		if(temp<0)
+			return false;
+		if(pollArray[0].revents&POLLIN)
+		{
+			sockaddr_in newaddr={0};
+			int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
+            this->addFd(newClient);
+            if(newClient>maxNow)
+            	maxNow=newClient;
+            for(int j=1;j<pollMax;j++)
+            {
+				if(pollArray[j].fd<0)
+				{
+					pollArray[j].fd=newClient;
+					pollArray[j].events=POLLIN;
+					break;
+				}
+				if(j==pollMax-1)
+					return false;
+			}
+			*pthing=1;
+			*pnum=newClient;
+			strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
+			if(pfunc!=NULL)
+			{
+				if(pfunc(*pthing,*pnum,0,pget,pneed,*this))
+					return false;
+			}
+		}
+		for(int i=1;i<pollMax;i++)
+		{
+			if(pollArray[i].revents&POLLIN)
+			{
+				int getNum=recv(pollArray[i].fd,(char*)pget,len,0);
+				*pnum=pollArray[i].fd;
+				if(getNum>0)
+					*pthing=2;
+				else
+				{
+					*(char*)pget=0;
+					*pthing=0;
+                    this->deleteFd(pollArray[i].fd);
+					pollArray[i].fd=-1;
+					close(pollArray[i].fd);
+				}
+				if(pfunc!=NULL)
+				{
+					if(pfunc(*pthing,*pnum,getNum,pget,pneed,*this))
+						return false;
+				}
+			}
+		}
+		return true;
 	}
 };
 struct CliMsg{ 
@@ -1487,7 +1639,7 @@ int funcThree(int thing,int num,int,void* pget,void* sen,ServerTcpIp& server)//m
 }
 void selectTry()
 {
-	ServerTcpIp server(5201);
+	ServerTcpIp server(5201,0,5,50);
 	int thing=0,num=0;
 	char get[2048]={0};
 	char* sen=(char*)malloc(sizeof(char)*10000000);
@@ -1502,7 +1654,7 @@ void selectTry()
 		exit(0);
 	printf("server ip is:%s\nthe server is ok\n",server.getHostIp());
 	while(1)
-		server.selectModel(&thing,&num,get,2048,sen,funcThree);
+		server.pollModel(&thing,&num,get,2048,sen,funcThree);
 	free(sen);
 }
 void serverHttp()
@@ -1534,6 +1686,7 @@ void serverHttp()
 }
 int main(int argc, char** argv) 
 {
-	selectTry();
+//	selectTry();
+	serverHttp();
 	return 0;
 }
