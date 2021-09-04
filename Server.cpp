@@ -1372,6 +1372,69 @@ public:
 		return this->deleteFd(clisoc);
 	}
 };
+/********************************
+	author:chenxuan
+	date:2021/9/4
+	funtion:the class ti ctrl file get and len 
+*********************************/
+class FileGet{
+private:
+	char* pbuffer;
+public:
+	FileGet()
+	{
+		pbuffer=NULL;
+	}
+	int getFileLen(const char* fileName)
+	{
+		int len=0;
+		FILE* fp=fopen(fileName,"rb");
+		if(fp==NULL)
+			return -1;
+		fseek(fp,0,SEEK_END);
+		len=ftell(fp);
+		fclose(fp);
+		return len;
+	}
+	bool getFileMsg(const char* fileName,char* buffer)
+	{
+		int i=0,len=0;
+		len=this->getFileLen(fileName);
+		FILE* fp=fopen(fileName,"rb");
+		if(fp==NULL)
+			return false;
+		for(i=0;i<len;i++)
+			buffer[i]=fgetc(fp);
+		buffer[i+1]=0;
+		fclose(fp);
+		return true;
+	}
+	bool fileStrstr(const char* fileName,const char* strFind)
+	{
+		int len=0;
+		char* pstr=NULL;
+		len=this->getFileLen(fileName);
+		if(pbuffer!=NULL)
+			free(pbuffer);
+		FILE* fp=fopen(fileName,"r");
+		if(fp==NULL)
+			return false;
+		pbuffer=(char*)malloc(sizeof(char)*(len+10));
+		if(pbuffer==NULL)
+			return false;
+		if(false==this->getFileMsg(fileName,pbuffer))
+			return false;
+		pstr=strstr(pbuffer,strFind);
+		if(pbuffer!=NULL)
+			free(pbuffer);
+		fclose(fp);
+		if(pstr!=NULL)
+			return true;
+		else
+			return false;
+		return false;
+	}
+};
 struct CliMsg{ 
 	char hao[20];
 	char mi[20];
