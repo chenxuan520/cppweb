@@ -79,7 +79,7 @@ protected:
         return false;
     }
 public:
-	ServerTcpIp(unsigned short port=5200,int epollNum=0,int wait=5)
+	ServerTcpIp(unsigned short port=5200,int epollNum=1,int wait=5)
 	{
 		sock=socket(AF_INET,SOCK_STREAM,0);//AF=addr family internet
 		addr.sin_addr.s_addr=htonl(INADDR_ANY);//inaddr_any
@@ -685,7 +685,7 @@ public:
 };
 /********************************
 	author:chenxuan
-	date:2021/8/10
+	date:2021/9/5
 	funtion:class for deal Mysql ask
 *********************************/
 class MySql{
@@ -702,7 +702,6 @@ public:
         this->mysql=mysql_init(NULL);
         if(NULL==mysql_real_connect(this->mysql,ipOrHostName,user,passwd,dataBaseName,0,NULL,0))
         {
-            cerr<<mysql_error(this->mysql)<<endl;
             this->~MySql();
             throw;
         }
@@ -719,26 +718,17 @@ public:
             mysql_free_result(this->results);
         int temp=mysql_query(this->mysql,sql);
         if(temp!=0)
-        {
-            cerr<<mysql_error(this->mysql)<<endl;
             return 0;
-        }
         this->results=mysql_store_result(mysql);
         if(results==NULL)
-        {
-            cerr<<mysql_error(this->mysql)<<endl;
             return 0;
-        }
         return mysql_num_fields(this->results);
     }
     bool MySqlOtherQuery(const char* sql)
     {
         int temp=mysql_query(this->mysql,sql);
         if(temp!=0)
-        {
-            cerr<<mysql_error(this->mysql)<<endl;
             return false;
-        }
         return true;
     }
     char** MySqlGetResultRow()
@@ -749,6 +739,7 @@ public:
     }
     char* GetSqlLastError(char* errorSay)
     {
+    	if(mysql_error(this->mysql)!=NULL)
 		strcpy(errorSay,mysql_error(this->mysql));
 		return errorSay;
 	}
@@ -1384,6 +1375,11 @@ public:
 	FileGet()
 	{
 		pbuffer=NULL;
+	}
+	~FileGet()
+	{
+		if(pbuffer!=NULL)
+			free(pbuffer);
 	}
 	int getFileLen(const char* fileName)
 	{
