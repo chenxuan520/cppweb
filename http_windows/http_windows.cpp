@@ -449,16 +449,22 @@ public:
 };//D:/Dev-Cpp/MinGW64/x86_64-w64-mingw32/lib/libws2_32.a
 class DealHttp{
 private:
-	char ask[200];
+	char ask[256];
 	char* pfind;
 	char* pfile;
+	int lastLen;
+public:
+	enum FileKind{
+		UNKNOWN=0,HTML=1,EXE=2,IMAGE=3,NOFOUND=4,CSS=5,JS=6,ZIP7=7
+	};
 public:
 	DealHttp()
 	{
-		for(int i=0;i<200;i++)
+		for(int i=0;i<256;i++)
 			ask[i]=0;
 		pfind=NULL;
 		pfile=NULL;
+		lastLen=0;
 	}
 	~DealHttp()
 	{
@@ -485,10 +491,10 @@ public:
 	{
 		return strstr((char*)pask,ptofind);
 	}
-	char* findBackString(char* ps,int len,char* word)
+	char* findBackString(char* local,int len,char* word)
 	{
 		int i=0;
-		char* ptemp=ps+len+1;
+		char* ptemp=local+len+1;
 		char* pend=NULL;
 		while(1)
 			if((*ptemp>47&&*ptemp<58)||(*ptemp>96&&*ptemp<123)||(*ptemp>64&&*ptemp<91)||*ptemp==95)
@@ -506,57 +512,57 @@ public:
 		word[i]=0;
 		return word;
 	}
-	void createTop(int kind,char* ptop,int* topLen,int fileLen)//1:http 2:down 3:pic
+	void createTop(FileKind kind,char* ptop,int* topLen,int fileLen)//1:http 2:down 3:pic
 	{
 		switch (kind)
 		{
-			case 0:
+			case UNKNOWN:
 				*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
 				"Server LCserver/1.1\r\n"
 				"Connection: keep-alive\r\n"
 				"Content-Length:%d\r\n\r\n",fileLen);
 				break;
-			case 1:
+			case HTML:
 				*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
 				"Server LCserver/1.1\r\n"
 				"Connection: keep-alive\r\n"
 				"Content-Type:text/html\r\n"
 				"Content-Length:%d\r\n\r\n",fileLen);
 				break;
-			case 2:
+			case EXE:
 				*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
 				"Server LCserver/1.1\r\n"
 				"Connection: keep-alive\r\n"
 				"Content-Type:application/octet-stream\r\n"
 				"Content-Length:%d\r\n\r\n",fileLen);
 				break;
-			case 3:
+			case IMAGE:
 				*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
 				"Server LCserver/1.1\r\n"
 				"Connection: keep-alive\r\n"
 				"Content-Type:image\r\n"
 				"Content-Length:%d\r\n\r\n",fileLen);
 				break;
-			case 4:
-				*topLen=sprintf(ptop,"HTTP/1.1 404 Not Fount\r\n"
+			case NOFOUND:
+				*topLen=sprintf(ptop,"HTTP/1.1 404 Not Found\r\n"
 				"Server LCserver/1.1\r\n"
 				"Connection: keep-alive\r\n");
 				break;
-			case 5:
+			case CSS:
 				*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
 				"Server LCserver/1.1\r\n"
 				"Connection: keep-alive\r\n"
 				"Content-Type:text/css\r\n"
 				"Content-Length:%d\r\n\r\n",fileLen);
 				break;
-			case 6:
+			case JS:
 				*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
 				"Server LCserver/1.1\r\n"
 				"Connection: keep-alive\r\n"
 				"Content-Type:text/javascript\r\n"
 				"Content-Length:%d\r\n\r\n",fileLen);
 				break;
-			case 7:
+			case ZIP7:
 				*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
 				"Server LCserver/1.1\r\n"
 				"Connection: keep-alive\r\n"
@@ -565,66 +571,21 @@ public:
 				break;
 		}
 	}
-	bool createSendMsg(int kind,char* pask,const char* pfile,int* plong)
+	bool createSendMsg(FileKind kind,char* pask,const char* pfile,int* plong)
 	{
 		int temp=0;
 		int len=0,noUse=0;
-		switch (kind)
+		if(kind==NOFOUND)
 		{
-		case 0:
-			len=this->getFileLen(pfile);
-			if(len==0)
-				return false;
-			this->createTop(0,pask,&temp,len);
-			memcpy(pask+temp,this->findFileMsg(pfile,&noUse),len+3);
-			break;
-		case 1:
-			len=this->getFileLen(pfile);
-			if(len==0)
-				return false;
-			this->createTop(1,pask,&temp,len);
-			memcpy(pask+temp,this->findFileMsg(pfile,&noUse),len+3);
-			break;
-		case 2:
-			len=this->getFileLen(pfile);
-			if(len==0)
-				return false;
-			this->createTop(2,pask,&temp,len);
-			memcpy(pask+temp,this->findFileMsg(pfile,&noUse),len+3);
-			break;
-		case 3:
-			len=this->getFileLen(pfile);
-			if(len==0)
-				return false;
-			this->createTop(3,pask,&temp,len);
-			memcpy(pask+temp,this->findFileMsg(pfile,&noUse),len+3);
-			break;
-		case 4:
-			this->createTop(4,pask,&temp,len);
-			break;
-		case 5:
-			len=this->getFileLen(pfile);
-			if(len==0)
-				return false;
-			this->createTop(5,pask,&temp,len);
-			memcpy(pask+temp,this->findFileMsg(pfile,&noUse),len+3);printf("yes create\n");
-			break;
-		case 6:
-			len=this->getFileLen(pfile);
-			if(len==0)
-				return false;
-			this->createTop(6,pask,&temp,len);
-			memcpy(pask+temp,this->findFileMsg(pfile,&noUse),len+3);
-			break;
-		case 7:
-			len=this->getFileLen(pfile);
-			if(len==0)
-				return false;
-			this->createTop(7,pask,&temp,len);
-			memcpy(pask+temp,this->findFileMsg(pfile,&noUse),len+3);
-		default:
-			break;
+			this->createTop(kind,pask,&temp,len);
+			*plong=len+temp+10;
+			return true;
 		}
+		len=this->getFileLen(pfile);
+		if(len==0)
+			return false;
+		this->createTop(kind,pask,&temp,len);
+		memcpy(pask+temp,this->findFileMsg(pfile,&noUse),len+3);
 		*plong=len+temp+10;
 		return true;
 	}
@@ -636,12 +597,17 @@ public:
 			return NULL;
 		fseek(fp,0,SEEK_END);
 		flen=ftell(fp);
-		if(pfile!=NULL)
-			free(pfile);
-		pfile=(char*)malloc(sizeof(char)*flen+10);
+		if(flen>lastLen)
+		{		
+			if(pfile!=NULL)
+				free(pfile);
+			pfile=(char*)malloc(sizeof(char)*flen+10);
+			lastLen=sizeof(char)*flen+10;
+			memset(pfile,0,sizeof(char)*flen+10);
+		}
 		if(pfile==NULL)
 			return NULL;
-		memset(pfile,0,sizeof(char)*flen+10);
+		memset(pfile,0,lastLen);
 		fseek(fp,0,SEEK_SET);
 		for(i=0;i<flen;i++)
 			pfile[i]=fgetc(fp);
@@ -661,59 +627,86 @@ public:
 		fclose(fp);
 		return len;
 	}
-	bool autoAnalysisGet(const char* pask,char* psend,const char* pfirstFile,int* plen)
+	int autoAnalysisGet(const char* pask,char* psend,const char* pfirstFile,int* plen)
 	{
 		if(NULL==this->analysisHttpAsk((void*)pask))
-			return false;
-		if(strcmp(ask,"HTTP/1.1")==0)
-		{
-			if(false==this->createSendMsg(1,psend,pfirstFile,plen))
-			{
-				if(false==this->createSendMsg(4,psend,pfirstFile,plen))
-					return false;
-			}
-		}
-		else if(strstr(ask,".html"))
-		{
-			if(false==this->createSendMsg(1,psend,ask,plen))
-				if(false==this->createSendMsg(4,psend,ask,plen))
-					return false;
-		}
-		else if(strstr(ask,".exe"))
-		{
-			if(false==this->createSendMsg(2,psend,ask,plen))
-				if(false==this->createSendMsg(4,psend,ask,plen))
-					return false;
-		}
-		else if(strstr(ask,".PNG")||strstr(ask,".jpg"))
-		{
-			if(false==this->createSendMsg(3,psend,ask,plen))
-				if(false==this->createSendMsg(4,psend,ask,plen))
-					return false;
-		}
-		else if(strstr(ask,".css"))
-		{
-			if(false==this->createSendMsg(5,psend,ask,plen))
-				if(false==this->createSendMsg(4,psend,ask,plen))
-					return false;
-		}
-		else if(strstr(ask,".js"))
-		{
-			if(false==this->createSendMsg(6,psend,ask,plen))
-				if(false==this->createSendMsg(4,psend,ask,plen))
-					return false;
-		}
-		else if(strstr(ask,".7z"))
-		{
-			if(false==this->createSendMsg(7,psend,ask,plen))
-				if(false==this->createSendMsg(4,psend,ask,plen))
-					return false;
-		}
-		else 
-			if(false==this->createSendMsg(0,psend,ask,plen))
-				if(false==this->createSendMsg(4,psend,ask,plen))
-					return false;
-		return true;
+	        return 0;
+	    if(strcmp(ask,"HTTP/1.1")==0||strcmp(ask,"HTTP/1.0")==0)
+	    {
+	        if(false==this->createSendMsg(HTML,psend,pfirstFile,plen))
+	        {
+	            if(false==this->createSendMsg(NOFOUND,psend,pfirstFile,plen))
+	                return 0;
+	            else 
+	                return 2;
+	        }
+	    }
+	    else if(strstr(ask,".html"))
+	    {
+	        if(false==this->createSendMsg(HTML,psend,ask,plen))
+	            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
+	                return 0;
+	            else 
+	                return 2;
+	    }
+	    else if(strstr(ask,".exe"))
+	    {
+	        if(false==this->createSendMsg(EXE,psend,ask,plen))
+	            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
+	                return 0;
+	            else 
+	                return 2;
+	    }
+	    else if(strstr(ask,".png")||strstr(ask,".PNG")||strstr(ask,".jpg")||strstr(ask,".jpeg"))
+	    {
+	        if(false==this->createSendMsg(IMAGE,psend,ask,plen))
+	            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
+	                return 0;
+	            else 
+	                return 2;
+	    }
+	    else if(strstr(ask,".css"))
+	    {
+	        if(false==this->createSendMsg(CSS,psend,ask,plen))
+	            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
+	                return 0;
+	            else 
+	                return 2;
+	    }
+	    else if(strstr(ask,".js"))
+	    {
+	        if(false==this->createSendMsg(JS,psend,ask,plen))
+	            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
+	                return 0;
+	            else 
+	                return 2;
+	    }
+	    else 
+	        if(false==this->createSendMsg(UNKNOWN,psend,ask,plen))
+	            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
+	                return 0;
+	            else 
+	                return 2;
+	    return 1;
+	}
+	const char* getKeyValue(const void* message,const char* key,char* value)
+	{
+		char* temp=strstr((char*)message,key);
+		if(temp==NULL)
+			return NULL;
+		return this->findBackString(temp,strlen(key),value);
+	}
+	const char* getKeyLine(const void* message,const char* key,char* line)
+	{
+		int i=0;
+		char* ptemp=strstr((char*)message,key);
+		ptemp+=strlen(key);
+		if(ptemp==NULL)
+			return NULL;
+		while(*(ptemp++)!='\n')
+			line[i++]=*ptemp;
+		line[i]=0;
+		return line;
 	}
 };
 struct CliMsg{ 
@@ -845,8 +838,8 @@ int funcTwo(int thing,int num,void* pget,void* sen,ServerTcpIp& server)
 			return 0;
 		printf("ask:%s\n",(char*)pget);
 		printf("http:%s\n",http.analysisHttpAsk(pget));
-		if(false==http.autoAnalysisGet((char*)pget,(char*)sen,indexName,&len))
-			printf("some thing wrong %s\n",sen);
+		if(2==http.autoAnalysisGet((char*)pget,(char*)sen,indexName,&len))
+			printf("some thing wrong %s\n",(char*)pget);
 		else
 			printf("create auto success\n");
 		if(false==server.selectSend(sen,num,len))
@@ -861,7 +854,7 @@ void serverHttp()
 	unsigned int port=80;
 	bool is_back=false;
 	chooseModel(&port);
-	ServerTcpIp server(80);
+	ServerTcpIp server(port);
 	int thing=0,num=0;
 	char get[2048]={0};
 	char* sen=(char*)malloc(sizeof(char)*10000000);
