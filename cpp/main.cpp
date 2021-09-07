@@ -101,6 +101,17 @@ void chooseModel(unsigned int* port,bool* pflag)
 		*pflag=true;
 	else 
 		*pflag=false;
+	FILE* fp=fopen("my.ini","r+");
+	if(fp!=NULL)
+	{
+		fclose(fp);
+		return;
+	}
+	fp=fopen("my.ini","w+");
+	if(fp==NULL)
+		return;
+	fprintf(fp,"%u %s %d %s",*port,indexName,memory,temp);
+	fclose(fp);
 }
 /********************************
 	author:chenxuan
