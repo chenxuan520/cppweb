@@ -740,7 +740,7 @@ public:
     char* GetSqlLastError(char* errorSay)
     {
     	if(mysql_error(this->mysql)!=NULL)
-		strcpy(errorSay,mysql_error(this->mysql));
+			strcpy(errorSay,mysql_error(this->mysql));
 		return errorSay;
 	}
 };
@@ -789,9 +789,9 @@ public:
 			if((fp=fopen(pfileName,"w+"))==NULL)		
 				return false;
 			else
-				fprintf(fp,"服务器被进攻日志\n");
-		fprintf(fp,"%d年%d月%d日%d时%d分%d秒:",pt->tm_year+1900,pt->tm_mon+1,pt->tm_mday,pt->tm_hour,pt->tm_min,pt->tm_sec);
-		fprintf(fp,"%s:%d 端口发起对服务器进攻\n",ip,port);
+				fprintf(fp,"server attacked log\n");
+		fprintf(fp,"%d year%d month%d day%d hour%d min%d sec:",pt->tm_year+1900,pt->tm_mon+1,pt->tm_mday,pt->tm_hour,pt->tm_min,pt->tm_sec);
+		fprintf(fp,"%s:%d port attack server\n",ip,port);
 		fclose(fp);
 		return true;
 	}
@@ -1431,6 +1431,11 @@ public:
 		return false;
 	}
 };
+/********************************
+	author:chenxuan
+	date:2021/9/8
+	funtion:a struct temp but no use
+*********************************/
 struct CliMsg{ 
 	char hao[20];
 	char mi[20];
@@ -1491,6 +1496,13 @@ int funcTwo(int thing,int num,int,void* pget,void* sen,ServerTcpIp& server)//mai
 	}
 	return 0;
 } 
+/********************************
+	author:chenxuan
+	date:2021/9/8
+	funtion:the main funtion to deal message
+	parameter:thing stand what happen,num is socket,len is get len,
+	return:return 0 stand continue,other stop
+*********************************/
 int funcThree(int thing,int num,int,void* pget,void* sen,ServerTcpIp& server)//main deal func
 {
 	char ask[200]={0},*pask=NULL;
@@ -1544,6 +1556,13 @@ int funcThree(int thing,int num,int,void* pget,void* sen,ServerTcpIp& server)//m
 	}
 	return 0;
 }
+/********************************
+	author:chenxuan
+	date:2021/9/8
+	funtion:select model
+	parameter:void
+	return:void
+*********************************/
 void selectTry()
 {
 	ServerTcpIp server(5201);
@@ -1564,6 +1583,13 @@ void selectTry()
 		server.selectModel(&thing,&num,get,2048,sen,funcThree);
 	free(sen);
 }
+/********************************
+	author:chenxuan
+	date:2021/9/8
+	funtion:epoll model
+	parameter:void
+	return:void
+*********************************/
 void serverHttp()
 {
 	int pid=0;
