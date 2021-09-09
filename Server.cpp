@@ -80,7 +80,7 @@ protected:
     }
 public:
 	ServerTcpIp(unsigned short port=5200,int epollNum=1,int wait=5)
-	{
+	{//port is bound ,epollNum is if open epoll model,wait is listen socket max wait
 		sock=socket(AF_INET,SOCK_STREAM,0);//AF=addr family internet
 		addr.sin_addr.s_addr=htonl(INADDR_ANY);//inaddr_any
 		addr.sin_family=AF_INET;//af_intt IPv4
@@ -162,7 +162,7 @@ public:
             if(pfdn[i]!=0)
                 send(pfdn[i],psen,len,0);
     }
-	inline int sendSocket(int socCli,const void* psen,int len)
+	inline int sendSocket(int socCli,const void* psen,int len)//send by socket
 	{
 		return send(socCli,(char*)psen,len,0);
 	}
@@ -384,7 +384,7 @@ public:
 	{
 		return recv(sock,(char*)prec,len,0);
 	}
-	int sendHost(const void* ps,int len)
+	inline int sendHost(const void* ps,int len)
 	{
 		return send(sock,(char*)ps,len,0);
 	}
@@ -859,7 +859,7 @@ public:
 			threadNum=10;
 		thread=new pthread_t[threadNum];
 		if(thread==NULL)
-			exit(0);
+			throw NULL;
 		for(unsigned int i=0;i<threadNum;i++)
 			thread[i]=0;
 		pthread_cond_init(&condition,NULL);
@@ -1617,6 +1617,11 @@ void serverHttp()
 			break;
 	free(sen);
 }
+/********************************
+	author:chenxuan
+	date:2021/9/9
+	funtion:thank you for watching
+*********************************/
 int main(int argc, char** argv) 
 {
 	selectTry();
