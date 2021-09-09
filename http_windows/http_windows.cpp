@@ -80,7 +80,7 @@ public:
 	ServerTcpIp(unsigned short port=5200,int wait=5,int maxClient=0)
 	{
 		if(WSAStartup(MAKEWORD(2,2),&wsa)!=0)
-			exit(0);
+			throw NULL;
 		sock=socket(AF_INET,SOCK_STREAM,0);//AF=addr family internet
 		addr.sin_addr.S_un.S_addr=htonl(INADDR_ANY);//inaddr_any
 		addr.sin_family=AF_INET;//af_intt IPv4
@@ -103,7 +103,7 @@ public:
 		{
 			psockClients=(SOCKET*)malloc(sizeof(SOCKET)*maxClient);
 			if(psockClients==NULL)
-				exit(0);
+				throw NULL;
 			max=maxClient;
 		}
 	}
@@ -270,13 +270,13 @@ public:
 			*pcount=fdClients.fd_count;
 		else
 			return false;
-		for(int i=0;i<fdClients.fd_count;i++)
+		for(unsigned int i=0;i<fdClients.fd_count;i++)
 			p[i]=fdClients.fd_array[i];
 		return true;
 	}
 	bool sendSocketSelect(SOCKET toClient,const void* ps,int len)
 	{
-		for(int i=0;i<fdClients.fd_count;i++)
+		for(unsigned int i=0;i<fdClients.fd_count;i++)
 		{
 			if(toClient==fdClients.fd_array[i])
 			{
@@ -301,7 +301,7 @@ public:
 	}
     bool disconnectSocket(SOCKET clisock)
     {
-        for(int i=0;i<fdClients.fd_count;i++)
+        for(unsigned int i=0;i<fdClients.fd_count;i++)
         {
             if(fdClients.fd_array[i]==clisock)
             {
@@ -409,7 +409,7 @@ public:
 	{
 		closesocket(sock);
 		sock=socket(AF_INET,SOCK_STREAM,0);
-		if(sock==-1)
+		if(sock<=0)
 			return false;
 		return true;
 	}
