@@ -399,9 +399,9 @@ public:
 			return false;
 		return true;
 	}
-	bool sendHost(const void* ps,int len)
+	bool sendHost(const void* psend,int len)
 	{
-		if(send(sock,(char*)ps,len,0)==SOCKET_ERROR)
+		if(send(sock,(char*)psend,len,0)==SOCKET_ERROR)
 			return false;
 		return true;
 	}
@@ -485,13 +485,13 @@ public:
 		pfind=strstr((char*)pask,pneed);
 		if(pfind==NULL)
 			return NULL;
-		return this->findBackString(pfind,needLen,ask);
+		return this->findBackString(pfind,needLen,ask,256);
 	}
 	inline char* findFirst(void* pask,const char* ptofind)
 	{
 		return strstr((char*)pask,ptofind);
 	}
-	char* findBackString(char* local,int len,char* word)
+	char* findBackString(char* local,int len,char* word,int maxWordLen)
 	{
 		int i=0;
 		char* ptemp=local+len+1;
@@ -507,7 +507,7 @@ public:
 				break;
 			else
 				pend++;
-		for(char* pi=ptemp;pi<pend;pi++)
+		for(char* pi=ptemp;pi<pend&&i<maxWordLen;pi++)
 			word[i++]=*pi;
 		word[i]=0;
 		return word;
@@ -689,21 +689,21 @@ public:
 	                return 2;
 	    return 1;
 	}
-	const char* getKeyValue(const void* message,const char* key,char* value)
+	const char* getKeyValue(const void* message,const char* key,char* value,int maxValueLen)
 	{
 		char* temp=strstr((char*)message,key);
 		if(temp==NULL)
 			return NULL;
-		return this->findBackString(temp,strlen(key),value);
+		return this->findBackString(temp,strlen(key),value,maxValueLen);
 	}
-	const char* getKeyLine(const void* message,const char* key,char* line)
+	const char* getKeyLine(const void* message,const char* key,char* line,int maxLineLen)
 	{
 		int i=0;
 		char* ptemp=strstr((char*)message,key);
 		ptemp+=strlen(key);
 		if(ptemp==NULL)
 			return NULL;
-		while(*(ptemp++)!='\n')
+		while(*(ptemp++)!='\n'&&i<maxLineLen)
 			line[i++]=*ptemp;
 		line[i]=0;
 		return line;
@@ -836,7 +836,7 @@ int funcTwo(int thing,int num,void* pget,void* sen,ServerTcpIp& server)
 	{
 		if(false==http.cutLineAsk((char*)pget,"GET"))
 			return 0;
-		printf("ask:%s\n",(char*)pget);
+		printf("ask:%s",(char*)pget);
 		printf("http:%s\n",http.analysisHttpAsk(pget));
 		if(2==http.autoAnalysisGet((char*)pget,(char*)sen,indexName,&len))
 			printf("some thing wrong %s\n",(char*)pget);
@@ -845,7 +845,7 @@ int funcTwo(int thing,int num,void* pget,void* sen,ServerTcpIp& server)
 		if(false==server.selectSend(sen,num,len))
 			printf("send wrong\n");
 		else
-			printf("send success\n");
+			printf("send success\n\n");
 	}
 	return 0;
 }
