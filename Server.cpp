@@ -459,13 +459,13 @@ public:
 		pfind=strstr((char*)pask,pneed);
 		if(pfind==NULL)
 			return NULL;
-		return this->findBackString(pfind,needLen,ask);
+		return this->findBackString(pfind,needLen,ask,256);
 	}
 	inline char* findFirst(void* pask,const char* ptofind)
 	{
 		return strstr((char*)pask,ptofind);
 	}
-	char* findBackString(char* local,int len,char* word)
+	char* findBackString(char* local,int len,char* word,int maxWordLen)
 	{
 		int i=0;
 		char* ptemp=local+len+1;
@@ -481,7 +481,7 @@ public:
 				break;
 			else
 				pend++;
-		for(char* pi=ptemp;pi<pend;pi++)
+		for(char* pi=ptemp;pi<pend&&i<maxWordLen;pi++)
 			word[i++]=*pi;
 		word[i]=0;
 		return word;
@@ -663,21 +663,21 @@ public:
 	                return 2;
 	    return 1;
 	}
-	const char* getKeyValue(const void* message,const char* key,char* value)
+	const char* getKeyValue(const void* message,const char* key,char* value,int maxValueLen)
 	{
 		char* temp=strstr((char*)message,key);
 		if(temp==NULL)
 			return NULL;
-		return this->findBackString(temp,strlen(key),value);
+		return this->findBackString(temp,strlen(key),value,maxValueLen);
 	}
-	const char* getKeyLine(const void* message,const char* key,char* line)
+	const char* getKeyLine(const void* message,const char* key,char* line,int maxLineLen)
 	{
 		int i=0;
 		char* ptemp=strstr((char*)message,key);
 		ptemp+=strlen(key);
 		if(ptemp==NULL)
 			return NULL;
-		while(*(ptemp++)!='\n')
+		while(*(ptemp++)!='\n'&&i<maxLineLen)
 			line[i++]=*ptemp;
 		line[i]=0;
 		return line;
@@ -1465,7 +1465,7 @@ int funcTwo(int thing,int num,int,void* pget,void* sen,ServerTcpIp& server)//mai
 		printf("%s in %d\n",(char*)pget,num);
 	if(thing==2)
 	{
-		if(http.getKeyLine(pget,"Accept-Language",ask)!=NULL)
+		if(http.getKeyLine(pget,"Accept-Language",ask,200)!=NULL)
 			printf("\n%s\n",ask);
 		if(false==http.cutLineAsk((char*)pget,"GET"))
 			return 0;
@@ -1525,7 +1525,7 @@ int funcThree(int thing,int num,int,void* pget,void* sen,ServerTcpIp& server)//m
 		printf("%s in %d\n",(char*)pget,num);
 	if(thing==2)
 	{
-		if(http.getKeyLine(pget,"Accept-Language",ask)!=NULL)
+		if(http.getKeyLine(pget,"Accept-Language",ask,200)!=NULL)
 			printf("\n%s\n",ask);
 		if(false==http.cutLineAsk((char*)pget,"GET"))
 			return 0;
