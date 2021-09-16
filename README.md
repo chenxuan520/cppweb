@@ -14,6 +14,7 @@
 1. git clone https://gitee.com/chenxuan520/server-for-static-web.git
 2. chmod 777 ./install.sh
 3. ./install.sh
+4. 填入端口等信息
 ## 制作说明
 - windows使用select模型
 - linux使用epoll模型

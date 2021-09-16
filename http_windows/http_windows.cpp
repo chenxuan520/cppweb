@@ -162,25 +162,25 @@ public:
 		}
 		return true;
 	}
-	bool sendClient(const void* ps,int len)//model one
+	bool sendClient(const void* psend,int len)//model one
 	{
-		if(send(sockC,(char*)ps,len,0)==SOCKET_ERROR)
+		if(send(sockC,(char*)psend,len,0)==SOCKET_ERROR)
 			return false;
 		return true;
 	}
-	bool sendClientSTwo(const void* ps,int i,int len)//model two
+	bool sendClientSTwo(const void* psend,int i,int len)//model two
 	{
-		if(send(psockClients[i],(char*)ps,len,0)==SOCKET_ERROR)
+		if(send(psockClients[i],(char*)psend,len,0)==SOCKET_ERROR)
 			return false;
 		return true;
 	}
-	bool sendClientsEveryoneTwo(const void* ps,int len)//model two
+	bool sendClientsEveryoneTwo(const void* psend,int len)//model two
 	{
 		for(int i=0;i<numClient;i++)
 		{ 
 			if(psockClients[i]==0)
 				continue;
-			send(psockClients[i],(char*)ps,len,0);
+			send(psockClients[i],(char*)psend,len,0);
 		}
 		return true;
 	}
@@ -248,39 +248,39 @@ public:
 			return false;
 		return true;
 	}
-	bool selectSend(const void* ps,int num,int len)
+	bool selectSend(const void* psend,int num,int len)
 	{
-		if(send(fdClients.fd_array[num],(char*)ps,len,0)==SOCKET_ERROR)
+		if(send(fdClients.fd_array[num],(char*)psend,len,0)==SOCKET_ERROR)
 			return false;
 		return true;
 	}
-	bool selectSendEveryone(void* ps,int len)
+	bool selectSendEveryone(void* psend,int len)
 	{
 		for(unsigned int i=0;i<fdClients.fd_count;i++)
 		{ 
 			SOCKET clientSent=fdClients.fd_array[i];
 			if(clientSent!=0)
-				send(fdClients.fd_array[i],(char*)ps,len,0);
+				send(fdClients.fd_array[i],(char*)psend,len,0);
 		}
 		return true;
 	}
-	bool updateSocketSelect(SOCKET* p,int* pcount)
+	bool updateSocketSelect(SOCKET* psocket,int* pcount)
 	{
 		if(fdClients.fd_count!=0)
 			*pcount=fdClients.fd_count;
 		else
 			return false;
 		for(unsigned int i=0;i<fdClients.fd_count;i++)
-			p[i]=fdClients.fd_array[i];
+			psocket[i]=fdClients.fd_array[i];
 		return true;
 	}
-	bool sendSocketSelect(SOCKET toClient,const void* ps,int len)
+	bool sendSocketSelect(SOCKET toClient,const void* psend,int len)
 	{
 		for(unsigned int i=0;i<fdClients.fd_count;i++)
 		{
 			if(toClient==fdClients.fd_array[i])
 			{
-				send(fdClients.fd_array[i],(char*)ps,len,0);
+				send(fdClients.fd_array[i],(char*)psend,len,0);
 				return true;
 			}
 		}
@@ -293,9 +293,9 @@ public:
 		else
 			return -1;
 	}
-    bool sendSocketAll(int socCli,const void* ps,int len)
+    bool sendSocketAll(int socCli,const void* psend,int len)
 	{
-		if(send(socCli,(char*)ps,len,0)==-1)
+		if(send(socCli,(char*)psend,len,0)==-1)
 			return false;
 		return true;
 	}
@@ -393,19 +393,15 @@ public:
 			return false;
 		return true;
 	}
-	bool receive(void* prec,int len)
+	inline int receiveHost(void* prec,int len)
 	{
-		if(recv(sock,(char*)prec,len,0)==SOCKET_ERROR)
-			return false;
-		return true;
+		return recv(sock,(char*)prec,len,0);
 	}
-	bool sendHost(const void* psend,int len)
+	inline int sendHost(const void* psend,int len)
 	{
-		if(send(sock,(char*)psend,len,0)==SOCKET_ERROR)
-			return false;
-		return true;
+		return send(sock,(char*)psend,len,0);
 	}
-	bool updateSocket()
+	bool disconnectHost()
 	{
 		closesocket(sock);
 		sock=socket(AF_INET,SOCK_STREAM,0);
