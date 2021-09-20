@@ -10,11 +10,13 @@
 - 支持get以及post方法
 - 支持自定义扩展后台 通过dealaskcpp来快速扩展网页内容
 - 支持mysql数据库
+- 支持扩展使用redis数据库
 ## 使用教程
 1. git clone https://gitee.com/chenxuan520/server-for-static-web.git
 2. chmod 777 ./install.sh
 3. ./install.sh
 4. 填入端口等信息
+5. 也可直接更改my.ini的内容
 ## 制作说明
 - windows使用select模型
 - linux使用epoll模型
