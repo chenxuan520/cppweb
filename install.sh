@@ -17,5 +17,6 @@ then
 fi
 make
 make clean
+echo $port $index $memory $back > my.ini
 echo 'every thing is ok'
 ./main $port $index $memory $back
