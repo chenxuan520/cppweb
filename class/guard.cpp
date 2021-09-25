@@ -1,5 +1,6 @@
 #include<unistd.h>
 #include<stdlib.h>
+#include<string.h>
 #include<errno.h>
 #include<stdio.h>
 #include<sys/types.h>
@@ -19,21 +20,15 @@ public:
 		pid=0;
 		pid=fork();
 		if(pid!=0)
-			exit(0);
+			throw 0;
 		if(true==isAllHide)
 		{
 			pid=setsid();
 			if(-1==pid)
-			{
-				perror("pid");
-				exit(0);
-			}
+				throw 1;
 			pid=chdir("/");
 			if(-1==pid)
-			{
-				perror("chdir");
-				exit(0);
-			}
+				throw 2;
 			umask(0);
 			close(STDERR_FILENO);
 			close(STDIN_FILENO);
@@ -44,10 +39,102 @@ public:
 	{
 		while(pfuncWork(arg)==0);	
 	}
+	static bool changeWorkingDir(const char* dirPath)
+	{
+		int temp=chdir(dirPath);
+		if(-1==temp)
+			return false;
+		return true;
+	}
+	static inline void showLastError()
+	{
+		perror("last error");
+	}
+};
+/********************************
+	author:chenxuan
+	date:2021/9/25
+	funtion:file class to do something
+*********************************/
+class FileGet{
+private:
+	char* pbuffer;
+public:
+	FileGet()
+	{
+		pbuffer=NULL;
+	}
+	~FileGet()
+	{
+		if(pbuffer!=NULL)
+		{
+			free(pbuffer);
+			pbuffer=NULL;
+		}
+	}
+	int getFileLen(const char* fileName)
+	{
+		int len=0;
+		FILE* fp=fopen(fileName,"rb");
+		if(fp==NULL)
+			return -1;
+		fseek(fp,0,SEEK_END);
+		len=ftell(fp);
+		fclose(fp);
+		return len;
+	}
+	bool getFileMsg(const char* fileName,char* buffer)
+	{
+		int i=0,len=0;
+		len=this->getFileLen(fileName);
+		FILE* fp=fopen(fileName,"rb");
+		if(fp==NULL)
+			return false;
+		for(i=0;i<len;i++)
+			buffer[i]=fgetc(fp);
+		buffer[i+1]=0;
+		fclose(fp);
+		return true;
+	}
+	bool fileStrstr(const char* fileName,const char* strFind)
+	{
+		int len=0;
+		char* pstr=NULL;
+		len=this->getFileLen(fileName);
+		if(pbuffer!=NULL)
+		{
+			free(pbuffer);
+			pbuffer=NULL;
+		}
+		FILE* fp=fopen(fileName,"r");
+		if(fp==NULL)
+			return false;
+		pbuffer=(char*)malloc(sizeof(char)*(len+10));
+		memset(pbuffer,0,sizeof(char)*(len+5));
+		char* ptemp=pbuffer;
+		if(pbuffer==NULL)
+			return false;
+		if(false==this->getFileMsg(fileName,pbuffer))
+			return false;
+		while((*ptemp<65||*ptemp>122)&&ptemp<pbuffer+sizeof(char)*len)
+			ptemp++;
+		pstr=strstr(ptemp,strFind);
+		if(pbuffer!=NULL)
+		{
+			free(pbuffer);
+			pbuffer=NULL;
+		}
+		fclose(fp);
+		if(pstr!=NULL)
+			return true;
+		else
+			return false;
+		return false;
+	}
 };
 int func(void*)
 {
-	system("date > /data/time");
+	
 	return 0;
 }
 int main()

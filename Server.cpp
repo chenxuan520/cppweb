@@ -1379,7 +1379,10 @@ public:
 	~FileGet()
 	{
 		if(pbuffer!=NULL)
+		{
 			free(pbuffer);
+			pbuffer=NULL;
+		}
 	}
 	int getFileLen(const char* fileName)
 	{
@@ -1411,18 +1414,28 @@ public:
 		char* pstr=NULL;
 		len=this->getFileLen(fileName);
 		if(pbuffer!=NULL)
+		{
 			free(pbuffer);
+			pbuffer=NULL;
+		}
 		FILE* fp=fopen(fileName,"r");
 		if(fp==NULL)
 			return false;
 		pbuffer=(char*)malloc(sizeof(char)*(len+10));
+		memset(pbuffer,0,sizeof(char)*(len+5));
+		char* ptemp=pbuffer;
 		if(pbuffer==NULL)
 			return false;
 		if(false==this->getFileMsg(fileName,pbuffer))
 			return false;
-		pstr=strstr(pbuffer,strFind);
+		while((*ptemp<65||*ptemp>122)&&ptemp<pbuffer+sizeof(char)*len)
+			ptemp++;
+		pstr=strstr(ptemp,strFind);
 		if(pbuffer!=NULL)
+		{
 			free(pbuffer);
+			pbuffer=NULL;
+		}
 		fclose(fp);
 		if(pstr!=NULL)
 			return true;
