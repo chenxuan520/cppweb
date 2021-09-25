@@ -19,7 +19,7 @@ int memory=0;
 int funcTwo(int thing,int num,void* pget,void* sen,ServerTcpIp& server)//main deal func
 {
 	char ask[200]={0};
-	DealHttp http;
+	static DealHttp http;
 	DealAsk dealAsk;
 	int len=0;
     int flag=0;
