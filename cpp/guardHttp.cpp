@@ -132,13 +132,32 @@ public:
 		return false;
 	}
 };
-int func(void*)
+int func(void* guardName)
 {
-	
+	char sys[50]={0};
+	const char* name=(char*)guardName;
+	FileGet file;
+	if(strlen(name)==0)
+		exit(0);
+	sleep(10);
+	sprintf(sys,"pstree -p | grep %s > temp",name);
+	system(sys);
+	if(false==file.fileStrstr("./temp",name))
+		system(name);
 	return 0;
 }
-int main()
+int main(int argc,char** argv)
 {
+	char nameGuard[20]={0};
+	if(argc==1)
+	{
+		printf("please input the name of guard:");
+		scanf("%s",nameGuard);
+	}
 	GuardProcess process;
-	process.working(func,NULL);
+	if(argc>1)
+		process.working(func,argv[1]);
+	else 
+		process.working(func,nameGuard);
+	return 0;
 }
