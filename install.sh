@@ -23,7 +23,6 @@ echo $port $index $memory $back > my.ini
 ./main $port $index $memory $back
 if [ $if_guard == 'y' ]
 then 
-	g++ ./cpp/guardHttp.cpp -o guardHttp
-	./guardHttp main 
+	./guard main 
 fi
 echo 'every thing is ok'
