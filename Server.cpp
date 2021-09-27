@@ -425,8 +425,6 @@ class DealHttp{
 private:
 	char ask[256];
 	char* pfind;
-	char* pfile;
-	int lastLen;
 public:
 	enum FileKind{
 		UNKNOWN=0,HTML=1,EXE=2,IMAGE=3,NOFOUND=4,CSS=5,JS=6,ZIP7=7
@@ -437,13 +435,6 @@ public:
 		for(int i=0;i<256;i++)
 			ask[i]=0;
 		pfind=NULL;
-		pfile=NULL;
-		lastLen=0;
-	}
-	~DealHttp()
-	{
-		if(pfile!=NULL)
-			free(pfile);
 	}
 	bool cutLineAsk(char* pask,const char* pcutIn)
 	{
@@ -552,18 +543,18 @@ public:
 		if(kind==NOFOUND)
 		{
 			this->createTop(kind,pask,&temp,len);
-			*plong=len+temp+10;
+			*plong=len+temp+1;
 			return true;
 		}
 		len=this->getFileLen(pfile);
 		if(len==0)
 			return false;
 		this->createTop(kind,pask,&temp,len);
-		memcpy(pask+temp,this->findFileMsg(pfile,&noUse),len+3);
-		*plong=len+temp+10;
+		this->findFileMsg(pfile,&noUse,pask+temp);
+		*plong=len+temp+1;
 		return true;
 	}
-	char* findFileMsg(const char* pname,int* plen)
+	char* findFileMsg(const char* pname,int* plen,char* buffer)
 	{
 		FILE* fp=fopen(pname,"rb+");
 		int flen=0,i=0;
@@ -571,24 +562,13 @@ public:
 			return NULL;
 		fseek(fp,0,SEEK_END);
 		flen=ftell(fp);
-		if(flen>lastLen)
-		{		
-			if(pfile!=NULL)
-				free(pfile);
-			pfile=(char*)malloc(sizeof(char)*flen+10);
-			lastLen=sizeof(char)*flen+10;
-			memset(pfile,0,sizeof(char)*flen+10);
-		}
-		if(pfile==NULL)
-			return NULL;
-		memset(pfile,0,lastLen);
 		fseek(fp,0,SEEK_SET);
 		for(i=0;i<flen;i++)
-			pfile[i]=fgetc(fp);
-		pfile[i]=0;
+			buffer[i]=fgetc(fp);
+		buffer[i]=0;
 		*plen=flen;
 		fclose(fp);
-		return pfile;
+		return buffer;
 	}
 	int getFileLen(const char* pname)
 	{
@@ -1637,6 +1617,6 @@ void serverHttp()
 *********************************/
 int main(int argc, char** argv) 
 {
-	selectTry();
+	serverHttp();
 	return 0;
 }
