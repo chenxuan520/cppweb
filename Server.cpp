@@ -468,7 +468,7 @@ public:
 				ptemp++;
 		pend=ptemp;
 		while(1)
-			if((*pend>90&&*pend<97&&*pend!=95)||(*pend<48&&*pend!=46&&*pend!=47&&*pend!=45)||*pend>122||*pend==63)
+			if((*pend>90&&*pend<97&&*pend!=95)||(*pend<48&&*pend!=46&&*pend!=47&&*pend!=45&&*pend!=43)||*pend>122||*pend==63)
 				break;
 			else
 				pend++;
@@ -594,6 +594,8 @@ public:
 	            else 
 	                return 2;
 	        }
+	        else
+	        	return 1;
 	    }
 	    else if(strstr(ask,".html"))
 	    {
@@ -602,6 +604,8 @@ public:
 	                return 0;
 	            else 
 	                return 2;
+	        else
+	        	return 1;
 	    }
 	    else if(strstr(ask,".exe"))
 	    {
@@ -610,6 +614,8 @@ public:
 	                return 0;
 	            else 
 	                return 2;
+	        else
+	        	return 1;	        
 	    }
 	    else if(strstr(ask,".png")||strstr(ask,".PNG")||strstr(ask,".jpg")||strstr(ask,".jpeg"))
 	    {
@@ -618,6 +624,8 @@ public:
 	                return 0;
 	            else 
 	                return 2;
+	        else
+	        	return 1;	                
 	    }
 	    else if(strstr(ask,".css"))
 	    {
@@ -626,6 +634,8 @@ public:
 	                return 0;
 	            else 
 	                return 2;
+	        else
+	        	return 1;	                
 	    }
 	    else if(strstr(ask,".js"))
 	    {
@@ -634,6 +644,8 @@ public:
 	                return 0;
 	            else 
 	                return 2;
+	        else
+	        	return 1;
 	    }
 	    else 
 	        if(false==this->createSendMsg(UNKNOWN,psend,ask,plen))
@@ -641,6 +653,8 @@ public:
 	                return 0;
 	            else 
 	                return 2;
+	        else
+	        	return 1;
 	    return 1;
 	}
 	const char* getKeyValue(const void* message,const char* key,char* value,int maxValueLen)
@@ -654,9 +668,9 @@ public:
 	{
 		int i=0;
 		char* ptemp=strstr((char*)message,key);
-		ptemp+=strlen(key);
 		if(ptemp==NULL)
 			return NULL;
+		ptemp+=strlen(key);
 		while(*(ptemp++)!='\n'&&i<maxLineLen)
 			line[i++]=*ptemp;
 		line[i]=0;

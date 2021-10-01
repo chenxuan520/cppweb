@@ -16,7 +16,7 @@ int memory=0;
 	date:2021.7.5
 	funtion:main function to deal ask
 *********************************/
-int funcTwo(int thing,int num,void* pget,void* sen,ServerTcpIp& server)//main deal func
+int funcTwo(int thing,int num,int,void* pget,void* sen,ServerTcpIp& server)//main deal func
 {
 	char ask[200]={0};
 	static DealHttp http;
@@ -72,7 +72,7 @@ int funcTwo(int thing,int num,void* pget,void* sen,ServerTcpIp& server)//main de
 		}
 		else 
 			return 0;
-		if(false==server.sendSocketAll(num,sen,len))
+		if(0>=server.sendSocket(num,sen,len))
 			printf("send wrong\n");
 		else
 			printf("send success\n");
@@ -204,7 +204,7 @@ void serverHttp(int argc,char** argv)
 			return;
 		}
 	}
-	ServerTcpIp server(port,100);
+	ServerTcpIp server((unsigned short)port,100);
 	int thing=0,num=0;
 	char get[2048]={0};
 	char* sen=(char*)malloc(sizeof(char)*memory*1024*1024);
