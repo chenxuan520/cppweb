@@ -15,17 +15,16 @@ class ServerTcpIp{
 private:
 	int sizeAddr;//sizeof(sockaddr_in) connect with addr_in;
 	int backwait;//the most waiting clients ;
-	int numClient;//how many clients now; 
-	int max;//the most clients;
+	int numClient;//how many clients now;
 	int fd_count;//sum of clients in fd_set
+	int last_count;//last fd_count
 	int epfd;//file descriptor to ctrl epoll
 	char* hostip;//host IP 
 	char* hostname;//host name
 	int sock;//file descriptor of host;
-	int* psockClients;//client[];
 	int sockC;//file descriptor to sign every client;
 	epoll_event nowEvent;//a temp event to get event
-    epoll_event* pevent;//all the event
+	epoll_event* pevent;//all the event
 	sockaddr_in addr;//IPv4 of host;
 	sockaddr_in client;//IPv4 of client;
 	fd_set  fdClients;//file descriptor
@@ -36,29 +35,24 @@ protected:
     bool addFd(int addsoc);
     bool deleteFd(int clisoc);
 public:
-    ServerTcpIp(unsigned short port=5200,int epollNum=0,int wait=5,int maxClient=0);
+    ServerTcpIp(unsigned short port=5200,int epollNum=1,int wait=5);
     ~ServerTcpIp();//clean server
     bool bondhost();//bond myself first
-    bool setlisten();//set listem to accept second
-    bool acceptClient();//wait until success model one
-    bool acceptClientsModelTwo(int cliNum);//model two
-    bool receiveMystl(void* pget,int len);//model one
-    bool receiveSMystlModelTwo(void* prec,int cliNum,int len);//model two
-    bool sendClientMystl(const void* ps,int len);//model one
-	bool sendClientSMystlModelTwo(const void* ps,int cliNum,int len);//model two;
-	bool sendClientsEveryoneMystlTwo(const void* ps,int len);//model two
-	bool selectModelMysql(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int ,int ,void* ,void*,ServerTcpIp& ));
-	bool selectSendMystl(const void* ps,int cliNum,int len);
-	bool selectSendEveryoneMystl(void* ps,int len);
-	bool updateSocketSelect(int* p,int* pcount);
-	bool updateSocketEpoll(int* p,int* pcount);
-	bool sendSocketMystlSelect(int toClient,const void* ps,int len);
-    bool sendEverySocket(void* ps,int len);
-	bool sendSocketAll(int socCli,const void* ps,int len);
-	int findSocketSelsct(int i);
-	bool findSocketEpoll(int cliSoc);
-	char* getHostName();
-	char* getHostIp();
-	bool epollModel(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int ,int ,void* ,void*,ServerTcpIp& ));
+	bool setlisten();//set listem to accept second
+	int acceptClient();//wait until success model one
+	bool acceptClients(int* pcliNum);//model two
+	int receiveOne(void* pget,int len);//model one
+	int receiveSocket(int clisoc,void* pget,int len);
+	int sendClientOne(const void* psen,int len);//model one
+	void sendEverySocket(void* psen,int len);
+	int sendSocket(int socCli,const void* psen,int len);//send by socket
+	bool selectModel(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int ,int ,int,void* ,void*,ServerTcpIp& ));
+	bool updateSocket(int* array,int* pcount);//get epoll array
+	bool findSocket(int cliSoc);//find if socket is connect
+	char* getHostName();//get self name
+	char* getHostIp();//get self ip
+	char* getPeerIp(int cliSoc,int* pcliPort);//get ip and port by socket
+	bool epollModel(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int ,int ,int ,void* ,void*,ServerTcpIp& ));
+	bool disconnectSocket(int clisock);//disconnect from socket
 };
 #endif
