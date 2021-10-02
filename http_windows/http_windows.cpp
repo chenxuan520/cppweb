@@ -7,7 +7,7 @@ class WSAinit{
 public:
 	WSAinit()
 	{
-		WSADATA wsa;//web server api data加载库初始化 
+		WSADATA wsa;//web server api data
 		if(WSAStartup(MAKEWORD(2,2),&wsa)!=0)
 		{
 			printf("wsadata wrong\n");
@@ -24,16 +24,14 @@ private:
 	int sizeAddr;//sizeof(sockaddr_in) connect with addr_in;
 	int backwait;//the most waiting clients ;
 	int numClient;//how many clients now; 
-	int max;//the most clients;
 	char* hostip;//host IP 
 	char* hostname;//host name
 	WSADATA wsa;//apply verson of windows;
 	SOCKET sock;//file descriptor of host;
-	SOCKET* psockClients;//client[];
 	SOCKET sockC;//file descriptor to sign every client;
 	SOCKADDR_IN addr;//IPv4 of host;
 	SOCKADDR_IN client;//IPv4 of client;
-	fd_set  fdClients;//file descriptor文件描述符
+	fd_set  fdClients;//file descriptor
 protected:
     int* pfdn;//pointer if file descriptor
     int fdNumNow;//num of fd now
@@ -77,7 +75,7 @@ protected:
         return false;
     } 
 public:
-	ServerTcpIp(unsigned short port=5200,int wait=5,int maxClient=0)
+	ServerTcpIp(unsigned short port=5200,int wait=5)
 	{
 		if(WSAStartup(MAKEWORD(2,2),&wsa)!=0)
 			throw NULL;
@@ -97,20 +95,9 @@ public:
 		hostname=(char*)malloc(sizeof(char)*30);
 		memset(hostname,0,sizeof(char)*30);
 		FD_ZERO(&fdClients);//clean fdClients;
-		if(maxClient<=0||maxClient>100)
-			psockClients=NULL;
-		else 
-		{
-			psockClients=(SOCKET*)malloc(sizeof(SOCKET)*maxClient);
-			if(psockClients==NULL)
-				throw NULL;
-			max=maxClient;
-		}
 	}
 	~ServerTcpIp()//clean server
 	{
-		if(psockClients!=NULL)
-			free(psockClients);
 		closesocket(sock);
 		closesocket(sockC);
 		free(pfdn);
@@ -131,60 +118,39 @@ public:
 		FD_SET(sock,&fdClients);
 		return true;
 	}
-	bool acceptClient()//wait until success
+	unsigned int acceptClient()//wait until success
 	{
 		sockC=accept(sock,(sockaddr*)&client,&sizeAddr);
-		return true;
+		return sockC;
 	}
-	bool acceptClientSTwo(int i)//model two
+	bool acceptClients(unsigned int* psock)//model two
 	{
-		if(i<max)
-		{
-			psockClients[i]=accept(sock,(sockaddr*)&client,&sizeAddr);
-			numClient++;
-		}	
-		else
-			return false;
-		return true;
+		*psock=accept(sock,(sockaddr*)&client,&sizeAddr);
+		return this->addFd(*psock);
 	}
-	bool receiveOne(void* pget,int len)//model one
+	inline int receiveOne(void* pget,int len)//model one
 	{
-		if(recv(sockC,(char*)pget,len,0)==SOCKET_ERROR)
-			return false;
-		return true;
+		return recv(sockC,(char*)pget,len,0);
 	}
-	bool receiveSTwo(void* prec,int i,int len)//model two
+	inline int receiveSocket(unsigned int sock,void* prec,int len)//model two
 	{
-		if(recv(psockClients[i],(char*)prec,len,0)==SOCKET_ERROR)
-		{
-			psockClients[i]=0;
-			return false;
-		}
-		return true;
+		return recv(sock,(char*)prec,len,0);
 	}
-	bool sendClient(const void* psend,int len)//model one
+	inline int sendClientOne(const void* psend,int len)//model one
 	{
-		if(send(sockC,(char*)psend,len,0)==SOCKET_ERROR)
-			return false;
-		return true;
+		return send(sockC,(char*)psend,len,0);
 	}
-	bool sendClientSTwo(const void* psend,int i,int len)//model two
+	inline int sendSocket(unsigned int sock ,const void* psend,int len)//model two
 	{
-		if(send(psockClients[i],(char*)psend,len,0)==SOCKET_ERROR)
-			return false;
-		return true;
+		return send(sock,(char*)psend,len,0);
 	}
-	bool sendClientsEveryoneTwo(const void* psend,int len)//model two
+	void sendEverySocket(const void* psen,int len)//model two
 	{
-		for(int i=0;i<numClient;i++)
-		{ 
-			if(psockClients[i]==0)
-				continue;
-			send(psockClients[i],(char*)psend,len,0);
-		}
-		return true;
+		for(int i=0;i<fdNumNow;i++)
+			if(pfdn[i]!=0)
+			    send(pfdn[i],(char*)psen,len,0);
 	}
-	bool selectModel(int* pthing,int* pnum,void* pget,void* pneed,int len,int (*pfunc)(int ,int ,void* ,void*,ServerTcpIp& ))
+	bool selectModel(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int ,int ,int ,void* ,void*,ServerTcpIp& ))
 	{//0 out,1 in,2 say
 		fd_set temp=fdClients;
 		int sign=select(0,&temp,NULL,NULL,NULL);
@@ -202,19 +168,12 @@ public:
 							SOCKET newClient=accept(sock,(sockaddr*)&newaddr,&sizeAddr);
 							FD_SET(newClient,&fdClients);
 							this->addFd(newClient);
-							for(int j=0;j<(int)fdClients.fd_count;j++)
-							{
-								if(newClient==fdClients.fd_array[j])
-								{
-									*pnum=j;
-									break;
-								}
-							}
 							*pthing=1;
+							*pnum=newClient;
 							strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
 							if(pfunc!=NULL)
 							{
-								if(pfunc(*pthing,*pnum,pget,pneed,*this))
+								if(pfunc(*pthing,*pnum,0,pget,pneed,*this))
 									return false;
 							}
 						}
@@ -224,7 +183,7 @@ public:
 					else
 					{
 						int sRec=recv(fdClients.fd_array[i],(char*)pget,len,0);
-						*pnum=i;
+						*pnum=fdClients.fd_array[i];
 						if(sRec>0)
 							*pthing=2;
 						if(sRec<=0)
@@ -232,12 +191,11 @@ public:
 							closesocket(fdClients.fd_array[i]);
 							FD_CLR(fdClients.fd_array[i],&fdClients);
 							this->deleteFd(fdClients.fd_array[i]);
-							*(char*)pget=NULL;
 							*pthing=0;
 						}
 						if(pfunc!=NULL)
 						{
-							if(pfunc(*pthing,*pnum,pget,pneed,*this))
+							if(pfunc(*pthing,*pnum,sRec,pget,pneed,*this))
 								return false;
 						}
 					}
@@ -248,20 +206,11 @@ public:
 			return false;
 		return true;
 	}
-	bool selectSend(const void* psend,int num,int len)
-	{
-		if(send(fdClients.fd_array[num],(char*)psend,len,0)==SOCKET_ERROR)
-			return false;
-		return true;
-	}
 	bool selectSendEveryone(void* psend,int len)
 	{
 		for(unsigned int i=0;i<fdClients.fd_count;i++)
-		{ 
-			SOCKET clientSent=fdClients.fd_array[i];
-			if(clientSent!=0)
+			if(fdClients.fd_array[i]!=0)
 				send(fdClients.fd_array[i],(char*)psend,len,0);
-		}
 		return true;
 	}
 	bool updateSocketSelect(SOCKET* psocket,int* pcount)
@@ -293,39 +242,32 @@ public:
 		else
 			return -1;
 	}
-    bool sendSocketAll(int socCli,const void* psend,int len)
-	{
-		if(send(socCli,(char*)psend,len,0)==-1)
-			return false;
-		return true;
-	}
     bool disconnectSocket(SOCKET clisock)
     {
         for(unsigned int i=0;i<fdClients.fd_count;i++)
-        {
             if(fdClients.fd_array[i]==clisock)
-            {
-                closesocket(clisock);
                 FD_CLR(fdClients.fd_array[i],&fdClients);
-                return true;
-            }
-        }
-        return false;
+        closesocket(clisock);
+        return this->deleteFd(clisock);
     }
-	int getSocketArray(int* socArray)
+	bool updateSocket(SOCKET* array,int* pcount)
 	{
+		if(fdNumNow!=0)
+			*pcount=fdNumNow;
+		else
+			return false;
 		for(int i=0;i<fdNumNow;i++)
-			socArray[i]=pfdn[i];
-		return fdNumNow;
+			array[i]=pfdn[i];
+		return true;		
 	}
-	bool findSocketArray(int cliSoc)
+	bool findSocket(int cliSoc)
 	{
 		for(int i=0;i<fdNumNow;i++)
 			if(pfdn[i]==cliSoc)
 				return true;
 		return false;
 	}
-	char* getHustIp()
+	char* getHostIp()
 	{
 		char name[30]={0};
 		gethostname(name,30);
@@ -365,14 +307,16 @@ private:
 	char* hostip;//host ip
 	char* hostname;//host name
 public:
-	ClientTcpIp(const char* ps,int port=5200)
+	ClientTcpIp(const char* hostIp,int port=5200)
 	{
 		if(WSAStartup(MAKEWORD(2,2),&wsa)!=0)
 			exit(0);
 		memset(ip,0,20);
-		strcpy(ip,ps);
+		if(hostIp!=NULL)
+			strcpy(ip,hostIp);
 		sock=socket(AF_INET,SOCK_STREAM,0);
-		addrC.sin_addr.S_un.S_addr=inet_addr(ip);
+		if(hostIp!=NULL)
+			addrC.sin_addr.S_un.S_addr=inet_addr(ip);
 		addrC.sin_family=AF_INET;
 		addrC.sin_port=htons(port);
 		hostip=(char*)malloc(sizeof(char)*20);
@@ -386,6 +330,13 @@ public:
 		free(hostname);
 		closesocket(sock);
 		WSACleanup();
+	}
+	void addHostIp(const char* ip)
+	{
+		if(ip==NULL)
+			return;
+		strcpy(this->ip,ip);
+		addrC.sin_addr.S_un.S_addr=inet_addr(ip);
 	}
 	bool tryConnect()
 	{
@@ -409,7 +360,7 @@ public:
 			return false;
 		return true;
 	}
-	char* getHustIp()
+	char* getSelfIp()
 	{
 		char name[30]={0};
 		gethostname(name,30);
@@ -421,7 +372,7 @@ public:
 		memcpy(hostip,inet_ntoa(addr),strlen(inet_ntoa(addr)));
 		return hostip;
 	}
-	char* getHostName()
+	char* getSelfName()
 	{
 		char name[30]={0};
 		gethostname(name,30);
@@ -695,8 +646,36 @@ public:
 		ptemp+=strlen(key);
 		while(*(ptemp++)!='\n'&&i<maxLineLen)
 			line[i++]=*ptemp;
-		line[i]=0;
+		line[i-1]=0;
 		return line;
+	}
+	static void dealUrl(const char* url,char* urlTop,char* urlEnd)
+	{
+		const char* ptemp=NULL;
+		int len=0;
+		if((ptemp=strstr(url,"http://"))==NULL)
+		{
+			if(strstr(url,"https://")!=NULL)
+			{
+				sscanf(url+8,"%[^/]",urlTop);
+				len=strlen(urlTop);
+				sscanf(url+len+8,"%s",urlEnd);
+				return;
+			}
+			else
+			{
+				sscanf(url,"%[^/]",urlTop);
+				len=strlen(urlTop);
+				sscanf(url+len,"%s",urlEnd);
+				return;
+			}
+		}
+		else
+		{
+			sscanf(url+7,"%[^/]",urlTop);
+			len=strlen(urlTop);
+			sscanf(url+len+7,"%s",urlEnd);
+		}
 	}
 };
 struct CliMsg{ 
@@ -803,7 +782,7 @@ void chooseModel(unsigned int* port)
 	printf("please input index.html(default welcome.html):");
 	scanf("%s",indexName);
 }
-int funcTwo(int thing,int num,void* pget,void* sen,ServerTcpIp& server)
+int funcTwo(int thing,int num,int,void* pget,void* sen,ServerTcpIp& server)
 {
 	DealHttp http;
 	int len=0;
@@ -812,12 +791,12 @@ int funcTwo(int thing,int num,void* pget,void* sen,ServerTcpIp& server)
 	memset(sen,0,sizeof(char)*10000000);
 	if(thing==0)
 	{
-		
+		printf("%d out %s\n",num,(char*)pget);
 
 	}
 	if(thing==1)
 	{
-		
+		printf("%d in %s\n",num,(char*)pget);
 	}
 	if(thing==2)
 	{
@@ -829,7 +808,7 @@ int funcTwo(int thing,int num,void* pget,void* sen,ServerTcpIp& server)
 			printf("some thing wrong %s\n",(char*)pget);
 		else
 			printf("create auto success\n");
-		if(false==server.selectSend(sen,num,len))
+		if(false==server.sendSocket(num,sen,len))
 			printf("send wrong\n");
 		else
 			printf("send success\n\n");
@@ -851,9 +830,9 @@ void serverHttp()
 		exit(0);
 	if(false==server.setlisten())
 		exit(0);
-	printf("server ip is:%s\nthe server is ok\n",server.getHustIp());
+	printf("server ip is:%s\nthe server is ok\n",server.getHostIp());
 	while(1)
-		if(false==server.selectModel(&thing,&num,get,sen,2048,funcTwo))
+		if(false==server.selectModel(&thing,&num,get,2048,sen,funcTwo))
 			break;
 	free(sen);
 }
