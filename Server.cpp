@@ -415,6 +415,17 @@ public:
 		memcpy(hostname,name,strlen(name));
 		return hostname;
 	}
+	static bool getDnsIp(const char* name,char* ip)
+	{
+		hostent* phost=gethostbyname(name);
+		if(phost==NULL)
+			return false;
+		in_addr addr;
+		char* p=phost->h_addr_list[0];
+		memcpy(&addr.s_addr,p,phost->h_length);
+		strcpy(ip,inet_ntoa(addr));
+		return true;
+	}
 };
 /********************************
 	author:chenxuan
@@ -673,8 +684,36 @@ public:
 		ptemp+=strlen(key);
 		while(*(ptemp++)!='\n'&&i<maxLineLen)
 			line[i++]=*ptemp;
-		line[i]=0;
+		line[i-1]=0;
 		return line;
+	}
+	static void dealUrl(const char* url,char* urlTop,char* urlEnd)
+	{
+		const char* ptemp=NULL;
+		int len=0;
+		if((ptemp=strstr(url,"http://"))==NULL)
+		{
+			if(strstr(url,"https://")!=NULL)
+			{
+				sscanf(url+8,"%[^/]",urlTop);
+				len=strlen(urlTop);
+				sscanf(url+len+8,"%s",urlEnd);
+				return;
+			}
+			else
+			{
+				sscanf(url,"%[^/]",urlTop);
+				len=strlen(urlTop);
+				sscanf(url+len,"%s",urlEnd);
+				return;
+			}
+		}
+		else
+		{
+			sscanf(url+7,"%[^/]",urlTop);
+			len=strlen(urlTop);
+			sscanf(url+len+7,"%s",urlEnd);
+		}
 	}
 };
 /********************************
@@ -1416,10 +1455,10 @@ public:
 		if(fp==NULL)
 			return false;
 		pbuffer=(char*)malloc(sizeof(char)*(len+10));
-		memset(pbuffer,0,sizeof(char)*(len+5));
 		char* ptemp=pbuffer;
 		if(pbuffer==NULL)
 			return false;
+		memset(pbuffer,0,sizeof(char)*(len+5));
 		if(false==this->getFileMsg(fileName,pbuffer))
 			return false;
 		while((*ptemp<65||*ptemp>122)&&ptemp<pbuffer+sizeof(char)*len)
