@@ -3,6 +3,8 @@
 #include<conio.h>
 #include<time.h>
 #include<winsock2.h>
+//#include<openssl/ssl.h>
+//#include<openssl/err.h>
 class WSAinit{
 public:
 	WSAinit()
@@ -306,6 +308,8 @@ private:
 	char rec[200];//what you get
 	char* hostip;//host ip
 	char* hostname;//host name
+//	SSL* ssl;
+//	SSL_CTX* ctx;
 public:
 	ClientTcpIp(const char* hostIp,int port=5200)
 	{
@@ -323,9 +327,18 @@ public:
 		memset(hostip,0,sizeof(char)*20);
 		hostname=(char*)malloc(sizeof(char)*30);
 		memset(hostname,0,sizeof(char)*30);
+//		ssl=NULL;
+//		ctx=NULL;
 	}
 	~ClientTcpIp()
 	{
+//		if(ssl!=NULL)
+//		{
+//			SSL_shutdown(ssl);
+//			SSL_free(ssl);	
+//		}
+//		if(ctx!=NULL)
+//			SSL_CTX_free(ctx);
 		free(hostip);
 		free(hostname);
 		closesocket(sock);
@@ -393,6 +406,31 @@ public:
 		strcpy(ip,inet_ntoa(addr));
 		return true;
 	} 
+//	bool sslInit()
+//	{
+//		const SSL_METHOD* meth=SSLv23_client_method();
+//		if(meth==NULL)
+//			return false;
+//		ctx=SSL_CTX_new(meth);
+//		if(ctx==NULL)
+//			return false;
+//		ssl=SSL_new(ctx);
+//		if(NULL==ssl)
+//			return false;
+//		SSL_set_fd(ssl,sock);
+//		int ret=SSL_connect(ssl);
+//		if(ret==-1)
+//			return false;
+//		return true;
+//	}
+//	inline int sendhostSSL(const void* psen,int len)
+//	{
+//		return SSL_write(ssl,psen,len);
+//	}
+//	inline int receiveHostSSL(void* buffer,int len)
+//	{
+//		return SSL_read(ssl,buffer,len);
+//	}
 };//D:/Dev-Cpp/MinGW64/x86_64-w64-mingw32/lib/libws2_32.a
 class DealHttp{
 private:
