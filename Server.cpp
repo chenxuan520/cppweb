@@ -9,10 +9,12 @@
 #include<sys/types.h>
 #include<unistd.h>
 #include<string.h>
-#include</usr/include/mysql/mysql.h>
 #include<netdb.h>
 #include<pthread.h>
 #include<queue>
+#include</usr/include/mysql/mysql.h>
+#include<openssl/ssl.h>
+#include<openssl/err.h>
 using namespace std;
 /********************************
 	author:chenxuan
@@ -344,6 +346,8 @@ private:
 	char* hostip;//host ip
 	char* hostname;//host name
 	char selfIp[100];
+	SSL* ssl;
+	SSL_CTX* ctx;
 public:
 	ClientTcpIp(const char* hostIp,unsigned short port)
 	{
@@ -360,9 +364,18 @@ public:
 			addrC.sin_addr.s_addr=inet_addr(hostIp);
 		addrC.sin_family=AF_INET;//af_intt IPv4
 		addrC.sin_port=htons(port);
+		ssl=NULL;
+		ctx=NULL;
 	}
 	~ClientTcpIp()
 	{
+		if(ssl!=NULL)
+		{
+			SSL_shutdown(ssl);
+			SSL_free(ssl);	
+		}
+		if(ctx!=NULL)
+			SSL_CTX_free(ctx);
 		free(hostip);
 		free(hostname);
 		close(sock);
@@ -425,6 +438,31 @@ public:
 		memcpy(&addr.s_addr,p,phost->h_length);
 		strcpy(ip,inet_ntoa(addr));
 		return true;
+	}
+	bool sslInit()
+	{
+		const SSL_METHOD* meth=SSLv23_client_method();
+		if(meth==NULL)
+			return false;
+		ctx=SSL_CTX_new(meth);
+		if(ctx==NULL)
+			return false;
+		ssl=SSL_new(ctx);
+		if(NULL==ssl)
+			return false;
+		SSL_set_fd(ssl,sock);
+		int ret=SSL_connect(ssl);
+		if(ret==-1)
+			return false;
+		return true;
+	}
+	inline int sendhostSSL(const void* psen,int len)
+	{
+		return SSL_write(ssl,psen,len);
+	}
+	inline int receiveHostSSL(void* buffer,int len)
+	{
+		return SSL_read(ssl,buffer,len);
 	}
 };
 /********************************
@@ -971,6 +1009,15 @@ public:
 	inline void mutexUnlock()//user to lock ctrl
 	{
 		pthread_mutex_unlock(&this->lockTask);
+	}
+	static pthread_t createPthread(void* arg,void* (*pfunc)(void*))
+	{
+		pthread_t thread=0;
+		pthread_create(&thread,NULL,pfunc,arg);
+	}
+	static inline void waitPthread(pthread_t thread,void** preturn=NULL)
+	{
+		pthread_join(thread,preturn);
 	}
 };
 /********************************
