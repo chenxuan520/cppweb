@@ -282,10 +282,10 @@ bool ServerTcpIp::addFd(int addsoc)
     {
         if(fdNumNow>=fdMax)
         {
-            pfdn=(int*)realloc(pfdn,sizeof(int)*fdMax+32);
+            pfdn=(int*)realloc(pfdn,sizeof(int)*(fdMax+32));
             if(pfdn==NULL)
-                exit(0);
-            fdMax+=10;
+                return false;
+            fdMax+=31;
         }
         pfdn[fdNumNow]=addsoc;
         fdNumNow++;
