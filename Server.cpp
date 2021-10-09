@@ -58,10 +58,10 @@ protected:
         {
             if(fdNumNow>=fdMax)
             {
-                pfdn=(int*)realloc(pfdn,sizeof(int)*fdMax+32);//try to realloc
+                pfdn=(int*)realloc(pfdn,sizeof(int)*(fdMax+32));//try to realloc
                 if(pfdn==NULL)
                 	return false;
-                fdMax+=10;
+                fdMax+=31;
             }
             pfdn[fdNumNow]=addsoc;
             fdNumNow++;
@@ -1010,12 +1010,12 @@ public:
 	{
 		pthread_mutex_unlock(&this->lockTask);
 	}
-	static pthread_t createPthread(void* arg,void* (*pfunc)(void*))
+	static pthread_t createPthread(void* arg,void* (*pfunc)(void*))//create a thread 
 	{
 		pthread_t thread=0;
 		pthread_create(&thread,NULL,pfunc,arg);
 	}
-	static inline void waitPthread(pthread_t thread,void** preturn=NULL)
+	static inline void waitPthread(pthread_t thread,void** preturn=NULL)//wait the thread end
 	{
 		pthread_join(thread,preturn);
 	}
@@ -1101,7 +1101,7 @@ public:
 		void* pget;	
 	};
 public:
-	ServerTcpIpThreadPool(unsigned short port=5200,int epollNum=0,int wait=5,unsigned int threadNum=0)
+	ServerTcpIpThreadPool(unsigned short port=5200,int epollNum=1,int wait=5,unsigned int threadNum=0)
 	{
 		sock=socket(AF_INET,SOCK_STREAM,0);//AF=addr family internet
 		addr.sin_addr.s_addr=htonl(INADDR_ANY);//inaddr_any

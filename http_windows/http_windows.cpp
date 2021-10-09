@@ -54,10 +54,10 @@ protected:
         {
             if(fdNumNow>=fdMax)
             {
-                pfdn=(int*)realloc(pfdn,sizeof(int)*fdMax+32);
+                pfdn=(int*)realloc(pfdn,sizeof(int)*(fdMax+32));
                 if(pfdn==NULL)
-                    exit(0);
-                fdMax+=10;
+                    return false;
+                fdMax+=31;
             }
             pfdn[fdNumNow]=addsoc;
             fdNumNow++;
@@ -843,7 +843,10 @@ int funcTwo(int thing,int num,int,void* pget,void* sen,ServerTcpIp& server)
 		printf("ask:%s",(char*)pget);
 		printf("http:%s\n",http.analysisHttpAsk(pget));
 		if(2==http.autoAnalysisGet((char*)pget,(char*)sen,indexName,&len))
+		{
+			perror("file");	
 			printf("some thing wrong %s\n",(char*)pget);
+		}
 		else
 			printf("create auto success\n");
 		if(false==server.sendSocket(num,sen,len))
