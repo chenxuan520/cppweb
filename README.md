@@ -13,7 +13,7 @@
 - 支持扩展使用redis数据库
 - 支持扩展使用线程池服务器
 - 自带守护进程，宕机恢复时间小于1分钟
-## 使用教程
+## Linux使用
 1. git clone https://gitee.com/chenxuan520/server-for-static-web.git
 2. chmod 777 ./install.sh
 3. ./install.sh
@@ -25,6 +25,9 @@
 3. ./init 
 4. 打开8888端口远程配置
 5. ./main
+## Window使用
+1. http_windows文件夹下的exe为服务器可直接双击填写配置使用
+2. netsocket.h和netsocket.o是封装好的C++库，使用时需要链接-lnetsocket -lpthread -lwsock32
 ## 制作说明
 - windows使用select模型
 - linux使用epoll模型
