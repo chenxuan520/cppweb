@@ -1014,6 +1014,7 @@ public:
 	{
 		pthread_t thread=0;
 		pthread_create(&thread,NULL,pfunc,arg);
+		return thread;
 	}
 	static inline void waitPthread(pthread_t thread,void** preturn=NULL)//wait the thread end
 	{
