@@ -820,7 +820,7 @@ void chooseModel(unsigned int* port)
 	printf("please input index.html(default welcome.html):");
 	scanf("%s",indexName);
 }
-int funcTwo(int thing,int num,int,void* pget,void* sen,ServerTcpIp& server)
+int funcTwo(int thing,int num,int getLen,void* pget,void* sen,ServerTcpIp& server)
 {
 	DealHttp http;
 	int len=0;
@@ -829,12 +829,12 @@ int funcTwo(int thing,int num,int,void* pget,void* sen,ServerTcpIp& server)
 	memset(sen,0,sizeof(char)*10000000);
 	if(thing==0)
 	{
-		printf("%d out %s\n",num,(char*)pget);
+		printf("%d out\n",num);
 
 	}
 	if(thing==1)
 	{
-		printf("%d in %s\n",num,(char*)pget);
+		printf("%d in %s %d\n",num,(char*)pget,getLen);
 	}
 	if(thing==2)
 	{
