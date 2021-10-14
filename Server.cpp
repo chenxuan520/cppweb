@@ -1149,11 +1149,11 @@ public:
         free(pool);
         pthread_mutex_destroy(&mutex);
 	}
-	void mutexLock()
+	inline void mutexLock()
 	{
 		pthread_mutex_lock(&mutex);
 	}
-	void mutexUnlock()
+	inline void mutexUnlock()
 	{
 		pthread_mutex_unlock(&mutex);
 	}
