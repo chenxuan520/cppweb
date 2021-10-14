@@ -3,8 +3,11 @@
 #include<conio.h>
 #include<time.h>
 #include<winsock2.h>
+#include<pthread.h>
+#include<queue>
 //#include<openssl/ssl.h>
 //#include<openssl/err.h>
+using namespace std;
 class WSAinit{
 public:
 	WSAinit()
@@ -19,6 +22,155 @@ public:
 	~WSAinit()
 	{
 		WSACleanup();
+	}
+};
+class ThreadPool{
+public://a struct for you to add task
+	struct Task{
+		void* (*ptask)(void*);
+		void* arg;
+	};
+private:
+	queue<Task> thingWork;//a queue for struct task
+	pthread_cond_t condition;//a condition mutex
+	pthread_mutex_t lockPoll;//a lock to lock queue
+	pthread_mutex_t lockTask;//a lock for user to ctrl
+	pthread_mutex_t lockBusy;//a lock for busy thread
+	pthread_t* thread;//an array for thread
+	pthread_t threadManager;//thread for manager user to ctrl
+	unsigned int liveThread;//num for live thread
+	unsigned int busyThread;//num for busy thread
+	bool isContinue;//if the pool is continue
+private:
+	static void* worker(void* arg)//the worker for user 
+	{
+		ThreadPool* poll=(ThreadPool*)arg;
+		while(1)
+		{
+			pthread_mutex_lock(&poll->lockPoll);
+			while(poll->isContinue==true&&poll->thingWork.size()==0)
+				pthread_cond_wait(&poll->condition,&poll->lockPoll);
+			if(poll->isContinue==false)
+			{
+				pthread_mutex_unlock(&poll->lockPoll);
+				pthread_exit(NULL);
+			}
+			if(poll->thingWork.size()>0)
+			{
+				pthread_mutex_lock(&poll->lockBusy);
+				poll->busyThread++;
+				pthread_mutex_unlock(&poll->lockBusy);
+				ThreadPool::Task task=poll->thingWork.front();
+				poll->thingWork.pop();
+				pthread_mutex_unlock(&poll->lockPoll);
+				task.ptask(task.arg);
+				pthread_mutex_lock(&poll->lockBusy);
+				poll->busyThread--;
+				pthread_mutex_unlock(&poll->lockBusy);
+			}
+		}
+		return NULL;
+	}
+	static void* manager(void* arg)//manager for user
+	{
+		return NULL;
+	}
+public:
+	ThreadPool(unsigned int threadNum=10)//create threads
+	{
+		if(threadNum<=1)
+			threadNum=10;
+		thread=new pthread_t[threadNum];
+		if(thread==NULL)
+			throw NULL;
+		for(unsigned int i=0;i<threadNum;i++)
+			thread[i]=0;
+		pthread_cond_init(&condition,NULL);
+		pthread_mutex_init(&lockPoll,NULL);
+		pthread_mutex_init(&lockTask,NULL);
+		pthread_mutex_init(&lockBusy,NULL);
+		liveThread=threadNum;
+		isContinue=true;
+		busyThread=0;
+		pthread_create(&threadManager,NULL,manager,this);
+		for(unsigned int i=0;i<threadNum;i++)
+			pthread_create(&thread[i],NULL,worker,this);
+	}
+	~ThreadPool()//destory pool
+	{
+		if(isContinue==false)
+			return;
+		isContinue=false;
+		pthread_join(threadManager,NULL);
+		for(unsigned int i=0;i<liveThread;i++)
+			pthread_cond_signal(&condition);
+		for(unsigned int i=0;i<liveThread;i++)
+			pthread_join(thread[i],NULL);
+		pthread_cond_destroy(&condition);
+		pthread_mutex_destroy(&lockPoll);
+		pthread_mutex_destroy(&lockTask);
+		pthread_mutex_destroy(&lockBusy);
+		delete[] thread;
+	}
+	void threadExit()// a no use funtion
+	{
+		pthread_t pid=pthread_self();
+		for(unsigned int i=0;i<liveThread;i++)
+			if(pid==thread[i])
+			{
+				thread[i]=0;
+				break;
+			}
+		pthread_exit(NULL);
+	}
+	void addTask(Task task)//by this you can add task
+	{
+		if(isContinue==false)
+			return;
+		pthread_mutex_lock(&this->lockPoll);
+		this->thingWork.push(task);
+		pthread_mutex_unlock(&this->lockPoll);
+		pthread_cond_signal(&this->condition);
+	}
+	void endPool()//user delete the pool
+	{
+		isContinue=false;
+		pthread_join(threadManager,NULL);
+		for(unsigned int i=0;i<liveThread;i++)
+			pthread_cond_signal(&condition);
+		for(unsigned int i=0;i<liveThread;i++)
+			pthread_join(thread[i],NULL);
+		pthread_cond_destroy(&condition);
+		pthread_mutex_destroy(&lockPoll);
+		pthread_mutex_destroy(&lockTask);
+		delete[] thread;
+	}
+	void getBusyAndTask(unsigned int* pthread,unsigned int* ptask)//get busy live and task num
+	{
+		pthread_mutex_lock(&lockBusy);
+		*pthread=busyThread;
+		pthread_mutex_unlock(&lockBusy);
+		pthread_mutex_lock(&lockPoll);
+		*ptask=thingWork.size();
+		pthread_mutex_unlock(&lockPoll);
+	}
+	inline void mutexLock()//user to lock ctrl
+	{
+		pthread_mutex_lock(&this->lockTask);
+	}
+	inline void mutexUnlock()//user to lock ctrl
+	{
+		pthread_mutex_unlock(&this->lockTask);
+	}
+	static pthread_t createPthread(void* arg,void* (*pfunc)(void*))//create a thread 
+	{
+		pthread_t thread=0;
+		pthread_create(&thread,NULL,pfunc,arg);
+		return thread;
+	}
+	static inline void waitPthread(pthread_t thread,void** preturn=NULL)//wait the thread end
+	{
+		pthread_join(thread,preturn);
 	}
 };
 class ServerTcpIp{
@@ -152,6 +304,62 @@ public:
 			if(pfdn[i]!=0)
 			    send(pfdn[i],(char*)psen,len,0);
 	}
+	bool epollModel(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int ,int ,int ,void* ,void*,ServerTcpIp& ))
+	{//0 out,1 in,2 say
+		fd_set temp=fdClients;
+		int sign=select(0,&temp,NULL,NULL,NULL);
+		if(sign>0)
+		{
+			for(int i=0;i<(int)fdClients.fd_count;i++)
+			{
+				if(FD_ISSET(fdClients.fd_array[i],&temp))
+				{
+					if(fdClients.fd_array[i]==sock)
+					{
+						if(fdClients.fd_count<FD_SETSIZE)
+						{
+							SOCKADDR_IN newaddr={0};
+							SOCKET newClient=accept(sock,(sockaddr*)&newaddr,&sizeAddr);
+							FD_SET(newClient,&fdClients);
+							this->addFd(newClient);
+							*pthing=1;
+							*pnum=newClient;
+							strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
+							if(pfunc!=NULL)
+							{
+								if(pfunc(*pthing,*pnum,0,pget,pneed,*this))
+									return false;
+							}
+						}
+						else
+							continue;
+					}
+					else
+					{
+						int sRec=recv(fdClients.fd_array[i],(char*)pget,len,0);
+						*pnum=fdClients.fd_array[i];
+						if(sRec>0)
+							*pthing=2;
+						if(sRec<=0)
+						{
+							closesocket(fdClients.fd_array[i]);
+							FD_CLR(fdClients.fd_array[i],&fdClients);
+							this->deleteFd(fdClients.fd_array[i]);
+							*pthing=0;
+						}
+						if(pfunc!=NULL)
+						{
+							if(pfunc(*pthing,*pnum,sRec,pget,pneed,*this))
+								return false;
+						}
+					}
+				}
+			}
+		}
+		else
+			return false;
+		return true;
+	}	
 	bool selectModel(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int ,int ,int ,void* ,void*,ServerTcpIp& ))
 	{//0 out,1 in,2 say
 		fd_set temp=fdClients;
@@ -207,6 +415,376 @@ public:
 		else
 			return false;
 		return true;
+	}
+	bool selectSendEveryone(void* psend,int len)
+	{
+		for(unsigned int i=0;i<fdClients.fd_count;i++)
+			if(fdClients.fd_array[i]!=0)
+				send(fdClients.fd_array[i],(char*)psend,len,0);
+		return true;
+	}
+	bool updateSocketSelect(SOCKET* psocket,int* pcount)
+	{
+		if(fdClients.fd_count!=0)
+			*pcount=fdClients.fd_count;
+		else
+			return false;
+		for(unsigned int i=0;i<fdClients.fd_count;i++)
+			psocket[i]=fdClients.fd_array[i];
+		return true;
+	}
+	bool sendSocketSelect(SOCKET toClient,const void* psend,int len)
+	{
+		for(unsigned int i=0;i<fdClients.fd_count;i++)
+		{
+			if(toClient==fdClients.fd_array[i])
+			{
+				send(fdClients.fd_array[i],(char*)psend,len,0);
+				return true;
+			}
+		}
+		return false;
+	}
+	SOCKET findSocketSelect(int i)
+	{
+		if(fdClients.fd_array[i]!=0)
+			return fdClients.fd_array[i];
+		else
+			return -1;
+	}
+    bool disconnectSocket(SOCKET clisock)
+    {
+        for(unsigned int i=0;i<fdClients.fd_count;i++)
+            if(fdClients.fd_array[i]==clisock)
+                FD_CLR(fdClients.fd_array[i],&fdClients);
+        closesocket(clisock);
+        return this->deleteFd(clisock);
+    }
+	bool updateSocket(SOCKET* array,int* pcount)
+	{
+		if(fdNumNow!=0)
+			*pcount=fdNumNow;
+		else
+			return false;
+		for(int i=0;i<fdNumNow;i++)
+			array[i]=pfdn[i];
+		return true;		
+	}
+	bool findSocket(int cliSoc)
+	{
+		for(int i=0;i<fdNumNow;i++)
+			if(pfdn[i]==cliSoc)
+				return true;
+		return false;
+	}
+	char* getHostIp()
+	{
+		char name[30]={0};
+		gethostname(name,30);
+		hostent* phost=gethostbyname(name);
+		in_addr addr;
+		char* p=phost->h_addr_list[0];
+		memcpy(&addr.S_un.S_addr,p,phost->h_length);
+		memset(hostip,0,sizeof(char)*20);
+		memcpy(hostip,inet_ntoa(addr),strlen(inet_ntoa(addr)));
+		return hostip;
+	}
+	char* getHostName()
+	{
+		char name[30]={0};
+		gethostname(name,30);
+		memcpy(hostname,name,30);
+		return hostname;
+	}
+	char* getPeerIp(SOCKET cliSoc,int* pcliPort)
+	{
+		SOCKADDR_IN cliAddr={0};
+		int len=sizeof(cliAddr);
+		if(-1==getpeername(cliSoc,(SOCKADDR*)&cliAddr,&len))
+			return NULL;
+		*pcliPort=cliAddr.sin_port;
+		return inet_ntoa(cliAddr.sin_addr); 
+	}
+};
+class ServerTcpIpThreadPool{
+private:
+	int sizeAddr;//sizeof(sockaddr_in) connect with addr_in;
+	int backwait;//the most waiting clients ;
+	int numClient;//how many clients now; 
+	char* hostip;//host IP 
+	char* hostname;//host name
+	WSADATA wsa;//apply verson of windows;
+	SOCKET sock;//file descriptor of host;
+	SOCKET sockC;//file descriptor to sign every client;
+	SOCKADDR_IN addr;//IPv4 of host;
+	SOCKADDR_IN client;//IPv4 of client;
+	fd_set  fdClients;//file descriptor
+	ThreadPool* pool;
+protected:
+    int* pfdn;//pointer if file descriptor
+    int fdNumNow;//num of fd now
+    int fdMax;//fd max num
+    bool addFd(int addsoc)
+    {
+        bool flag=false;
+        for(int i=0;i<fdNumNow;i++)
+        {
+            if(pfdn[i]==0)
+            {
+                pfdn[i]=addsoc;
+                flag=true;
+                break;
+            }
+        }
+        if(flag==false)
+        {
+            if(fdNumNow>=fdMax)
+            {
+                pfdn=(int*)realloc(pfdn,sizeof(int)*(fdMax+32));
+                if(pfdn==NULL)
+                    return false;
+                fdMax+=31;
+            }
+            pfdn[fdNumNow]=addsoc;
+            fdNumNow++;
+        }
+        return true;
+    }
+    bool deleteFd(int clisoc)
+    {
+        for(int i=0;i<fdNumNow;i++)
+        {
+            if(pfdn[i]==clisoc)
+            {
+                pfdn[i]=0;
+                return true;
+            }
+        }
+        return false;
+    } 
+public:
+	struct ArgvSer{
+		ServerTcpIpThreadPool& server;
+		int soc;
+		void* pneed;
+	};
+	struct ArgvSerEpoll{
+		ServerTcpIpThreadPool& server;
+		int soc;
+		int thing;
+		int len;
+		void* pneed;
+		void* pget;	
+	};
+public:
+	ServerTcpIpThreadPool(unsigned short port=5200,int wait=5,int threadNum=0)
+	{
+		if(WSAStartup(MAKEWORD(2,2),&wsa)!=0)
+			throw NULL;
+		sock=socket(AF_INET,SOCK_STREAM,0);//AF=addr family internet
+		addr.sin_addr.S_un.S_addr=htonl(INADDR_ANY);//inaddr_any
+		addr.sin_family=AF_INET;//af_intt IPv4
+		addr.sin_port=htons(port);//host to net short
+		sizeAddr=sizeof(sockaddr);
+		backwait=wait;
+		numClient=0;
+		fdNumNow=0;
+		fdMax=100;
+		pfdn=(int*)malloc(sizeof(int)*100);
+		memset(pfdn,0,sizeof(int)*100);
+		hostip=(char*)malloc(sizeof(char)*20);
+		memset(hostip,0,sizeof(char)*20);
+		hostname=(char*)malloc(sizeof(char)*30);
+		memset(hostname,0,sizeof(char)*30);
+		FD_ZERO(&fdClients);//clean fdClients;
+		if(threadNum>0)
+		{	
+			pool=new ThreadPool(threadNum);
+			if(pool==NULL)
+				throw NULL;
+		}
+	}
+	~ServerTcpIpThreadPool()//clean server
+	{
+		closesocket(sock);
+		closesocket(sockC);
+		free(pfdn);
+		free(hostip);
+		free(hostname);
+		WSACleanup();
+	}
+	bool bondhost()//bond myself
+	{
+		if(bind(sock,(sockaddr*)&addr,sizeof(addr))==-1)
+			return false;
+		return true;
+	}
+	bool setlisten()//set listem to accept
+	{
+		if(listen(sock,backwait)==SOCKET_ERROR)
+			return false;
+		FD_SET(sock,&fdClients);
+		return true;
+	}
+	unsigned int acceptClient()//wait until success
+	{
+		sockC=accept(sock,(sockaddr*)&client,&sizeAddr);
+		return sockC;
+	}
+	bool acceptClients(unsigned int* psock)//model two
+	{
+		*psock=accept(sock,(sockaddr*)&client,&sizeAddr);
+		return this->addFd(*psock);
+	}
+	inline int receiveOne(void* pget,int len)//model one
+	{
+		return recv(sockC,(char*)pget,len,0);
+	}
+	inline int receiveSocket(unsigned int sock,void* prec,int len)//model two
+	{
+		return recv(sock,(char*)prec,len,0);
+	}
+	inline int sendClientOne(const void* psend,int len)//model one
+	{
+		return send(sockC,(char*)psend,len,0);
+	}
+	inline int sendSocket(unsigned int sock ,const void* psend,int len)//model two
+	{
+		return send(sock,(char*)psend,len,0);
+	}
+	void sendEverySocket(const void* psen,int len)//model two
+	{
+		for(int i=0;i<fdNumNow;i++)
+			if(pfdn[i]!=0)
+			    send(pfdn[i],(char*)psen,len,0);
+	}
+	bool epollModel(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int ,int ,int ,void* ,void*,ServerTcpIpThreadPool& ))
+	{//0 out,1 in,2 say
+		fd_set temp=fdClients;
+		int sign=select(0,&temp,NULL,NULL,NULL);
+		if(sign>0)
+		{
+			for(int i=0;i<(int)fdClients.fd_count;i++)
+			{
+				if(FD_ISSET(fdClients.fd_array[i],&temp))
+				{
+					if(fdClients.fd_array[i]==sock)
+					{
+						if(fdClients.fd_count<FD_SETSIZE)
+						{
+							SOCKADDR_IN newaddr={0};
+							SOCKET newClient=accept(sock,(sockaddr*)&newaddr,&sizeAddr);
+							FD_SET(newClient,&fdClients);
+							this->addFd(newClient);
+							*pthing=1;
+							*pnum=newClient;
+							strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
+							if(pfunc!=NULL)
+							{
+								if(pfunc(*pthing,*pnum,0,pget,pneed,*this))
+									return false;
+							}
+						}
+						else
+							continue;
+					}
+					else
+					{
+						int sRec=recv(fdClients.fd_array[i],(char*)pget,len,0);
+						*pnum=fdClients.fd_array[i];
+						if(sRec>0)
+							*pthing=2;
+						if(sRec<=0)
+						{
+							closesocket(fdClients.fd_array[i]);
+							FD_CLR(fdClients.fd_array[i],&fdClients);
+							this->deleteFd(fdClients.fd_array[i]);
+							*pthing=0;
+						}
+						if(pfunc!=NULL)
+						{
+							if(pfunc(*pthing,*pnum,sRec,pget,pneed,*this))
+								return false;
+						}
+					}
+				}
+			}
+		}
+		else
+			return false;
+		return true;
+	}	
+	bool selectModel(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int ,int ,int ,void* ,void*,ServerTcpIpThreadPool& ))
+	{//0 out,1 in,2 say
+		fd_set temp=fdClients;
+		int sign=select(0,&temp,NULL,NULL,NULL);
+		if(sign>0)
+		{
+			for(int i=0;i<(int)fdClients.fd_count;i++)
+			{
+				if(FD_ISSET(fdClients.fd_array[i],&temp))
+				{
+					if(fdClients.fd_array[i]==sock)
+					{
+						if(fdClients.fd_count<FD_SETSIZE)
+						{
+							SOCKADDR_IN newaddr={0};
+							SOCKET newClient=accept(sock,(sockaddr*)&newaddr,&sizeAddr);
+							FD_SET(newClient,&fdClients);
+							this->addFd(newClient);
+							*pthing=1;
+							*pnum=newClient;
+							strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
+							if(pfunc!=NULL)
+							{
+								if(pfunc(*pthing,*pnum,0,pget,pneed,*this))
+									return false;
+							}
+						}
+						else
+							continue;
+					}
+					else
+					{
+						int sRec=recv(fdClients.fd_array[i],(char*)pget,len,0);
+						*pnum=fdClients.fd_array[i];
+						if(sRec>0)
+							*pthing=2;
+						if(sRec<=0)
+						{
+							closesocket(fdClients.fd_array[i]);
+							FD_CLR(fdClients.fd_array[i],&fdClients);
+							this->deleteFd(fdClients.fd_array[i]);
+							*pthing=0;
+						}
+						if(pfunc!=NULL)
+						{
+							if(pfunc(*pthing,*pnum,sRec,pget,pneed,*this))
+								return false;
+						}
+					}
+				}
+			}
+		}
+		else
+			return false;
+		return true;
+	}
+    void threadModel(void* pneed,void* (*pfunc)(void*))
+    {
+		ServerTcpIpThreadPool::ArgvSer argv={*this,0,pneed};
+		ThreadPool::Task task={pfunc,&argv};
+    	while(1)
+    	{
+			sockaddr_in newaddr={0};
+			int newClient=accept(sock,(sockaddr*)&newaddr,&sizeAddr);
+			if(newClient==-1)
+				continue;
+			this->addFd(newClient);
+			argv.soc=newClient;
+//			ThreadPool::createPthread(&argv,pfunc);
+			pool->addTask(task);
+		}
 	}
 	bool selectSendEveryone(void* psend,int len)
 	{
@@ -431,7 +1009,7 @@ public:
 //	{
 //		return SSL_read(ssl,buffer,len);
 //	}
-};//D:/Dev-Cpp/MinGW64/x86_64-w64-mingw32/lib/libws2_32.a
+};
 class DealHttp{
 private:
 	char ask[256];
