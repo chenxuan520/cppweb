@@ -24,6 +24,11 @@ public:
 		WSACleanup();
 	}
 };
+/********************************
+	author:chenxuan
+	date:2021/8/10
+	funtion:class thread pool
+*********************************/
 class ThreadPool{
 public://a struct for you to add task
 	struct Task{
@@ -171,6 +176,14 @@ public:
 	static inline void waitPthread(pthread_t thread,void** preturn=NULL)//wait the thread end
 	{
 		pthread_join(thread,preturn);
+	}
+	static void createDetachPthread(void* arg,void* (*pfunc)(void*))//create a ddetach thread
+	{
+		pthread_t thread=0;
+		pthread_attr_t attr;
+		pthread_attr_init(&attr);
+		pthread_attr_setdetachstate(&attr,PTHREAD_CREATE_DETACHED);
+		pthread_create(&thread,&attr,pfunc,arg);
 	}
 };
 class ServerTcpIp{
@@ -416,42 +429,42 @@ public:
 			return false;
 		return true;
 	}
-	bool selectSendEveryone(void* psend,int len)
-	{
-		for(unsigned int i=0;i<fdClients.fd_count;i++)
-			if(fdClients.fd_array[i]!=0)
-				send(fdClients.fd_array[i],(char*)psend,len,0);
-		return true;
-	}
-	bool updateSocketSelect(SOCKET* psocket,int* pcount)
-	{
-		if(fdClients.fd_count!=0)
-			*pcount=fdClients.fd_count;
-		else
-			return false;
-		for(unsigned int i=0;i<fdClients.fd_count;i++)
-			psocket[i]=fdClients.fd_array[i];
-		return true;
-	}
-	bool sendSocketSelect(SOCKET toClient,const void* psend,int len)
-	{
-		for(unsigned int i=0;i<fdClients.fd_count;i++)
-		{
-			if(toClient==fdClients.fd_array[i])
-			{
-				send(fdClients.fd_array[i],(char*)psend,len,0);
-				return true;
-			}
-		}
-		return false;
-	}
-	SOCKET findSocketSelect(int i)
-	{
-		if(fdClients.fd_array[i]!=0)
-			return fdClients.fd_array[i];
-		else
-			return -1;
-	}
+//	bool selectSendEveryone(void* psend,int len)
+//	{
+//		for(unsigned int i=0;i<fdClients.fd_count;i++)
+//			if(fdClients.fd_array[i]!=0)
+//				send(fdClients.fd_array[i],(char*)psend,len,0);
+//		return true;
+//	}
+//	bool updateSocketSelect(SOCKET* psocket,int* pcount)
+//	{
+//		if(fdClients.fd_count!=0)
+//			*pcount=fdClients.fd_count;
+//		else
+//			return false;
+//		for(unsigned int i=0;i<fdClients.fd_count;i++)
+//			psocket[i]=fdClients.fd_array[i];
+//		return true;
+//	}
+//	bool sendSocketSelect(SOCKET toClient,const void* psend,int len)
+//	{
+//		for(unsigned int i=0;i<fdClients.fd_count;i++)
+//		{
+//			if(toClient==fdClients.fd_array[i])
+//			{
+//				send(fdClients.fd_array[i],(char*)psend,len,0);
+//				return true;
+//			}
+//		}
+//		return false;
+//	}
+//	SOCKET findSocketSelect(int i)
+//	{
+//		if(fdClients.fd_array[i]!=0)
+//			return fdClients.fd_array[i];
+//		else
+//			return -1;
+//	}
     bool disconnectSocket(SOCKET clisock)
     {
         for(unsigned int i=0;i<fdClients.fd_count;i++)
@@ -460,13 +473,13 @@ public:
         closesocket(clisock);
         return this->deleteFd(clisock);
     }
-	bool updateSocket(SOCKET* array,int* pcount)
+	bool updateSocket(SOCKET* array,int* pcount,int arrayLen)
 	{
 		if(fdNumNow!=0)
 			*pcount=fdNumNow;
 		else
 			return false;
-		for(int i=0;i<fdNumNow;i++)
+		for(int i=0;i<fdNumNow&&i<arrayLen;i++)
 			array[i]=pfdn[i];
 		return true;		
 	}
@@ -782,7 +795,7 @@ public:
 				continue;
 			this->addFd(newClient);
 			argv.soc=newClient;
-//			ThreadPool::createPthread(&argv,pfunc);
+			task.arg=&argv;
 			pool->addTask(task);
 		}
 	}
@@ -830,13 +843,13 @@ public:
         closesocket(clisock);
         return this->deleteFd(clisock);
     }
-	bool updateSocket(SOCKET* array,int* pcount)
+	bool updateSocket(SOCKET* array,int* pcount,int arrayLen)
 	{
 		if(fdNumNow!=0)
 			*pcount=fdNumNow;
 		else
 			return false;
-		for(int i=0;i<fdNumNow;i++)
+		for(int i=0;i<fdNumNow&&i<arrayLen;i++)
 			array[i]=pfdn[i];
 		return true;		
 	}
@@ -970,7 +983,7 @@ public:
 		memcpy(hostname,name,30);
 		return hostname;
 	}
-	static bool getDnsIp(const char* name,char* ip)
+	static bool getDnsIp(const char* name,char* ip,unsigned int ipMaxLen)
 	{
 		WSADATA wsa;
 		if(WSAStartup(MAKEWORD(2,2),&wsa)!=0)
@@ -981,6 +994,8 @@ public:
 		in_addr addr;
 		char* p=phost->h_addr_list[0];
 		memcpy(&addr.S_un.S_addr,p,phost->h_length);
+		if(strlen(inet_ntoa(addr))<=ipMaxLen)
+			return false;
 		strcpy(ip,inet_ntoa(addr));
 		return true;
 	} 
