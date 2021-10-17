@@ -234,13 +234,13 @@ public:
 			return false;
 		return true;
 	}
-	bool updateSocket(int* array,int* pcount)//get epoll array
+	bool updateSocket(int* array,int* pcount,int arrayLen)//get epoll array
 	{
 		if(fdNumNow!=0)
 			*pcount=fdNumNow;
 		else
 			return false;
-		for(int i=0;i<fdNumNow;i++)
+		for(int i=0;i<fdNumNow&&i<arrayLen;i++)
 			array[i]=pfdn[i];
 		return true;
 	}
@@ -421,14 +421,16 @@ public:
 		memcpy(selfIp,inet_ntoa(addr),strlen(inet_ntoa(addr)));
 		return selfIp;
 	}
-	char* getSelfName(char* hostname)
+	char* getSelfName(char* hostname,unsigned int bufferLen)
 	{
 		char name[300]={0};
 		gethostname(name,300);
+		if(strlen(name)>=bufferLen)
+			return NULL;
 		memcpy(hostname,name,strlen(name));
 		return hostname;
 	}
-	static bool getDnsIp(const char* name,char* ip)
+	static bool getDnsIp(const char* name,char* ip,unsigned int ipMaxLen)
 	{
 		hostent* phost=gethostbyname(name);
 		if(phost==NULL)
@@ -436,6 +438,8 @@ public:
 		in_addr addr;
 		char* p=phost->h_addr_list[0];
 		memcpy(&addr.s_addr,p,phost->h_length);
+		if(strlen(inet_ntoa(addr))>=ipMaxLen)
+			return false;
 		strcpy(ip,inet_ntoa(addr));
 		return true;
 	}
@@ -1020,6 +1024,14 @@ public:
 	{
 		pthread_join(thread,preturn);
 	}
+	static void createDetachPthread(void* arg,void* (*pfunc)(void*))//create a ddetach thread
+	{
+		pthread_t thread=0;
+		pthread_attr_t attr;
+		pthread_attr_init(&attr);
+		pthread_attr_setdetachstate(&attr,PTHREAD_CREATE_DETACHED);
+		pthread_create(&thread,&attr,pfunc,arg);
+	}
 };
 /********************************
 	author:chenxuan
@@ -1269,13 +1281,13 @@ public:
 			return false;
 		return true;
 	}
-	bool updateSocket(int* p,int* pcount)//get epoll array
+	bool updateSocket(int* p,int* pcount,int arrayLen)//get epoll array
 	{
 		if(fdNumNow!=0)
 			*pcount=fdNumNow;
 		else
 			return false;
-		for(int i=0;i<fdNumNow;i++)
+		for(int i=0;i<fdNumNow&&arrayLen;i++)
 			p[i]=pfdn[i];
 		return true;
 	}
@@ -1379,6 +1391,8 @@ public:
     }
     void threadModel(void* pneed,void* (*pfunc)(void*))
     {
+    	ServerTcpIpThreadPool::ArgvSer argv={*this,0,pneed};
+    	ThreadPool::Task task={pfunc,&argv};
     	while(1)
     	{
 			sockaddr_in newaddr={0};
@@ -1386,8 +1400,9 @@ public:
 			if(newClient==-1)
 				continue;
 			this->addFd(newClient);
-			ServerTcpIpThreadPool::ArgvSer argv{*this,newClient,pneed};
-			ThreadPool::Task task={pfunc,&argv};
+			argv.soc=newClient;
+    		task.ptask=pfunc;
+    		task.arg=&argv;
 			pool->addTask(task);
 		}
 	}
