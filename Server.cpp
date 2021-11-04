@@ -18,6 +18,113 @@
 using namespace std;
 /********************************
 	author:chenxuan
+	date:2021/11/3
+	funtion:deal json data
+*********************************/
+class Json{
+private:
+	char* buffer;
+	char word[30];
+	const char* text;
+	unsigned int nowLen;
+	unsigned int maxLen;
+public:
+	Json()
+	{
+		buffer=NULL;
+		text=NULL;
+		nowLen=0;
+		maxLen=0;
+		memset(this->word,0,sizeof(char)*30);
+	}
+	Json(const char* jsonText)
+	{
+		text=jsonText;
+		buffer=NULL;
+		nowLen=0;
+		maxLen=0;
+		memset(this->word,0,sizeof(char)*30);		
+	}
+	~Json()
+	{
+		if(this->buffer!=NULL)
+			free(buffer);
+	}
+	bool jsonInit(unsigned int bufferLen)
+	{
+		if(bufferLen<=10)
+			return false;
+		buffer=(char*)malloc(sizeof(char)*bufferLen);
+		memset(buffer,0,sizeof(char)*bufferLen);
+		if(buffer==NULL)
+			return false;
+		this->maxLen=bufferLen;
+		strcat(this->buffer,"{");
+		this->nowLen+=2;
+		return true;
+	}
+	bool addKeyValue(const char* key,const char* value)
+	{
+		char temp[200]={0};
+		if(nowLen+strlen(key)+strlen(value)>maxLen)
+			return false;
+		if(strlen(key)+strlen(value)>=180)
+			return false;
+		int len=sprintf(temp,"\"%s\":\"%s\";",key,value);
+		strcat(this->buffer,temp);
+		nowLen+=len;
+		return true;
+	}
+	bool addKeyValInt(const char* key,int value)
+	{
+		char temp[50]={0};
+		if(nowLen+50>maxLen)
+			return false;
+		if(strlen(key)>=45)
+			return false;	
+		int len=sprintf(temp,"\"%s\":%d;",key,value);
+		strcat(this->buffer,temp);
+		nowLen+=len;
+		return true;	
+	}
+	const char* endJson()
+	{
+		if(nowLen+5>maxLen)
+			return NULL;
+		strcat(buffer,"}");
+		return this->buffer;
+	}
+	bool jsonToFile(const char* fileName)
+	{
+		FILE* fp=fopen(fileName,"w+");
+		if(fp==NULL)
+			return false;
+		fprintf(fp,"%s",this->buffer);
+		fclose(fp);
+		return true;
+	}
+	const char* operator[](const char* key)
+	{
+		char* temp=NULL;
+		if((temp=strstr((char*)this->text,key))==NULL)
+			return NULL;
+		temp=strchr(temp,'\"');
+		if(temp==NULL)
+			return NULL;
+		temp=strchr(temp+1,'\"');
+		if(temp==NULL)
+			return NULL;
+		temp++;
+		if(strchr(temp,'\"')-temp>30)
+			return NULL;
+		memset(this->word,0,sizeof(char)*30);
+		for(unsigned int i=0;*temp!='\"';i++,temp++)
+			word[i]=*temp;
+		return word;
+	}
+};
+/********************************
+	author:chenxuan
 	date:2021.8.1
 	funtion:this file is all class and zhushi
 *********************************/
@@ -480,7 +587,7 @@ private:
 	char* pfind;
 public:
 	enum FileKind{
-		UNKNOWN=0,HTML=1,EXE=2,IMAGE=3,NOFOUND=4,CSS=5,JS=6,ZIP7=7
+		UNKNOWN=0,HTML=1,EXE=2,IMAGE=3,NOFOUND=4,CSS=5,JS=6,ZIP7=7,JSON=8,
 	};
 public:
 	DealHttp()
@@ -587,23 +694,30 @@ public:
 				"Content-Type:application/x-7z-compressed\r\n"
 				"Content-Length:%d\r\n\r\n",fileLen);
 				break;
+			case JSON:
+				*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
+				"Server LCserver/1.1\r\n"
+				"Connection: keep-alive\r\n"
+				"Content-Type:application/json\r\n"
+				"Content-Length:%d\r\n\r\n",fileLen);
+				break;
 		}
 	}
-	bool createSendMsg(FileKind kind,char* pask,const char* pfile,int* plong)
+	bool createSendMsg(FileKind kind,char* buffer,const char* pfile,int* plong)
 	{
 		int temp=0;
 		int len=0,noUse=0;
 		if(kind==NOFOUND)
 		{
-			this->createTop(kind,pask,&temp,len);
+			this->createTop(kind,buffer,&temp,len);
 			*plong=len+temp+1;
 			return true;
 		}
 		len=this->getFileLen(pfile);
 		if(len==0)
 			return false;
-		this->createTop(kind,pask,&temp,len);
-		this->findFileMsg(pfile,&noUse,pask+temp);
+		this->createTop(kind,buffer,&temp,len);
+		this->findFileMsg(pfile,&noUse,buffer+temp);
 		*plong=len+temp+1;
 		return true;
 	}
@@ -700,6 +814,16 @@ public:
 	        else
 	        	return 1;
 	    }
+		else if(strstr(ask,".json"))
+	    {
+	        if(false==this->createSendMsg(JSON,psend,ask,plen))
+	            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
+	                return 0;
+	            else 
+	                return 2;
+	        else
+	        	return 1;
+	    }
 	    else 
 	        if(false==this->createSendMsg(UNKNOWN,psend,ask,plen))
 	            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
@@ -729,6 +853,14 @@ public:
 		line[i-1]=0;
 		return line;
 	}
+	const char* getAskRoute(const void* message,const char* askWay,char* buffer,unsigned int bufferLen)
+	{
+		char* temp=strstr((char*)message,ask);
+		if(temp==NULL)
+			return NULL;
+		sscanf(temp+strlen(askWay)+1,"%s",buffer);
+		return buffer;
+	}
 	static void dealUrl(const char* url,char* urlTop,char* urlEnd)
 	{
 		const char* ptemp=NULL;
@@ -756,6 +888,123 @@ public:
 			len=strlen(urlTop);
 			sscanf(url+len+7,"%s",urlEnd);
 		}
+	}
+};
+/********************************
+	author:chenxuan
+	date:2021/11/4
+	funtion:the http server for new
+*********************************/
+class HttpServer{
+public:
+	enum RouteType{
+		ONEWAY,WILD,
+	};
+	enum AskType{
+		GET,POST,
+	};
+	struct RouteFuntion{
+		RouteType type;
+		char route[100];
+		void (*pfunc)(DealHttp&,ServerTcpIp&);
+	};
+private:
+	static ServerTcpIp* pserver;
+	static RouteFuntion* array;
+	static unsigned int max;
+	static unsigned int now;
+public:
+	static void HttpServerInit()
+	{
+		array=NULL;
+		array=(RouteFuntion*)malloc(sizeof(RouteFuntion)*20);
+		if(array==NULL)
+			throw NULL;
+		now=0;
+		max=20;
+	}
+	static bool routeHandle(const char* route,void (*pfunc)(DealHttp&,ServerTcpIp&))
+	{
+		if(strlen(route)>100)
+			return false;
+		if(max-now<=2)
+		{
+			array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
+			if(array=NULL)
+				return false;
+			max+=10;
+		}
+		if(strchr(route,'*')!=NULL)
+			array[now].type=WILD;
+		else
+			array[now].type=ONEWAY;
+		strcpy(array[now].route,route);
+		array[now].pfunc=pfunc;
+		now++;
+		return true;
+	}
+	static void run(int port,int memory,const char* defaultFile)
+	{
+		int thing=0,num=0;
+		char get[3000]={0};
+		pserver=new ServerTcpIp;
+		if(pserver==NULL)
+			throw NULL;
+		char* sen=(char*)malloc(sizeof(char)*memory*1024*1024);
+		if(sen==NULL)
+			throw NULL;
+		memset(sen,0,sizeof(char)*memory*1024*1024);
+		pserver->bondhost();
+		pserver->setlisten();
+		pserver->epollModel(&thing,&num,get,3000,sen,func);
+	}
+private:
+	static int func(int thing,int num,int,void* pget,void* sen,ServerTcpIp& server)
+	{
+		DealHttp http;
+		AskType type;
+		int len=0,flag=0;
+		char ask[200]={0};
+		if(thing==2)
+		{
+			if(strstr((char*)pget,"GET")!=NULL)
+				printf("url:%s\n",http.getAskRoute(pget,"GET",ask,200));
+			if(strstr((char*)pget,"POST")!=NULL)
+				printf("url:%s\n",http.getAskRoute(pget,"POST",ask,200));
+			void (*pfunc)(DealHttp&,ServerTcpIp&)=NULL;
+			for(unsigned int i=0;i<now;i++)
+			{
+				if(array[i].type==ONEWAY)
+					if(strcmp(ask,array[i].route)==0)
+					{
+						pfunc=array[i].pfunc;
+						break;
+					}
+				else if(array[i].type==WILD)
+				{
+					if(strstr(ask,array[i].route)!=NULL)
+					{
+						pfunc=array[i].pfunc;
+						break;						
+					}
+				}
+			}
+			if(pfunc!=NULL)
+				pfunc(http,server);
+			else
+			{
+				printf("ask:%s",(char*)pget);
+				printf("http:%s\n",http.analysisHttpAsk(pget));
+				strcpy(ask,http.analysisHttpAsk(pget));
+				flag=http.autoAnalysisGet((char*)pget,(char*)sen,"./index.html",&len);
+			}
+			if(false==server.sendSocket(num,sen,len))
+				printf("send erong\n");
+			else
+				printf("send success\n");
+			return 0;
+		}
+		return 0;
 	}
 };
 /********************************
@@ -1491,14 +1740,14 @@ public:
 		fclose(fp);
 		return len;
 	}
-	bool getFileMsg(const char* fileName,char* buffer)
+	bool getFileMsg(const char* fileName,char* buffer,unsigned int bufferLen)
 	{
 		int i=0,len=0;
 		len=this->getFileLen(fileName);
 		FILE* fp=fopen(fileName,"rb");
 		if(fp==NULL)
 			return false;
-		for(i=0;i<len;i++)
+		for(i=0;i<len&&i<bufferLen;i++)
 			buffer[i]=fgetc(fp);
 		buffer[i+1]=0;
 		fclose(fp);
@@ -1522,7 +1771,7 @@ public:
 		if(pbuffer==NULL)
 			return false;
 		memset(pbuffer,0,sizeof(char)*(len+5));
-		if(false==this->getFileMsg(fileName,pbuffer))
+		if(false==this->getFileMsg(fileName,pbuffer,sizeof(char)*(len+10)))
 			return false;
 		while((*ptemp<65||*ptemp>122)&&ptemp<pbuffer+sizeof(char)*len)
 			ptemp++;
@@ -1576,6 +1825,25 @@ int funcTwo(int thing,int num,int,void* pget,void* sen,ServerTcpIp& server)//mai
 	{
 		if(http.getKeyLine(pget,"Accept-Language",ask,200)!=NULL)
 			printf("\n%s\n",ask);
+		printf("url:%s\n",http.getAskRoute(pget,"GET",ask,200));
+		if(strstr(http.getAskRoute(pget,"GET",ask,200),"/user")!=NULL)
+		{
+			Json json;
+			char data[300]={0};
+			json.jsonInit(200);
+			json.addKeyValue("hahah","lplplp");
+			json.addKeyValInt("dad",23);
+			printf("json:%s\n",json.endJson());
+			json.jsonToFile("./temp");
+			FileGet file;
+			if(false==file.getFileMsg("./temp",data,300))
+				perror("file");
+			if(false==http.createSendMsg(DealHttp::JSON,(char*)sen,"./temp",&len))
+				perror("create");
+			printf("sen %s\n",(char*)sen);
+			server.sendSocket(num,sen,len);
+			return 0;
+		}
 		if(false==http.cutLineAsk((char*)pget,"GET"))
 			return 0;
 		printf("ask:%s\n",(char*)pget);
@@ -1636,6 +1904,7 @@ int funcThree(int thing,int num,int,void* pget,void* sen,ServerTcpIp& server)//m
 	{
 		if(http.getKeyLine(pget,"Accept-Language",ask,200)!=NULL)
 			printf("\n%s\n",ask);
+		printf("url:%s\n",http.getAskRoute(pget,"GET",ask,200));
 		if(false==http.cutLineAsk((char*)pget,"GET"))
 			return 0;
 		printf("ask:%s\n",(char*)pget);
@@ -1733,6 +2002,11 @@ void serverHttp()
 *********************************/
 int main(int argc, char** argv) 
 {
-	serverHttp();
+//	serverHttp();
+//	HttpServer* pserver;
+//	pserver->HttpServerInit();
+//	pserver->run(5201,1,"index.html");
+	HttpServer::HttpServerInit();
+	HttpServer::run(5201,1,"index.html");
 	return 0;
 }
