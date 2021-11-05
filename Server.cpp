@@ -912,18 +912,32 @@ public:
 private:
 	RouteFuntion* array;
 	void* getText;
+	char* error;
 	unsigned int max;
 	unsigned int now;
+	bool isDebug;
 public:
-	HttpServer(unsigned port):ServerTcpIp(port)
+	HttpServer(unsigned port,bool debug=false):ServerTcpIp(port)
 	{
 		getText=NULL;
 		array=NULL;
+		error=NULL;
 		array=(RouteFuntion*)malloc(sizeof(RouteFuntion)*20);
 		if(array==NULL)
 			throw NULL;
+		error=(char*)malloc(sizeof(char)*100);
+		if(error==NULL)
+			throw NULL;
 		now=0;
 		max=20;
+		isDebug=debug;
+	}
+	~HttpServer()
+	{
+		if(array!=NULL)
+			free(array);
+		if(error!=NULL)
+			free(error);
 	}
 	bool routeHandle(AskType ask,RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&))
 	{
@@ -958,10 +972,19 @@ public:
 		if(sen==NULL)
 			throw NULL;
 		memset(sen,0,sizeof(char)*memory*1024*1024);
-		this->bondhost();
-		this->setlisten();
+		if(false==this->bondhost())
+		{
+			sprintf(this->error,"bond wrong");
+			return;
+		}
+		if(false==this->setlisten())
+		{
+			sprintf(this->error,"set listen wrong");
+			return;
+		}
 		this->getText=get;
-		printf("server is ok\n");
+		if(isDebug)
+			printf("server is ok\n");
 		while(1)
 			this->epollHttp(get,3000,sen,defaultFile);
 	}
@@ -973,6 +996,10 @@ public:
 	{
 		return this->getText;
 	}
+	inline const char* lastError()
+	{
+		return error;
+	}
 private:
 	int func(int num,void* pget,void* sen,const char* defaultFile,HttpServer& server)
 	{
@@ -982,12 +1009,16 @@ private:
 		char ask[200]={0};
 		if(strstr((char*)pget,"GET")!=NULL)
 		{
-			printf("url:%s\n",http.getAskRoute(pget,"GET",ask,200));
+			http.getAskRoute(pget,"GET",ask,200);
+			if(isDebug)
+				printf("url:%s\n",ask);
 			type=GET;
 		}
 		if(strstr((char*)pget,"POST")!=NULL)
 		{
-			printf("url:%s\n",http.getAskRoute(pget,"POST",ask,200));
+			http.getAskRoute(pget,"POST",ask,200);
+			if(isDebug)
+				printf("url:%s\n",ask);
 			type=POST;
 		}
 		void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&)=NULL;
@@ -1014,14 +1045,21 @@ private:
 			pfunc(http,*this,num,sen,len);
 		else
 		{
-			printf("http:%s\n",http.analysisHttpAsk(pget));
+			if(isDebug)
+				printf("http:%s\n",http.analysisHttpAsk(pget));
 			strcpy(ask,http.analysisHttpAsk(pget));
 			flag=http.autoAnalysisGet((char*)pget,(char*)sen,defaultFile,&len);
 		}
 		if(false==server.sendSocket(num,sen,len))
-			perror("send wrong");
+		{
+			if(isDebug)
+				perror("send wrong");
+		}
 		else
-			printf("send success\n");
+		{
+			if(isDebug)
+				printf("send success\n");
+		}
 		return 0;
 	}
 	void epollHttp(void* pget,int len,void* pneed,const char* defaultFile)
@@ -1836,6 +1874,16 @@ public:
 			return false;
 		return false;
 	}
+	static bool writeToFile(const char* fileName,const char* buffer,unsigned int writeLen)
+	{
+		FILE* fp=fopen(fileName,"wb+");
+		if(fp==NULL)
+			return false;
+		for(unsigned int i=0;i<writeLen;i++)
+			fputc(buffer[i],fp);
+		fclose(fp);
+		return true;
+	}
 };
 /********************************
 	author:chenxuan
@@ -2051,13 +2099,13 @@ void serverHttp()
 void func(DealHttp& http,HttpServer& server,int num,void* sen,int& len)
 {
 	char buffer[100]={0};
+	server.getWildUrl("/root/",buffer,100);
 	Json json;
 	json.jsonInit(300);
-	json.addKeyValue("jdiajds","ddieadioi");
+	json.addKeyValue("jdiajds",buffer);
 	json.addKeyValInt("wuwu",90);
 	printf("json%s\n",json.endJson());
 	json.jsonToFile("temp");
-	server.getWildUrl("/root/",buffer,100);
 	printf("buffer:%s\n",buffer);
 	http.createSendMsg(DealHttp::JSON,(char*)sen,"temp",&len);
 }
@@ -2069,7 +2117,7 @@ void func(DealHttp& http,HttpServer& server,int num,void* sen,int& len)
 int main(int argc, char** argv) 
 {
 //	serverHttp();
-	HttpServer server(5201);
+	HttpServer server(5201,true);
 	
 	server.routeHandle(HttpServer::GET,HttpServer::WILD,"/root/",func);
 	server.run(1,"./index.html");
