@@ -129,7 +129,7 @@ public:
 	funtion:this file is all class and zhushi
 *********************************/
 class ServerTcpIp{
-private:
+protected:
 	int sizeAddr;//sizeof(sockaddr_in) connect with addr_in;
 	int backwait;//the most waiting clients ;
 	int numClient;//how many clients now;
@@ -895,27 +895,29 @@ public:
 	date:2021/11/4
 	funtion:the http server for new
 *********************************/
-class HttpServer{
+class HttpServer:private ServerTcpIp{
 public:
 	enum RouteType{
 		ONEWAY,WILD,
 	};
 	enum AskType{
-		GET,POST,
+		GET,POST,ALL,
 	};
 	struct RouteFuntion{
+		AskType ask;
 		RouteType type;
 		char route[100];
-		void (*pfunc)(DealHttp&,ServerTcpIp&);
+		void (*pfunc)(DealHttp&,HttpServer&,int num,void* sen,int&);
 	};
 private:
-	static ServerTcpIp* pserver;
-	static RouteFuntion* array;
-	static unsigned int max;
-	static unsigned int now;
+	RouteFuntion* array;
+	void* getText;
+	unsigned int max;
+	unsigned int now;
 public:
-	static void HttpServerInit()
+	HttpServer(unsigned port):ServerTcpIp(port)
 	{
+		getText=NULL;
 		array=NULL;
 		array=(RouteFuntion*)malloc(sizeof(RouteFuntion)*20);
 		if(array==NULL)
@@ -923,7 +925,7 @@ public:
 		now=0;
 		max=20;
 	}
-	static bool routeHandle(const char* route,void (*pfunc)(DealHttp&,ServerTcpIp&))
+	bool routeHandle(AskType ask,RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&))
 	{
 		if(strlen(route)>100)
 			return false;
@@ -934,77 +936,123 @@ public:
 				return false;
 			max+=10;
 		}
-		if(strchr(route,'*')!=NULL)
-			array[now].type=WILD;
-		else
-			array[now].type=ONEWAY;
+		array[now].type=type;
+		array[now].ask=ask;
 		strcpy(array[now].route,route);
 		array[now].pfunc=pfunc;
 		now++;
 		return true;
 	}
-	static void run(int port,int memory,const char* defaultFile)
+	const char* getWildUrl(const char* route,char* buffer,int maxLen)
 	{
-		int thing=0,num=0;
+		char* temp=strstr((char*)this->getText,route);
+		if(temp==NULL)
+			return NULL;
+		temp+=strlen(route);
+		sscanf(temp,"%s",buffer);
+	}
+	void run(int memory,const char* defaultFile)
+	{
 		char get[3000]={0};
-		pserver=new ServerTcpIp;
-		if(pserver==NULL)
-			throw NULL;
 		char* sen=(char*)malloc(sizeof(char)*memory*1024*1024);
 		if(sen==NULL)
 			throw NULL;
 		memset(sen,0,sizeof(char)*memory*1024*1024);
-		pserver->bondhost();
-		pserver->setlisten();
-		pserver->epollModel(&thing,&num,get,3000,sen,func);
+		this->bondhost();
+		this->setlisten();
+		this->getText=get;
+		printf("server is ok\n");
+		while(1)
+			this->epollHttp(get,3000,sen,defaultFile);
+	}
+	int httpSend(int num,void* buffer,int sendLen)
+	{
+		return this->sendSocket(num,buffer,sendLen);
+	}
+	inline void* recText()
+	{
+		return this->getText;
 	}
 private:
-	static int func(int thing,int num,int,void* pget,void* sen,ServerTcpIp& server)
+	int func(int num,void* pget,void* sen,const char* defaultFile,HttpServer& server)
 	{
 		DealHttp http;
-		AskType type;
+		AskType type=GET;
 		int len=0,flag=0;
 		char ask[200]={0};
-		if(thing==2)
+		if(strstr((char*)pget,"GET")!=NULL)
 		{
-			if(strstr((char*)pget,"GET")!=NULL)
-				printf("url:%s\n",http.getAskRoute(pget,"GET",ask,200));
-			if(strstr((char*)pget,"POST")!=NULL)
-				printf("url:%s\n",http.getAskRoute(pget,"POST",ask,200));
-			void (*pfunc)(DealHttp&,ServerTcpIp&)=NULL;
-			for(unsigned int i=0;i<now;i++)
+			printf("url:%s\n",http.getAskRoute(pget,"GET",ask,200));
+			type=GET;
+		}
+		if(strstr((char*)pget,"POST")!=NULL)
+		{
+			printf("url:%s\n",http.getAskRoute(pget,"POST",ask,200));
+			type=POST;
+		}
+		void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&)=NULL;
+		for(unsigned int i=0;i<now;i++)
+		{
+			if(array[i].type==ONEWAY&&(array[i].ask==type||array[i].ask==ALL))
 			{
-				if(array[i].type==ONEWAY)
-					if(strcmp(ask,array[i].route)==0)
-					{
-						pfunc=array[i].pfunc;
-						break;
-					}
-				else if(array[i].type==WILD)
+				if(strcmp(ask,array[i].route)==0)
 				{
-					if(strstr(ask,array[i].route)!=NULL)
-					{
-						pfunc=array[i].pfunc;
-						break;						
-					}
+					pfunc=array[i].pfunc;
+					break;
 				}
 			}
-			if(pfunc!=NULL)
-				pfunc(http,server);
+			else if(array[i].type==WILD&&(array[i].ask==type||array[i].ask==ALL))
+			{
+				if(strstr(ask,array[i].route)!=NULL)
+				{
+					pfunc=array[i].pfunc;
+					break;						
+				}
+			}
+		}
+		if(pfunc!=NULL)
+			pfunc(http,*this,num,sen,len);
+		else
+		{
+			printf("http:%s\n",http.analysisHttpAsk(pget));
+			strcpy(ask,http.analysisHttpAsk(pget));
+			flag=http.autoAnalysisGet((char*)pget,(char*)sen,defaultFile,&len);
+		}
+		if(false==server.sendSocket(num,sen,len))
+			perror("send wrong");
+		else
+			printf("send success\n");
+		return 0;
+	}
+	void epollHttp(void* pget,int len,void* pneed,const char* defaultFile)
+	{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
+		int eventNum=epoll_wait(epfd,pevent,512,-1);
+		for(int i=0;i<eventNum;i++)
+		{
+			epoll_event temp=pevent[i];
+			if(temp.data.fd==sock)
+			{
+				sockaddr_in newaddr={0};
+				int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
+                this->addFd(newClient);
+				nowEvent.data.fd=newClient;
+				nowEvent.events=EPOLLIN;
+				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
+			}
 			else
 			{
-				printf("ask:%s",(char*)pget);
-				printf("http:%s\n",http.analysisHttpAsk(pget));
-				strcpy(ask,http.analysisHttpAsk(pget));
-				flag=http.autoAnalysisGet((char*)pget,(char*)sen,"./index.html",&len);
+				int getNum=recv(temp.data.fd,(char*)pget,len,0);
+				if(getNum>0)
+					func(temp.data.fd,pget,pneed,defaultFile,*this);
+				else
+				{
+                    this->deleteFd(temp.data.fd);
+					epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
+					close(temp.data.fd);
+				}
 			}
-			if(false==server.sendSocket(num,sen,len))
-				printf("send erong\n");
-			else
-				printf("send success\n");
-			return 0;
 		}
-		return 0;
+		return ;
 	}
 };
 /********************************
@@ -1997,16 +2045,33 @@ void serverHttp()
 }
 /********************************
 	author:chenxuan
+	date:2021/11/5
+	funtion:tryfunction
+*********************************/
+void func(DealHttp& http,HttpServer& server,int num,void* sen,int& len)
+{
+	char buffer[100]={0};
+	Json json;
+	json.jsonInit(300);
+	json.addKeyValue("jdiajds","ddieadioi");
+	json.addKeyValInt("wuwu",90);
+	printf("json%s\n",json.endJson());
+	json.jsonToFile("temp");
+	server.getWildUrl("/root/",buffer,100);
+	printf("buffer:%s\n",buffer);
+	http.createSendMsg(DealHttp::JSON,(char*)sen,"temp",&len);
+}
+/********************************
+	author:chenxuan
 	date:2021/9/9
 	funtion:thank you for watching
 *********************************/
 int main(int argc, char** argv) 
 {
 //	serverHttp();
-//	HttpServer* pserver;
-//	pserver->HttpServerInit();
-//	pserver->run(5201,1,"index.html");
-	HttpServer::HttpServerInit();
-	HttpServer::run(5201,1,"index.html");
+	HttpServer server(5201);
+	
+	server.routeHandle(HttpServer::GET,HttpServer::WILD,"/root/",func);
+	server.run(1,"./index.html");
 	return 0;
 }
