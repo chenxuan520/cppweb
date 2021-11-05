@@ -1,6 +1,7 @@
 #include<iostream>
 #include<cstdlib>
 #include<stdio.h>
+#include<time.h>
 #include<netinet/in.h>
 #include<arpa/inet.h>
 #include<sys/socket.h>
@@ -861,6 +862,13 @@ public:
 		sscanf(temp+strlen(askWay)+1,"%s",buffer);
 		return buffer;
 	}
+	const char* getRouteValue(const void* routeMeg,const char* key,char* value,unsigned int valueLen)
+	{
+		char* temp=strstr((char*)routeMeg,key);
+		if(temp==NULL)
+			return NULL;
+		return this->findBackString(temp,strlen(key),value,valueLen);
+	}
 	static void dealUrl(const char* url,char* urlTop,char* urlEnd)
 	{
 		const char* ptemp=NULL;
@@ -889,6 +897,20 @@ public:
 			sscanf(url+len+7,"%s",urlEnd);
 		}
 	}
+};
+/********************************
+	author:chenxuan
+	date:2021/11/5
+	funtion:my jwt try
+*********************************/
+class WebToken{
+private:
+	struct Token{
+		int now;
+		int end;
+	};
+public:
+//	const char* createToken(const char* key,const char*)
 };
 /********************************
 	author:chenxuan
@@ -1796,6 +1818,129 @@ public:
 };
 /********************************
 	author:chenxuan
+	date:2021/11/5
+	funtion:server tcp ip 2.0
+*********************************/
+class ServerPool:public ServerTcpIp{
+private:
+	ThreadPool* pool;
+	pthread_mutex_t mutex;
+public:
+	struct ArgvSer{
+		ServerPool& server;
+		int soc;
+		void* pneed;
+	};
+	struct ArgvSerEpoll{
+		ServerPool& server;
+		int soc;
+		int thing;
+		int len;
+		void* pneed;
+		void* pget;	
+	};
+public:
+	ServerPool(unsigned short port,unsigned int threadNum=0):ServerTcpIp(port)
+	{
+		if(threadNum>0)
+		{	
+			pool=new ThreadPool(threadNum);
+			if(pool==NULL)
+				throw NULL;
+		}
+		pthread_mutex_init(&mutex,NULL);
+	}
+	~ServerPool()
+	{
+       pthread_mutex_destroy(&mutex);
+	}
+	inline void mutexLock()
+	{
+		pthread_mutex_lock(&mutex);
+	}
+	inline void mutexUnlock()
+	{
+		pthread_mutex_unlock(&mutex);
+	}
+	bool mutexTryLock()
+	{
+		if(0==pthread_mutex_trylock(&mutex))
+			return true;
+		else
+			return false;
+	}
+	void threadModel(void* pneed,void* (*pfunc)(void*))
+    {
+    	ServerPool::ArgvSer argv={*this,0,pneed};
+    	ThreadPool::Task task={pfunc,&argv};
+    	while(1)
+    	{
+			sockaddr_in newaddr={0};
+			int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
+			if(newClient==-1)
+				continue;
+			this->addFd(newClient);
+			argv.soc=newClient;
+    		task.ptask=pfunc;
+    		task.arg=&argv;
+			pool->addTask(task);
+		}
+	}
+	bool epollThread(int* pthing,int* pnum,void* pget,int len,void* pneed,void* (*pfunc)(void*))
+	{
+		int eventNum=epoll_wait(epfd,pevent,512,-1);
+		for(int i=0;i<eventNum;i++)
+		{
+			epoll_event temp=pevent[i];
+			if(temp.data.fd==sock)
+			{
+				sockaddr_in newaddr={0};
+				int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
+	            this->addFd(newClient);
+				nowEvent.data.fd=newClient;
+				nowEvent.events=EPOLLIN;
+				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
+				*pthing=1;
+				*pnum=newClient;
+				strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
+				ServerPool::ArgvSerEpoll argv={*this,*pnum,*pthing,0,pneed,pget};
+				ThreadPool::Task task={pfunc,&argv};
+				if(pfunc!=NULL)
+					pool->addTask(task);
+			}
+			else
+			{
+				int getNum=recv(temp.data.fd,(char*)pget,len,0);
+				*pnum=temp.data.fd;
+				if(getNum>0)
+					*pthing=2;
+				else
+				{
+					*(char*)pget=0;
+					*pthing=0;
+	                this->deleteFd(temp.data.fd);
+					epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
+					close(temp.data.fd);
+				}
+				if(pfunc!=NULL)
+				{
+					ServerPool::ArgvSerEpoll argv={*this,*pnum,*pthing,getNum,pneed,pget};
+					ThreadPool::Task task={pfunc,&argv};
+					if(pfunc!=NULL)
+						pool->addTask(task);
+				}
+			}
+		}
+		return true;
+	}
+	inline bool threadDeleteSoc(int clisoc)
+	{
+		close(clisoc);
+		return this->deleteFd(clisoc);
+	}
+};
+/********************************
+	author:chenxuan
 	date:2021/9/4
 	funtion:the class ti ctrl file get and len 
 *********************************/
@@ -2098,12 +2243,14 @@ void serverHttp()
 *********************************/
 void func(DealHttp& http,HttpServer& server,int num,void* sen,int& len)
 {
-	char buffer[100]={0};
+	char buffer[100]={0},name[30]={0};
 	server.getWildUrl("/root/",buffer,100);
+	http.getRouteValue(buffer,"name",name,30);
 	Json json;
 	json.jsonInit(300);
-	json.addKeyValue("jdiajds",buffer);
+	json.addKeyValue("buffer",buffer);
 	json.addKeyValInt("wuwu",90);
+	json.addKeyValue("name",name);
 	printf("json%s\n",json.endJson());
 	json.jsonToFile("temp");
 	printf("buffer:%s\n",buffer);
@@ -2117,9 +2264,12 @@ void func(DealHttp& http,HttpServer& server,int num,void* sen,int& len)
 int main(int argc, char** argv) 
 {
 //	serverHttp();
-	HttpServer server(5201,true);
+	HttpServer server(5201);
 	
 	server.routeHandle(HttpServer::GET,HttpServer::WILD,"/root/",func);
-	server.run(1,"./index.html");
+	server.routeHandle(HttpServer::GET,HttpServer::WILD,"/key/",[](DealHttp&,HttpServer&,int,void*,int&){
+		printf("kokoko");
+	});
+	server.run(1 ,"./index.html");
 	return 0;
 }
