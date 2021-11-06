@@ -210,6 +210,8 @@ void serverHttp(int argc,char** argv)
 	char* sen=(char*)malloc(sizeof(char)*memory*1024*1024);
 	if(sen==NULL)
 		printf("memory wrong\n");
+//	HttpServer server(5200);
+//	server.run(1,"./index.html");
 	if(false==server.bondhost())
 	{
 		printf("bound wrong\n");

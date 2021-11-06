@@ -4,6 +4,7 @@
 	funtion:do not change this file 
 *********************************/
 #include"../hpp/server.h"
+#include"../hpp/http.h"
 #include<netinet/in.h>
 #include<arpa/inet.h>
 #include<sys/socket.h>
@@ -303,4 +304,170 @@ bool ServerTcpIp::deleteFd(int clisoc)
         }
     }
     return false;
+}
+HttpServer::HttpServer(unsigned port,bool debug):ServerTcpIp(port)
+{
+	getText=NULL;
+	array=NULL;
+	error=NULL;
+	array=(RouteFuntion*)malloc(sizeof(RouteFuntion)*20);
+	if(array==NULL)
+		throw NULL;
+	error=(char*)malloc(sizeof(char)*100);
+	if(error==NULL)
+		throw NULL;
+	now=0;
+	max=20;
+	isDebug=debug;
+}
+HttpServer::~HttpServer()
+{
+	if(array!=NULL)
+		free(array);
+	if(error!=NULL)
+		free(error);
+}
+bool HttpServer::routeHandle(AskType ask,RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&))
+{
+	if(strlen(route)>100)
+		return false;
+	if(max-now<=2)
+	{
+		array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
+		if(array=NULL)
+			return false;
+		max+=10;
+	}
+	array[now].type=type;
+	array[now].ask=ask;
+	strcpy(array[now].route,route);
+	array[now].pfunc=pfunc;
+	now++;
+	return true;
+}
+const char* HttpServer::getWildUrl(const char* route,char* buffer,int maxLen)
+{
+	char* temp=strstr((char*)this->getText,route);
+	if(temp==NULL)
+		return NULL;
+	temp+=strlen(route);
+	sscanf(temp,"%s",buffer);
+}
+void HttpServer::run(int memory,const char* defaultFile)
+{
+	char get[3000]={0};
+	char* sen=(char*)malloc(sizeof(char)*memory*1024*1024);
+	if(sen==NULL)
+		throw NULL;
+	memset(sen,0,sizeof(char)*memory*1024*1024);
+	if(false==this->bondhost())
+	{
+		sprintf(this->error,"bond wrong");
+		return;
+	}
+	if(false==this->setlisten())
+	{
+		sprintf(this->error,"set listen wrong");
+		return;
+	}
+	this->getText=get;
+	if(isDebug)
+		printf("server is ok\n");
+	while(1)
+		this->epollHttp(get,3000,sen,defaultFile);
+}
+int HttpServer::httpSend(int num,void* buffer,int sendLen)
+{
+	return this->sendSocket(num,buffer,sendLen);
+}
+int HttpServer::func(int num,void* pget,void* sen,const char* defaultFile,HttpServer& server)
+{
+	DealHttp http;
+	AskType type=GET;
+	int len=0,flag=0;
+	char ask[200]={0};
+	if(strstr((char*)pget,"GET")!=NULL)
+	{
+		http.getAskRoute(pget,"GET",ask,200);
+		if(isDebug)
+			printf("url:%s\n",ask);
+		type=GET;
+	}
+	if(strstr((char*)pget,"POST")!=NULL)
+	{
+		http.getAskRoute(pget,"POST",ask,200);
+		if(isDebug)
+			printf("url:%s\n",ask);
+		type=POST;
+	}
+	void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&)=NULL;
+	for(unsigned int i=0;i<now;i++)
+	{
+		if(array[i].type==ONEWAY&&(array[i].ask==type||array[i].ask==ALL))
+		{
+			if(strcmp(ask,array[i].route)==0)
+			{
+				pfunc=array[i].pfunc;
+				break;
+			}
+		}
+		else if(array[i].type==WILD&&(array[i].ask==type||array[i].ask==ALL))
+		{
+			if(strstr(ask,array[i].route)!=NULL)
+			{
+				pfunc=array[i].pfunc;
+				break;						
+			}
+		}
+	}
+	if(pfunc!=NULL)
+		pfunc(http,*this,num,sen,len);
+	else
+	{
+		if(isDebug)
+			printf("http:%s\n",http.analysisHttpAsk(pget));
+		strcpy(ask,http.analysisHttpAsk(pget));
+		flag=http.autoAnalysisGet((char*)pget,(char*)sen,defaultFile,&len);
+	}
+	if(false==server.sendSocket(num,sen,len))
+	{
+		if(isDebug)
+			perror("send wrong");
+	}
+	else
+	{
+		if(isDebug)
+			printf("send success\n");
+	}
+	return 0;
+}
+void HttpServer::epollHttp(void* pget,int len,void* pneed,const char* defaultFile)
+{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
+	int eventNum=epoll_wait(epfd,pevent,512,-1);
+	for(int i=0;i<eventNum;i++)
+	{
+		epoll_event temp=pevent[i];
+		if(temp.data.fd==sock)
+		{
+			sockaddr_in newaddr={0};
+			int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
+            this->addFd(newClient);
+			nowEvent.data.fd=newClient;
+			nowEvent.events=EPOLLIN;
+			epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
+		}
+		else
+		{
+			int getNum=recv(temp.data.fd,(char*)pget,len,0);
+			if(getNum>0)
+				func(temp.data.fd,pget,pneed,defaultFile,*this);
+			else
+			{
+                this->deleteFd(temp.data.fd);
+				epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
+				close(temp.data.fd);
+			}
+		}
+	}
+	return ;
 }
