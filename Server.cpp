@@ -88,6 +88,18 @@ public:
 		nowLen+=len;
 		return true;	
 	}
+	bool addKeyValFloat(const char* key,float value,int output)
+	{
+		char temp[50]={0};
+		if(nowLen+50>maxLen)
+			return false;
+		if(strlen(key)>=45)
+			return false;	
+		int len=sprintf(temp,"\"%s\":%.*f;",key,output,value);
+		strcat(this->buffer,temp);
+		nowLen+=len;
+		return true;		
+	}
 	const char* endJson()
 	{
 		if(nowLen+5>maxLen)
@@ -826,6 +838,7 @@ public:
 	        	return 1;
 	    }
 	    else 
+	    {
 	        if(false==this->createSendMsg(UNKNOWN,psend,ask,plen))
 	            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
 	                return 0;
@@ -833,6 +846,7 @@ public:
 	                return 2;
 	        else
 	        	return 1;
+		}
 	    return 1;
 	}
 	const char* getKeyValue(const void* message,const char* key,char* value,int maxValueLen)
@@ -905,12 +919,95 @@ public:
 *********************************/
 class WebToken{
 private:
-	struct Token{
-		int now;
-		int end;
-	};
+	char* backString;
+	char err[30];
 public:
-//	const char* createToken(const char* key,const char*)
+	WebToken()
+	{
+		backString=NULL;
+		memset(err,0,sizeof(char)*30);
+		sprintf(err,"no error");
+	}
+	const char* createToken(const char* key,const char* encryption,char* getString,unsigned int stringLen,unsigned int liveSecond)
+	{
+		int temp=0;
+		if(key==NULL||encryption==NULL||getString==NULL||stringLen<sizeof(char)*strlen(encryption)+30)
+		{
+			sprintf(err,"input wrong");
+			return NULL;
+		}	
+		if(backString!=NULL)
+			free(backString);
+		backString=(char*)malloc(sizeof(char)*strlen(encryption)+30);
+		memset(backString,0,sizeof(char)*strlen(encryption)+30);
+		if(backString==NULL)
+		{
+			sprintf(err,"malloc wrong");
+			return NULL;
+		}
+		for(unsigned int i=0;i<strlen(key);i++)
+			temp+=key[i];
+		int end=time(NULL)+liveSecond+temp;
+		temp=temp%4;
+		for(unsigned int i=0;i<strlen(encryption);i++)
+		{
+			backString[i]=encryption[i]-temp;
+			if(backString[i]==94)
+				backString[i]=92;
+		}
+		char tempString[30]={0};
+		sprintf(tempString,"&%d&%c",end,encryption[0]);
+		strcat(backString,tempString);
+		strcpy(getString,backString);
+		return getString;
+	}
+	const char* decryptToken(const char* key,const char* token,char* buffer,unsigned int bufferLen)
+	{
+		char* temp=strchr((char*)token,'&');
+		if(temp==NULL||key==NULL||token==NULL||buffer==NULL||bufferLen<strlen(token))
+		{
+			sprintf(err,"input wrong");
+			return NULL;
+		}
+		if(backString!=NULL)
+			free(backString);
+		backString=(char*)malloc(sizeof(char)*strlen(token));
+		memset(backString,0,sizeof(char)*strlen(token));
+		int end=0;
+		if(sscanf(temp+1,"%d",&end)<=0)
+		{
+			sprintf(err,"get time wrong");
+			return NULL;
+		}
+		int keyTemp=0;
+		for(unsigned int i=0;i<strlen(key);i++)
+			keyTemp+=key[i];
+		end-=keyTemp;
+		if(end-time(NULL)<=0)
+		{
+			sprintf(err,"over time");
+			return NULL;
+		}
+		keyTemp=keyTemp%4;
+		unsigned int i=0;
+		for(i=0;i+token<temp;i++)
+			if(token[i]!=92)
+				backString[i]=token[i]+keyTemp;
+			else
+				backString[i]=97;
+		backString[i+1]=0;
+		if(backString[0]!=token[strlen(token)-1])
+		{
+			sprintf(err,"key wrong");
+			return NULL;
+		}
+		strcpy(buffer,backString);
+		return buffer;
+	}
+	inline const char* LastError()
+	{
+		return err;
+	}
 };
 /********************************
 	author:chenxuan
@@ -1852,7 +1949,8 @@ public:
 	}
 	~ServerPool()
 	{
-       pthread_mutex_destroy(&mutex);
+		delete pool;
+       	pthread_mutex_destroy(&mutex);
 	}
 	inline void mutexLock()
 	{
@@ -2256,6 +2354,17 @@ void func(DealHttp& http,HttpServer& server,int num,void* sen,int& len)
 	printf("buffer:%s\n",buffer);
 	http.createSendMsg(DealHttp::JSON,(char*)sen,"temp",&len);
 }
+void funHa(DealHttp& http,HttpServer& server,int num,void* sen,int& len)
+{
+	char buffer[100]={0},name[30]={0};
+	Json json;
+	json.jsonInit(300);
+	json.addKeyValue("key","op");
+	json.endJson();
+	json.jsonToFile("temp");
+	printf("buffer:%s\n",buffer);
+	http.createSendMsg(DealHttp::JSON,(char*)sen,"temp",&len);
+}
 /********************************
 	author:chenxuan
 	date:2021/9/9
@@ -2264,12 +2373,10 @@ void func(DealHttp& http,HttpServer& server,int num,void* sen,int& len)
 int main(int argc, char** argv) 
 {
 //	serverHttp();
-	HttpServer server(5201);
+	HttpServer server(5201,true);
 	
 	server.routeHandle(HttpServer::GET,HttpServer::WILD,"/root/",func);
-	server.routeHandle(HttpServer::GET,HttpServer::WILD,"/key/",[](DealHttp&,HttpServer&,int,void*,int&){
-		printf("kokoko");
-	});
+	server.routeHandle(HttpServer::ALL,HttpServer::ONEWAY,"/key/",funHa);
 	server.run(1 ,"./index.html");
 	return 0;
 }

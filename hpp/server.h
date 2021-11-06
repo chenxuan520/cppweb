@@ -1,5 +1,6 @@
 #ifndef _SERVER_H_
 #define _SERVER_H_
+#include"./http.h"
 #include<netinet/in.h>
 #include<arpa/inet.h>
 #include<sys/socket.h>
@@ -12,7 +13,7 @@
 #include<iostream>
 using namespace std;
 class ServerTcpIp{
-private:
+protected:
 	int sizeAddr;//sizeof(sockaddr_in) connect with addr_in;
 	int backwait;//the most waiting clients ;
 	int numClient;//how many clients now;
@@ -54,5 +55,45 @@ public:
 	char* getPeerIp(int cliSoc,int* pcliPort);//get ip and port by socket
 	bool epollModel(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int ,int ,int ,void* ,void*,ServerTcpIp& ));
 	bool disconnectSocket(int clisock);//disconnect from socket
+};
+class HttpServer:private ServerTcpIp{
+public:
+	enum RouteType{
+		ONEWAY,WILD,
+	};
+	enum AskType{
+		GET,POST,ALL,
+	};
+	struct RouteFuntion{
+		AskType ask;
+		RouteType type;
+		char route[100];
+		void (*pfunc)(DealHttp&,HttpServer&,int num,void* sen,int&);
+	};
+private:
+	RouteFuntion* array;
+	void* getText;
+	char* error;
+	unsigned int max;
+	unsigned int now;
+	bool isDebug;
+public:
+	HttpServer(unsigned port,bool debug=false);
+	~HttpServer();
+	bool routeHandle(AskType ask,RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&));
+	const char* getWildUrl(const char* route,char* buffer,int maxLen);;
+	void run(int memory,const char* defaultFile);
+	int httpSend(int num,void* buffer,int sendLen);
+	inline void* recText()
+	{
+		return this->getText;
+	}
+	inline const char* lastError()
+	{
+		return error;
+	}
+private:
+	int func(int num,void* pget,void* sen,const char* defaultFile,HttpServer& server);
+	void epollHttp(void* pget,int len,void* pneed,const char* defaultFile);
 };
 #endif
