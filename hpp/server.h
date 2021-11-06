@@ -96,4 +96,28 @@ private:
 	int func(int num,void* pget,void* sen,const char* defaultFile,HttpServer& server);
 	void epollHttp(void* pget,int len,void* pneed,const char* defaultFile);
 };
+class Email{
+private:
+	sockaddr_in their_addr;
+	bool isDebug;
+	char error[30];
+    struct Base64Date6
+    {
+        unsigned int d4 : 6;
+        unsigned int d3 : 6;
+        unsigned int d2 : 6;
+        unsigned int d1 : 6;
+    };
+public:
+	Email(const char* domain,bool debug=false);
+	bool emailSend(const char* sendEmail,const char* passwd,const char* recEmail,const char* body);
+	char ConvertToBase64(char uc);
+    void EncodeBase64(char *dbuf, char *buf128, int len);
+    void CreateSend(const char* youName,const char* toName,const char* from,const char* to,const char* subject,const char* body,char* buf);
+    inline const char* LastError()
+    {
+		return error;
+	}
+	static const char* getDomainBySelfEmail(const char* email,char* buffer,int bufferLen);
+};
 #endif
