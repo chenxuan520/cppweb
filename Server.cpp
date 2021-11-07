@@ -876,12 +876,20 @@ public:
 		sscanf(temp+strlen(askWay)+1,"%s",buffer);
 		return buffer;
 	}
-	const char* getRouteValue(const void* routeMeg,const char* key,char* value,unsigned int valueLen)
+	const char* getRouteValue(const void* routeMsg,const char* key,char* value,unsigned int valueLen)
 	{
-		char* temp=strstr((char*)routeMeg,key);
+		char* temp=strstr((char*)routeMsg,key);
 		if(temp==NULL)
 			return NULL;
 		return this->findBackString(temp,strlen(key),value,valueLen);
+	}
+	const char* getWildUrl(const void* getText,const char* route,char* buffer,int maxLen)
+	{
+		char* temp=strstr((char*)getText,route);
+		if(temp==NULL)
+			return NULL;
+		temp+=strlen(route);
+		sscanf(temp,"%s",buffer);
 	}
 	static void dealUrl(const char* url,char* urlTop,char* urlEnd)
 	{
@@ -1273,6 +1281,8 @@ private:
 	unsigned int max;
 	unsigned int now;
 	bool isDebug;
+	void (*clientIn)(HttpServer&,int num,void* ip,int port);
+	void (*clientOut)(HttpServer&,int num,void* ip,int port);
 public:
 	HttpServer(unsigned port,bool debug=false):ServerTcpIp(port)
 	{
@@ -1288,6 +1298,8 @@ public:
 		now=0;
 		max=20;
 		isDebug=debug;
+		clientIn=NULL;
+		clientOut=NULL;
 	}
 	~HttpServer()
 	{
@@ -1314,13 +1326,17 @@ public:
 		now++;
 		return true;
 	}
-	const char* getWildUrl(const char* route,char* buffer,int maxLen)
+	bool clientInHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port))
 	{
-		char* temp=strstr((char*)this->getText,route);
-		if(temp==NULL)
-			return NULL;
-		temp+=strlen(route);
-		sscanf(temp,"%s",buffer);
+		if(clientIn!=NULL)
+			return false;
+		clientIn=pfunc;
+	}
+	bool clientOutHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port))
+	{
+		if(clientOut!=NULL)
+			return false;
+		clientOut=pfunc;
 	}
 	void run(int memory,const char* defaultFile)
 	{
@@ -1406,6 +1422,8 @@ private:
 				printf("http:%s\n",http.analysisHttpAsk(pget));
 			strcpy(ask,http.analysisHttpAsk(pget));
 			flag=http.autoAnalysisGet((char*)pget,(char*)sen,defaultFile,&len);
+			if(flag==2&&isDebug)
+				printf("404 get %s wrong\n",ask);
 		}
 		if(false==server.sendSocket(num,sen,len))
 		{
@@ -1415,7 +1433,7 @@ private:
 		else
 		{
 			if(isDebug)
-				printf("send success\n");
+				printf("200 ok send success\n\n");
 		}
 		return 0;
 	}
@@ -1433,6 +1451,11 @@ private:
 				nowEvent.data.fd=newClient;
 				nowEvent.events=EPOLLIN;
 				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
+				if(this->clientIn!=NULL)
+				{
+					strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
+					clientIn(*this,newClient,pget,newaddr.sin_port);
+				}
 			}
 			else
 			{
@@ -1441,6 +1464,12 @@ private:
 					func(temp.data.fd,pget,pneed,defaultFile,*this);
 				else
 				{
+					if(this->clientOut!=NULL)
+					{
+						int port=0;
+						strcpy((char*)pget,this->getPeerIp(temp.data.fd,&port));
+						clientOut(*this,temp.data.fd,pget,port);
+					}
                     this->deleteFd(temp.data.fd);
 					epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
 					close(temp.data.fd);
@@ -2580,7 +2609,8 @@ void serverHttp()
 void func(DealHttp& http,HttpServer& server,int num,void* sen,int& len)
 {
 	char buffer[100]={0},name[30]={0};
-	server.getWildUrl("/root/",buffer,100);
+	
+	http.getWildUrl(server.recText(),"/root/",buffer,100);
 	http.getRouteValue(buffer,"name",name,30);
 	Json json;
 	json.jsonInit(300);
@@ -2612,7 +2642,6 @@ int main(int argc, char** argv)
 {
 //	serverHttp();
 	HttpServer server(5201,true);
-	
 	server.routeHandle(HttpServer::GET,HttpServer::WILD,"/root/",func);
 	server.routeHandle(HttpServer::ALL,HttpServer::ONEWAY,"/key/",funHa);
 	server.run(1 ,"./index.html");

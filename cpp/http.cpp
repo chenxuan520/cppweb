@@ -278,6 +278,14 @@ const char* DealHttp::getRouteValue(const void* routeMeg,const char* key,char* v
 		return NULL;
 	return this->findBackString(temp,strlen(key),value,valueLen);
 }
+const char* DealHttp::getWildUrl(const void* getText,const char* route,char* buffer,int maxLen)
+{
+	char* temp=strstr((char*)getText,route);
+	if(temp==NULL)
+		return NULL;
+	temp+=strlen(route);
+	sscanf(temp,"%s",buffer);
+}
 void DealHttp::dealUrl(const char* url,char* urlTop,char* urlEnd)
 {
 	const char* ptemp=NULL;

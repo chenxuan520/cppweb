@@ -1,4 +1,4 @@
-all:main init guard
+all:main init guard main2.0
 
 init:init.o
 	g++ init.o -o init
@@ -8,6 +8,10 @@ guard:guard.o
 	g++ guard.o -o guard
 guard.o:
 	g++ -c ./cpp/guardHttp.cpp -o guard.o
+main2.0:main2.0.o server.o http.o dealask.o
+	g++ main2.0.o server.o http.o dealask.o -o main 
+main2.0.o:./cpp/main2.0.cpp
+	g++ -c ./cpp/main2.0.cpp -o main2.0.o
 main:main.o server.o http.o dealask.o
 	g++ main.o server.o http.o dealask.o -o main
 main.o:./cpp/main.cpp 

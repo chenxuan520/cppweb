@@ -1,5 +1,7 @@
 #!/bin/bash
 echo 'welcome to easy server';
+echo 'please choose version 1 or 2';
+read version;
 echo 'choose port to bound';
 read port;
 echo 'choose index html';
@@ -20,7 +22,14 @@ fi
 make
 make clean
 echo $port $index $memory $back > my.ini
-./main $port $index $memory $back
+if [ $version == '1' ]
+then
+	./main $port $index $memory $back
+elif [ $version == '2' ]
+	./main2.0 $port $index $memory $back
+else
+	echo 'setting wrong'
+fi
 if [ $if_guard == 'y' ]
 then 
 	./guard main 
