@@ -136,7 +136,7 @@ void serverHttp(int argc,char** argv)
 			return;
 		}
 	}
-	HttpServer server((unsigned short)port);
+	HttpServer server(port,true);
 	addHandle(server);
 	printf("the server is ok\n");
 	server.run(memory,"./index.html");

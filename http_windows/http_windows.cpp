@@ -26,6 +26,109 @@ public:
 };
 /********************************
 	author:chenxuan
+	date:2021/11/7
+	funtion:webtoken as jwt
+*********************************/
+class WebToken{
+private:
+	char* backString;
+	char err[30];
+public:
+	WebToken()
+	{
+		backString=NULL;
+		memset(err,0,sizeof(char)*30);
+		sprintf(err,"no error");
+	}
+	const char* createToken(const char* key,const char* encryption,char* getString,unsigned int stringLen,unsigned int liveSecond)
+	{
+		int temp=0;
+		if(key==NULL||encryption==NULL||getString==NULL||stringLen<sizeof(char)*strlen(encryption)+30)
+		{
+			sprintf(err,"input wrong");
+			return NULL;
+		}	
+		if(backString!=NULL)
+			free(backString);
+		backString=(char*)malloc(sizeof(char)*strlen(encryption)+30);
+		memset(backString,0,sizeof(char)*strlen(encryption)+30);
+		if(backString==NULL)
+		{
+			sprintf(err,"malloc wrong");
+			return NULL;
+		}
+		for(unsigned int i=0;i<strlen(key);i++)
+			temp+=key[i];
+		int end=time(NULL)+liveSecond+temp;
+		temp=temp%4;
+		for(unsigned int i=0;i<strlen(encryption);i++)
+		{
+			backString[i]=encryption[i]-temp;
+			if(backString[i]==94)
+				backString[i]=92;
+		}
+		char tempString[30]={0},endString[30]={0};
+		sprintf(endString,"%d",end);
+		for(unsigned int i=0;i<strlen(endString);i++)
+			endString[i]+=50;
+		sprintf(tempString,"&%s&%c",endString,encryption[0]);
+		strcat(backString,tempString);
+		strcpy(getString,backString);
+		return getString;
+	}
+	const char* decryptToken(const char* key,const char* token,char* buffer,unsigned int bufferLen)
+	{
+		char* temp=strchr((char*)token,'&');
+		if(temp==NULL||key==NULL||token==NULL||buffer==NULL||bufferLen<strlen(token))
+		{
+			sprintf(err,"input wrong");
+			return NULL;
+		}
+		if(backString!=NULL)
+			free(backString);
+		backString=(char*)malloc(sizeof(char)*strlen(token));
+		memset(backString,0,sizeof(char)*strlen(token));
+		char endString[20]={0};
+		if(sscanf(temp+1,"%[^&]",endString)<=0)
+		{
+			sprintf(err,"get time wrong");
+			return NULL;
+		}
+		int keyTemp=0,end=0;
+		for(unsigned int i=0;i<strlen(endString);i++)
+			endString[i]-=50;
+		sscanf(endString,"%d",&end);
+		for(unsigned int i=0;i<strlen(key);i++)
+			keyTemp+=key[i];
+		end-=keyTemp;
+		if(end-time(NULL)<=0)
+		{
+			sprintf(err,"over time");
+			return NULL;
+		}
+		keyTemp=keyTemp%4;
+		unsigned int i=0;
+		for(i=0;i+token<temp;i++)
+			if(token[i]!=92)
+				backString[i]=token[i]+keyTemp;
+			else
+				backString[i]=97;
+		backString[i+1]=0;
+		if(backString[0]!=token[strlen(token)-1])
+		{
+			sprintf(err,"key wrong");
+			return NULL;
+		}
+		strcpy(buffer,backString);
+		return buffer;
+	}
+	inline const char* LastError()
+	{
+		return err;
+	}
+};
+/********************************
+	author:chenxuan
 	date:2021/8/10
 	funtion:class thread pool
 *********************************/
@@ -187,7 +290,7 @@ public:
 	}
 };
 class ServerTcpIp{
-private:
+protected:
 	int sizeAddr;//sizeof(sockaddr_in) connect with addr_in;
 	int backwait;//the most waiting clients ;
 	int numClient;//how many clients now; 
@@ -1031,7 +1134,7 @@ private:
 	char* pfind;
 public:
 	enum FileKind{
-		UNKNOWN=0,HTML=1,EXE=2,IMAGE=3,NOFOUND=4,CSS=5,JS=6,ZIP7=7
+		UNKNOWN=0,HTML=1,EXE=2,IMAGE=3,NOFOUND=4,CSS=5,JS=6,ZIP7=7,JSON=8,
 	};
 public:
 	DealHttp()
@@ -1138,23 +1241,30 @@ public:
 				"Content-Type:application/x-7z-compressed\r\n"
 				"Content-Length:%d\r\n\r\n",fileLen);
 				break;
+			case JSON:
+				*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
+				"Server LCserver/1.1\r\n"
+				"Connection: keep-alive\r\n"
+				"Content-Type:application/json\r\n"
+				"Content-Length:%d\r\n\r\n",fileLen);
+				break;
 		}
 	}
-	bool createSendMsg(FileKind kind,char* pask,const char* pfile,int* plong)
+	bool createSendMsg(FileKind kind,char* buffer,const char* pfile,int* plong)
 	{
 		int temp=0;
 		int len=0,noUse=0;
 		if(kind==NOFOUND)
 		{
-			this->createTop(kind,pask,&temp,len);
+			this->createTop(kind,buffer,&temp,len);
 			*plong=len+temp+1;
 			return true;
 		}
 		len=this->getFileLen(pfile);
 		if(len==0)
 			return false;
-		this->createTop(kind,pask,&temp,len);
-		this->findFileMsg(pfile,&noUse,pask+temp);
+		this->createTop(kind,buffer,&temp,len);
+		this->findFileMsg(pfile,&noUse,buffer+temp);
 		*plong=len+temp+1;
 		return true;
 	}
@@ -1251,7 +1361,18 @@ public:
 	        else
 	        	return 1;
 	    }
+		else if(strstr(ask,".json"))
+	    {
+	        if(false==this->createSendMsg(JSON,psend,ask,plen))
+	            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
+	                return 0;
+	            else 
+	                return 2;
+	        else
+	        	return 1;
+	    }
 	    else 
+	    {
 	        if(false==this->createSendMsg(UNKNOWN,psend,ask,plen))
 	            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
 	                return 0;
@@ -1259,6 +1380,7 @@ public:
 	                return 2;
 	        else
 	        	return 1;
+		}
 	    return 1;
 	}
 	const char* getKeyValue(const void* message,const char* key,char* value,int maxValueLen)
@@ -1279,6 +1401,29 @@ public:
 			line[i++]=*ptemp;
 		line[i-1]=0;
 		return line;
+	}
+	const char* getAskRoute(const void* message,const char* askWay,char* buffer,unsigned int bufferLen)
+	{
+		char* temp=strstr((char*)message,ask);
+		if(temp==NULL)
+			return NULL;
+		sscanf(temp+strlen(askWay)+1,"%s",buffer);
+		return buffer;
+	}
+	const char* getRouteValue(const void* routeMsg,const char* key,char* value,unsigned int valueLen)
+	{
+		char* temp=strstr((char*)routeMsg,key);
+		if(temp==NULL)
+			return NULL;
+		return this->findBackString(temp,strlen(key),value,valueLen);
+	}
+	const char* getWildUrl(const void* getText,const char* route,char* buffer,int maxLen)
+	{
+		char* temp=strstr((char*)getText,route);
+		if(temp==NULL)
+			return NULL;
+		temp+=strlen(route);
+		sscanf(temp,"%s",buffer);
 	}
 	static void dealUrl(const char* url,char* urlTop,char* urlEnd)
 	{
@@ -1307,6 +1452,240 @@ public:
 			len=strlen(urlTop);
 			sscanf(url+len+7,"%s",urlEnd);
 		}
+	}
+};
+/********************************
+	author:chenxuan
+	date:2021/11/7
+	funtion:version 2.0
+*********************************/
+class HttpServer:private ServerTcpIp{
+public:
+	enum RouteType{
+		ONEWAY,WILD,
+	};
+	enum AskType{
+		GET,POST,ALL,
+	};
+	struct RouteFuntion{
+		AskType ask;
+		RouteType type;
+		char route[100];
+		void (*pfunc)(DealHttp&,HttpServer&,int num,void* sen,int&);
+	};
+private:
+	RouteFuntion* array;
+	void* getText;
+	char* error;
+	unsigned int max;
+	unsigned int now;
+	bool isDebug;
+	void (*clientIn)(HttpServer&,int num,void* ip,int port);
+	void (*clientOut)(HttpServer&,int num,void* ip,int port);
+public:
+	HttpServer(unsigned port,bool debug=false):ServerTcpIp(port)
+	{
+		getText=NULL;
+		array=NULL;
+		error=NULL;
+		array=(RouteFuntion*)malloc(sizeof(RouteFuntion)*20);
+		if(array==NULL)
+			throw NULL;
+		error=(char*)malloc(sizeof(char)*100);
+		if(error==NULL)
+			throw NULL;
+		now=0;
+		max=20;
+		isDebug=debug;
+		clientIn=NULL;
+		clientOut=NULL;
+	}
+	~HttpServer()
+	{
+		if(array!=NULL)
+			free(array);
+		if(error!=NULL)
+			free(error);
+	}
+	bool routeHandle(AskType ask,RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&))
+	{
+		if(strlen(route)>100)
+			return false;
+		if(max-now<=2)
+		{
+			array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
+			if(array=NULL)
+				return false;
+			max+=10;
+		}
+		array[now].type=type;
+		array[now].ask=ask;
+		strcpy(array[now].route,route);
+		array[now].pfunc=pfunc;
+		now++;
+		return true;
+	}
+	bool clientInHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port))
+	{
+		if(clientIn!=NULL)
+			return false;
+		clientIn=pfunc;
+	}
+	bool clientOutHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port))
+	{
+		if(clientOut!=NULL)
+			return false;
+		clientOut=pfunc;
+	}
+	void run(int memory,const char* defaultFile)
+	{
+		char get[3000]={0};
+		char* sen=(char*)malloc(sizeof(char)*memory*1024*1024);
+		if(sen==NULL)
+			throw NULL;
+		memset(sen,0,sizeof(char)*memory*1024*1024);
+		if(false==this->bondhost())
+		{
+			sprintf(this->error,"bond wrong");
+			return;
+		}
+		if(false==this->setlisten())
+		{
+			sprintf(this->error,"set listen wrong");
+			return;
+		}
+		this->getText=get;
+		if(isDebug)
+			printf("server is ok\n");
+		while(1)
+			this->epollHttp(get,3000,sen,defaultFile);
+	}
+	int httpSend(int num,void* buffer,int sendLen)
+	{
+		return this->sendSocket(num,buffer,sendLen);
+	}
+	inline void* recText()
+	{
+		return this->getText;
+	}
+	inline const char* lastError()
+	{
+		return error;
+	}
+private:
+	int func(int num,void* pget,void* sen,const char* defaultFile,HttpServer& server)
+	{
+		DealHttp http;
+		AskType type=GET;
+		int len=0,flag=0;
+		char ask[200]={0};
+		if(strstr((char*)pget,"GET")!=NULL)
+		{
+			http.getAskRoute(pget,"GET",ask,200);
+			if(isDebug)
+				printf("url:%s\n",ask);
+			type=GET;
+		}
+		if(strstr((char*)pget,"POST")!=NULL)
+		{
+			http.getAskRoute(pget,"POST",ask,200);
+			if(isDebug)
+				printf("url:%s\n",ask);
+			type=POST;
+		}
+		void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&)=NULL;
+		for(unsigned int i=0;i<now;i++)
+		{
+			if(array[i].type==ONEWAY&&(array[i].ask==type||array[i].ask==ALL))
+			{
+				if(strcmp(ask,array[i].route)==0)
+				{
+					pfunc=array[i].pfunc;
+					break;
+				}
+			}
+			else if(array[i].type==WILD&&(array[i].ask==type||array[i].ask==ALL))
+			{
+				if(strstr(ask,array[i].route)!=NULL)
+				{
+					pfunc=array[i].pfunc;
+					break;						
+				}
+			}
+		}
+		if(pfunc!=NULL)
+			pfunc(http,*this,num,sen,len);
+		else
+		{
+			if(isDebug)
+				printf("http:%s\n",http.analysisHttpAsk(pget));
+			strcpy(ask,http.analysisHttpAsk(pget));
+			flag=http.autoAnalysisGet((char*)pget,(char*)sen,defaultFile,&len);
+			if(flag==2&&isDebug)
+				printf("404 get %s wrong\n",ask);
+		}
+		if(false==server.sendSocket(num,sen,len))
+		{
+			if(isDebug)
+				perror("send wrong");
+		}
+		else
+		{
+			if(isDebug)
+				printf("200 ok send success\n\n");
+		}
+		return 0;
+	}
+	void epollHttp(void* pget,int len,void* pneed,const char* defaultFile)
+	{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
+		fd_set temp=fdClients;
+		int sign=select(0,&temp,NULL,NULL,NULL);
+		if(sign>0)
+		{
+			for(int i=0;i<(int)fdClients.fd_count;i++)
+			{
+				if(FD_ISSET(fdClients.fd_array[i],&temp))
+				{
+					if(fdClients.fd_array[i]==sock)
+					{
+						if(fdClients.fd_count<FD_SETSIZE)
+						{
+							SOCKADDR_IN newaddr={0};
+							SOCKET newClient=accept(sock,(sockaddr*)&newaddr,&sizeAddr);
+							FD_SET(newClient,&fdClients);
+							this->addFd(newClient);
+							strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
+							if(clientIn!=NULL)
+								clientIn(*this,newClient,pget,newaddr.sin_port);
+						}
+						else
+							continue;
+					}
+					else
+					{
+						int sRec=recv(fdClients.fd_array[i],(char*)pget,len,0);
+						if(sRec>0)
+							func(fdClients.fd_array[i],pget,pneed,defaultFile,*this);
+						if(sRec<=0)
+						{
+							if(this->clientOut!=NULL)
+							{
+								int port=0;
+								strcpy((char*)pget,this->getPeerIp(fdClients.fd_array[i],&port));
+								clientOut(*this,fdClients.fd_array[i],pget,port);
+							}
+							closesocket(fdClients.fd_array[i]);
+							FD_CLR(fdClients.fd_array[i],&fdClients);
+							this->deleteFd(fdClients.fd_array[i]);
+							
+						}
+					}
+				}
+			}
+		}
+		else
+			return ;
+		return ;
 	}
 };
 struct CliMsg{ 
@@ -1453,22 +1832,24 @@ void serverHttp()
 {
 	unsigned int port=80;
 	chooseModel(&port);
-	ServerTcpIp server(port);
-	int thing=0,num=0;
-	char get[2048]={0};
-	char* sen=(char*)malloc(sizeof(char)*10000000);
-	if(sen==NULL)
-		printf("memory wrong\n");
+	HttpServer server(port);
+	server.run(10,indexName);
+//	ServerTcpIp server(port);
+//	int thing=0,num=0;
+//	char get[2048]={0};
+//	char* sen=(char*)malloc(sizeof(char)*10000000);
+//	if(sen==NULL)
+//		printf("memory wrong\n");
 	system("title web server");
-	if(false==server.bondhost())
-		exit(0);
-	if(false==server.setlisten())
-		exit(0);
-	printf("server ip is:%s\nthe server is ok\n",server.getHostIp());
-	while(1)
-		if(false==server.selectModel(&thing,&num,get,2048,sen,funcTwo))
-			break;
-	free(sen);
+//	if(false==server.bondhost())
+//		exit(0);
+//	if(false==server.setlisten())
+//		exit(0);
+//	printf("server ip is:%s\nthe server is ok\n",server.getHostIp());
+//	while(1)
+//		if(false==server.selectModel(&thing,&num,get,2048,sen,funcTwo))
+//			break;
+//	free(sen);
 }
 int main(int argc, char** argv) 
 {

@@ -347,11 +347,19 @@ bool DealAttack::attackLog(int port,const char* ip,const char* pfileName)//log a
         if((fp=fopen(pfileName,"w+"))==NULL)		
             return false;
         else
-            fprintf(fp,"服务器被进攻日志\n");
-    fprintf(fp,"%d年%d月%d日%d时%d分%d秒:",pt->tm_year+1900,pt->tm_mon+1,pt->tm_mday,pt->tm_hour,pt->tm_min,pt->tm_sec);
-    fprintf(fp,"%s:%d 端口发起对服务器进攻\n",ip,port);
+            fprintf(fp,"server attacked log\n");
+    fprintf(fp,"%d year%d month%d day%d hour%d min%d sec:",pt->tm_year+1900,pt->tm_mon+1,pt->tm_mday,pt->tm_hour,pt->tm_min,pt->tm_sec);
+    fprintf(fp,"%s:%d port attack server\n",ip,port);
     fclose(fp);
     return true;
+}
+Json::Json()
+{
+	buffer=NULL;
+	text=NULL;
+	nowLen=0;
+	maxLen=0;
+	memset(this->word,0,sizeof(char)*30);
 }
 Json::Json(const char* jsonText)
 {

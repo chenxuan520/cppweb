@@ -135,6 +135,64 @@ public:
 			word[i]=*temp;
 		return word;
 	}
+	float getValueFloat(const char* key,bool& flag)
+	{
+		float value=0;
+		char* temp=strstr((char*)text,key);
+		if(temp==NULL)
+		{
+			flag=false;
+			return -1;
+		}
+		temp=strchr(temp,'\"');
+		if(temp==NULL)
+		{
+			flag=false;
+			return -1;
+		}
+		temp=strchr(temp+1,':');
+		if(temp==NULL)
+		{
+			flag=false;
+			return -1;
+		}
+		if(sscanf(temp+1,"%f",&value)<=0)
+		{
+			flag=true;
+			return -1;
+		}
+		flag=true;
+		return value;
+	}
+	int getValueInt(const char* key,bool& flag)
+	{
+		int value=0;
+		char* temp=strstr((char*)text,key);
+		if(temp==NULL)
+		{
+			flag=false;
+			return -1;
+		}
+		temp=strchr(temp,'\"');
+		if(temp==NULL)
+		{
+			flag=false;
+			return -1;
+		}
+		temp=strchr(temp+1,':');
+		if(temp==NULL)
+		{
+			flag=false;
+			return -1;
+		}
+		if(sscanf(temp+1,"%d",&value)<=0)
+		{
+			flag=true;
+			return -1;
+		}
+		flag=true;
+		return value;
+	}
 };
 /********************************
 	author:chenxuan

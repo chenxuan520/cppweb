@@ -54,6 +54,7 @@ private:
 	unsigned int nowLen;
 	unsigned int maxLen;
 public:
+	Json();
 	Json(const char* jsonText);
 	~Json();
 	bool jsonInit(unsigned int bufferLen);
