@@ -11,7 +11,7 @@ guard.o:
 main:main.o sql.o server.o http.o dealask.o
 	g++ main.o sql.o server.o http.o dealask.o -o main -lmysqlclient
 main2.0:main2.0.o sql.o server.o http.o dealask.o
-	g++ main2.0.o sql.o server.o http.o dealask.o -o main -lmysqlclient
+	g++ main2.0.o sql.o server.o http.o dealask.o -o main2.0 -lmysqlclient
 main2.0.o:./cpp/main2.0.cpp
 	g++ -c ./cpp/main2.0.cpp -o main2.0.o
 main.o:./cpp/main.cpp 

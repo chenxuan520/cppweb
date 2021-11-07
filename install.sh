@@ -26,6 +26,7 @@ if [ $version == '1' ]
 then
 	./main $port $index $memory $back
 elif [ $version == '2' ]
+then
 	./main2.0 $port $index $memory $back
 else
 	echo 'setting wrong'

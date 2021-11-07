@@ -9,7 +9,7 @@ guard:guard.o
 guard.o:
 	g++ -c ./cpp/guardHttp.cpp -o guard.o
 main2.0:main2.0.o server.o http.o dealask.o
-	g++ main2.0.o server.o http.o dealask.o -o main 
+	g++ main2.0.o server.o http.o dealask.o -o main2.0 
 main2.0.o:./cpp/main2.0.cpp
 	g++ -c ./cpp/main2.0.cpp -o main2.0.o
 main:main.o server.o http.o dealask.o
