@@ -483,8 +483,11 @@ const char* WebToken::createToken(const char* key,const char* encryption,char* g
 		if(backString[i]==94)
 			backString[i]=92;
 	}
-	char tempString[30]={0};
-	sprintf(tempString,"&%d&%c",end,encryption[0]);
+	char tempString[30]={0},endString[30]={0};
+	sprintf(endString,"%d",end);
+	for(unsigned int i=0;i<strlen(endString);i++)
+		endString[i]+=50;
+	sprintf(tempString,"&%s&%c",endString,encryption[0]);
 	strcat(backString,tempString);
 	strcpy(getString,backString);
 	return getString;
@@ -501,13 +504,16 @@ const char* WebToken::decryptToken(const char* key,const char* token,char* buffe
 		free(backString);
 	backString=(char*)malloc(sizeof(char)*strlen(token));
 	memset(backString,0,sizeof(char)*strlen(token));
-	int end=0;
-	if(sscanf(temp+1,"%d",&end)<=0)
+	char endString[20]={0};
+	if(sscanf(temp+1,"%[^&]",endString)<=0)
 	{
 		sprintf(err,"get time wrong");
 		return NULL;
 	}
-	int keyTemp=0;
+	int keyTemp=0,end=0;
+	for(unsigned int i=0;i<strlen(endString);i++)
+		endString[i]-=50;
+	sscanf(endString,"%d",&end);
 	for(unsigned int i=0;i<strlen(key);i++)
 		keyTemp+=key[i];
 	end-=keyTemp;
