@@ -77,11 +77,14 @@ private:
 	unsigned int max;
 	unsigned int now;
 	bool isDebug;
+	void (*clientIn)(HttpServer&,int num,void* ip,int port);
+	void (*clientOut)(HttpServer&,int num,void* ip,int port);
 public:
 	HttpServer(unsigned port,bool debug=false);
 	~HttpServer();
+	bool clientOutHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port));
+	bool clientInHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port));
 	bool routeHandle(AskType ask,RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&));
-	const char* getWildUrl(const char* route,char* buffer,int maxLen);;
 	void run(int memory,const char* defaultFile);
 	int httpSend(int num,void* buffer,int sendLen);
 	inline void* recText()

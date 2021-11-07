@@ -319,6 +319,8 @@ HttpServer::HttpServer(unsigned port,bool debug):ServerTcpIp(port)
 	now=0;
 	max=20;
 	isDebug=debug;
+	clientIn=NULL;
+	clientOut=NULL;
 }
 HttpServer::~HttpServer()
 {
@@ -345,14 +347,6 @@ bool HttpServer::routeHandle(AskType ask,RouteType type,const char* route,void (
 	now++;
 	return true;
 }
-const char* HttpServer::getWildUrl(const char* route,char* buffer,int maxLen)
-{
-	char* temp=strstr((char*)this->getText,route);
-	if(temp==NULL)
-		return NULL;
-	temp+=strlen(route);
-	sscanf(temp,"%s",buffer);
-}
 void HttpServer::run(int memory,const char* defaultFile)
 {
 	char get[3000]={0};
@@ -375,6 +369,18 @@ void HttpServer::run(int memory,const char* defaultFile)
 		printf("server is ok\n");
 	while(1)
 		this->epollHttp(get,3000,sen,defaultFile);
+}
+bool HttpServer::clientInHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port))
+{
+	if(clientIn!=NULL)
+		return false;
+	clientIn=pfunc;
+}
+bool HttpServer::clientOutHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port))
+{
+	if(clientOut!=NULL)
+		return false;
+	clientOut=pfunc;
 }
 int HttpServer::httpSend(int num,void* buffer,int sendLen)
 {
@@ -428,6 +434,8 @@ int HttpServer::func(int num,void* pget,void* sen,const char* defaultFile,HttpSe
 			printf("http:%s\n",http.analysisHttpAsk(pget));
 		strcpy(ask,http.analysisHttpAsk(pget));
 		flag=http.autoAnalysisGet((char*)pget,(char*)sen,defaultFile,&len);
+		if(flag==2&&isDebug)
+			printf("404 get %s wrong\n",ask);
 	}
 	if(false==server.sendSocket(num,sen,len))
 	{
@@ -437,12 +445,12 @@ int HttpServer::func(int num,void* pget,void* sen,const char* defaultFile,HttpSe
 	else
 	{
 		if(isDebug)
-			printf("send success\n");
+			printf("200 ok send success\n\n");
 	}
 	return 0;
 }
 void HttpServer::epollHttp(void* pget,int len,void* pneed,const char* defaultFile)
-{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
+{
 	int eventNum=epoll_wait(epfd,pevent,512,-1);
 	for(int i=0;i<eventNum;i++)
 	{
@@ -455,6 +463,11 @@ void HttpServer::epollHttp(void* pget,int len,void* pneed,const char* defaultFil
 			nowEvent.data.fd=newClient;
 			nowEvent.events=EPOLLIN;
 			epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
+			if(this->clientIn!=NULL)
+			{
+				strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
+				clientIn(*this,newClient,pget,newaddr.sin_port);
+			}
 		}
 		else
 		{
@@ -463,6 +476,12 @@ void HttpServer::epollHttp(void* pget,int len,void* pneed,const char* defaultFil
 				func(temp.data.fd,pget,pneed,defaultFile,*this);
 			else
 			{
+				if(this->clientOut!=NULL)
+				{
+					int port=0;
+					strcpy((char*)pget,this->getPeerIp(temp.data.fd,&port));
+					clientOut(*this,temp.data.fd,pget,port);
+				}
                 this->deleteFd(temp.data.fd);
 				epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
 				close(temp.data.fd);
