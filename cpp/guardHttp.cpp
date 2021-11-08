@@ -140,12 +140,12 @@ int func(void* guardName)
 	if(strlen(name)==0)
 		exit(0);
 	sleep(10);
-    printf("guard:%s\n",name);
 	sprintf(sys,"pstree -p | grep %s > temp",name);
 	system(sys);
     memset(sys,0,sizeof(char)*50);
 	if(false==file.fileStrstr("./temp",name))
     {
+    	printf("guard:%s\n",name);
         sprintf(sys,"./%s",name);
         system(sys);
     }
