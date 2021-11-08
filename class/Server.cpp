@@ -928,7 +928,7 @@ public:
 	}
 	const char* getAskRoute(const void* message,const char* askWay,char* buffer,unsigned int bufferLen)
 	{
-		char* temp=strstr((char*)message,ask);
+		char* temp=strstr((char*)message,askWay);
 		if(temp==NULL)
 			return NULL;
 		sscanf(temp+strlen(askWay)+1,"%s",buffer);
@@ -948,6 +948,7 @@ public:
 			return NULL;
 		temp+=strlen(route);
 		sscanf(temp,"%s",buffer);
+		return buffer;
 	}
 	static void dealUrl(const char* url,char* urlTop,char* urlEnd)
 	{

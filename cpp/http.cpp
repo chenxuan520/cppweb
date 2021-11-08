@@ -265,7 +265,7 @@ const char* DealHttp::getKeyLine(const void* message,const char* key,char* line,
 }
 const char* DealHttp::getAskRoute(const void* message,const char* askWay,char* buffer,unsigned int bufferLen)
 {
-	char* temp=strstr((char*)message,ask);
+	char* temp=strstr((char*)message,askWay);
 	if(temp==NULL)
 		return NULL;
 	sscanf(temp+strlen(askWay)+1,"%s",buffer);
