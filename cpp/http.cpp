@@ -458,6 +458,64 @@ const char* Json::operator[](const char* key)
 		word[i]=*temp;
 	return word;
 }
+float Json::getValueFloat(const char* key,bool& flag)
+{
+	float value=0;
+	char* temp=strstr((char*)text,key);
+	if(temp==NULL)
+	{
+		flag=false;
+		return -1;
+	}
+	temp=strchr(temp,'\"');
+	if(temp==NULL)
+	{
+		flag=false;
+		return -1;
+	}
+	temp=strchr(temp+1,':');
+	if(temp==NULL)
+	{
+		flag=false;
+		return -1;
+	}
+	if(sscanf(temp+1,"%f",&value)<=0)
+	{
+		flag=true;
+		return -1;
+	}
+	flag=true;
+	return value;
+}
+int Json::getValueInt(const char* key,bool& flag)
+{
+	int value=0;
+	char* temp=strstr((char*)text,key);
+	if(temp==NULL)
+	{
+		flag=false;
+		return -1;
+	}
+	temp=strchr(temp,'\"');
+	if(temp==NULL)
+	{
+		flag=false;
+		return -1;
+	}
+	temp=strchr(temp+1,':');
+	if(temp==NULL)
+	{
+		flag=false;
+		return -1;
+	}
+	if(sscanf(temp+1,"%d",&value)<=0)
+	{
+		flag=true;
+		return -1;
+	}
+	flag=true;
+	return value;
+}
 WebToken::WebToken()
 {
 	backString=NULL;
@@ -545,4 +603,85 @@ const char* WebToken::decryptToken(const char* key,const char* token,char* buffe
 	}
 	strcpy(buffer,backString);
 	return buffer;
+}
+FileGet::FileGet()
+{
+	pbuffer=NULL;
+}
+FileGet::~FileGet()
+{
+	if(pbuffer!=NULL)
+	{
+		free(pbuffer);
+		pbuffer=NULL;
+	}
+}
+int FileGet::getFileLen(const char* fileName)
+{
+	int len=0;
+	FILE* fp=fopen(fileName,"rb");
+	if(fp==NULL)
+		return -1;
+	fseek(fp,0,SEEK_END);
+	len=ftell(fp);
+	fclose(fp);
+	return len;
+}
+bool FileGet::getFileMsg(const char* fileName,char* buffer,unsigned int bufferLen)
+{
+	int i=0,len=0;
+	len=this->getFileLen(fileName);
+	FILE* fp=fopen(fileName,"rb");
+	if(fp==NULL)
+		return false;
+	for(i=0;i<len&&i<bufferLen;i++)
+		buffer[i]=fgetc(fp);
+	buffer[i+1]=0;
+	fclose(fp);
+	return true;
+}
+bool FileGet::fileStrstr(const char* fileName,const char* strFind)
+{
+	int len=0;
+	char* pstr=NULL;
+	len=this->getFileLen(fileName);
+	if(pbuffer!=NULL)
+	{
+		free(pbuffer);
+		pbuffer=NULL;
+	}
+	FILE* fp=fopen(fileName,"r");
+	if(fp==NULL)
+		return false;
+	pbuffer=(char*)malloc(sizeof(char)*(len+10));
+	char* ptemp=pbuffer;
+	if(pbuffer==NULL)
+		return false;
+	memset(pbuffer,0,sizeof(char)*(len+5));
+	if(false==this->getFileMsg(fileName,pbuffer,sizeof(char)*(len+10)))
+		return false;
+	while((*ptemp<65||*ptemp>122)&&ptemp<pbuffer+sizeof(char)*len)
+		ptemp++;
+	pstr=strstr(ptemp,strFind);
+	if(pbuffer!=NULL)
+	{
+		free(pbuffer);
+		pbuffer=NULL;
+	}
+	fclose(fp);
+	if(pstr!=NULL)
+		return true;
+	else
+		return false;
+	return false;
+}
+bool FileGet::writeToFile(const char* fileName,const char* buffer,unsigned int writeLen)
+{
+	FILE* fp=fopen(fileName,"wb+");
+	if(fp==NULL)
+		return false;
+	for(unsigned int i=0;i<writeLen;i++)
+		fputc(buffer[i],fp);
+	fclose(fp);
+	return true;
 }
