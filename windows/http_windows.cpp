@@ -26,6 +26,183 @@ public:
 };
 /********************************
 	author:chenxuan
+	date:2021/11/3
+	funtion:deal json data
+*********************************/
+class Json{
+private:
+	char* buffer;
+	char word[30];
+	const char* text;
+	unsigned int nowLen;
+	unsigned int maxLen;
+public:
+	Json()
+	{
+		buffer=NULL;
+		text=NULL;
+		nowLen=0;
+		maxLen=0;
+		memset(this->word,0,sizeof(char)*30);
+	}
+	Json(const char* jsonText)
+	{
+		text=jsonText;
+		buffer=NULL;
+		nowLen=0;
+		maxLen=0;
+		memset(this->word,0,sizeof(char)*30);		
+	}
+	~Json()
+	{
+		if(this->buffer!=NULL)
+			free(buffer);
+	}
+	bool jsonInit(unsigned int bufferLen)
+	{
+		if(bufferLen<=10)
+			return false;
+		buffer=(char*)malloc(sizeof(char)*bufferLen);
+		memset(buffer,0,sizeof(char)*bufferLen);
+		if(buffer==NULL)
+			return false;
+		this->maxLen=bufferLen;
+		strcat(this->buffer,"{");
+		this->nowLen+=2;
+		return true;
+	}
+	bool addKeyValue(const char* key,const char* value)
+	{
+		char temp[200]={0};
+		if(nowLen+strlen(key)+strlen(value)>maxLen)
+			return false;
+		if(strlen(key)+strlen(value)>=180)
+			return false;
+		int len=sprintf(temp,"\"%s\":\"%s\";",key,value);
+		strcat(this->buffer,temp);
+		nowLen+=len;
+		return true;
+	}
+	bool addKeyValInt(const char* key,int value)
+	{
+		char temp[50]={0};
+		if(nowLen+50>maxLen)
+			return false;
+		if(strlen(key)>=45)
+			return false;	
+		int len=sprintf(temp,"\"%s\":%d;",key,value);
+		strcat(this->buffer,temp);
+		nowLen+=len;
+		return true;	
+	}
+	bool addKeyValFloat(const char* key,float value,int output)
+	{
+		char temp[50]={0};
+		if(nowLen+50>maxLen)
+			return false;
+		if(strlen(key)>=45)
+			return false;	
+		int len=sprintf(temp,"\"%s\":%.*f;",key,output,value);
+		strcat(this->buffer,temp);
+		nowLen+=len;
+		return true;		
+	}
+	const char* endJson()
+	{
+		if(nowLen+5>maxLen)
+			return NULL;
+		strcat(buffer,"}");
+		return this->buffer;
+	}
+	bool jsonToFile(const char* fileName)
+	{
+		FILE* fp=fopen(fileName,"w+");
+		if(fp==NULL)
+			return false;
+		fprintf(fp,"%s",this->buffer);
+		fclose(fp);
+		return true;
+	}
+	const char* operator[](const char* key)
+	{
+		char* temp=NULL;
+		if((temp=strstr((char*)this->text,key))==NULL)
+			return NULL;
+		temp=strchr(temp,'\"');
+		if(temp==NULL)
+			return NULL;
+		temp=strchr(temp+1,'\"');
+		if(temp==NULL)
+			return NULL;
+		temp++;
+		if(strchr(temp,'\"')-temp>30)
+			return NULL;
+		memset(this->word,0,sizeof(char)*30);
+		for(unsigned int i=0;*temp!='\"';i++,temp++)
+			word[i]=*temp;
+		return word;
+	}
+	float getValueFloat(const char* key,bool& flag)
+	{
+		float value=0;
+		char* temp=strstr((char*)text,key);
+		if(temp==NULL)
+		{
+			flag=false;
+			return -1;
+		}
+		temp=strchr(temp,'\"');
+		if(temp==NULL)
+		{
+			flag=false;
+			return -1;
+		}
+		temp=strchr(temp+1,':');
+		if(temp==NULL)
+		{
+			flag=false;
+			return -1;
+		}
+		if(sscanf(temp+1,"%f",&value)<=0)
+		{
+			flag=true;
+			return -1;
+		}
+		flag=true;
+		return value;
+	}
+	int getValueInt(const char* key,bool& flag)
+	{
+		int value=0;
+		char* temp=strstr((char*)text,key);
+		if(temp==NULL)
+		{
+			flag=false;
+			return -1;
+		}
+		temp=strchr(temp,'\"');
+		if(temp==NULL)
+		{
+			flag=false;
+			return -1;
+		}
+		temp=strchr(temp+1,':');
+		if(temp==NULL)
+		{
+			flag=false;
+			return -1;
+		}
+		if(sscanf(temp+1,"%d",&value)<=0)
+		{
+			flag=true;
+			return -1;
+		}
+		flag=true;
+		return value;
+	}
+};
+/********************************
+	author:chenxuan
 	date:2021/11/7
 	funtion:webtoken as jwt
 *********************************/
@@ -1404,7 +1581,7 @@ public:
 	}
 	const char* getAskRoute(const void* message,const char* askWay,char* buffer,unsigned int bufferLen)
 	{
-		char* temp=strstr((char*)message,ask);
+		char* temp=strstr((char*)message,askWay);
 		if(temp==NULL)
 			return NULL;
 		sscanf(temp+strlen(askWay)+1,"%s",buffer);
@@ -1424,6 +1601,7 @@ public:
 			return NULL;
 		temp+=strlen(route);
 		sscanf(temp,"%s",buffer);
+		return buffer;
 	}
 	static void dealUrl(const char* url,char* urlTop,char* urlEnd)
 	{
@@ -1619,7 +1797,8 @@ private:
 		{
 			if(isDebug)
 				printf("http:%s\n",http.analysisHttpAsk(pget));
-			strcpy(ask,http.analysisHttpAsk(pget));
+			if(http.analysisHttpAsk(pget)!=NULL)
+				strcpy(ask,http.analysisHttpAsk(pget));
 			flag=http.autoAnalysisGet((char*)pget,(char*)sen,defaultFile,&len);
 			if(flag==2&&isDebug)
 				printf("404 get %s wrong\n",ask);
@@ -1828,11 +2007,28 @@ int funcTwo(int thing,int num,int getLen,void* pget,void* sen,ServerTcpIp& serve
 	}
 	return 0;
 }
+void func(DealHttp& http,HttpServer& server,int num,void* sen,int& len)
+{
+	char buffer[100]={0},name[30]={0};
+	
+	http.getWildUrl(server.recText(),"/root/",buffer,100);
+	http.getRouteValue(buffer,"name",name,30);
+	Json json;
+	json.jsonInit(300);
+	json.addKeyValue("buffer",buffer);
+	json.addKeyValInt("wuwu",90);
+	json.addKeyValue("name",name);
+	printf("json%s\n",json.endJson());
+	json.jsonToFile("temp");
+	printf("buffer:%s\n",buffer);
+	http.createSendMsg(DealHttp::JSON,(char*)sen,"temp",&len);
+}
 void serverHttp()
 {
 	unsigned int port=80;
 	chooseModel(&port);
-	HttpServer server(port);
+	HttpServer server(port,true);
+		server.routeHandle(HttpServer::GET,HttpServer::WILD,"/login/",func);
 	server.run(10,indexName);
 //	ServerTcpIp server(port);
 //	int thing=0,num=0;

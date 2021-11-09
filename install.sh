@@ -14,10 +14,10 @@ echo 'choose if use mysql';
 read if_sql;
 echo 'choose if use guard';
 read if_guard;
-if [ $if_sql == 'n' ]
+if [ $if_sql == 'y' ]
 then
-    mv ./makefile makeBeifen;
-    mv ./makefileNoSql makefile
+    mv ./makefile makeNoSql;
+    mv ./makefileSql makefile
 fi
 make
 make clean

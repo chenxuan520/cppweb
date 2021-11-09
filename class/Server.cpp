@@ -1485,7 +1485,8 @@ private:
 		{
 			if(isDebug)
 				printf("http:%s\n",http.analysisHttpAsk(pget));
-			strcpy(ask,http.analysisHttpAsk(pget));
+			if(http.analysisHttpAsk(pget)!=NULL)
+				strcpy(ask,http.analysisHttpAsk(pget));
 			flag=http.autoAnalysisGet((char*)pget,(char*)sen,defaultFile,&len);
 			if(flag==2&&isDebug)
 				printf("404 get %s wrong\n",ask);

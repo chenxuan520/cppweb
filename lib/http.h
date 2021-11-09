@@ -64,6 +64,8 @@ public:
 	const char* endJson();
 	bool jsonToFile(const char* fileName);
 	const char* operator[](const char* key);
+	float getValueFloat(const char* key,bool& flag);
+	int getValueInt(const char* key,bool& flag);
 };
 class WebToken{
 private:
@@ -77,5 +79,16 @@ public:
 	{
 		return err;
 	}
+};
+class FileGet{
+private:
+	char* pbuffer;
+public:
+	FileGet();
+	~FileGet();
+	int getFileLen(const char* fileName);
+	bool getFileMsg(const char* fileName,char* buffer,unsigned int bufferLen);
+	bool fileStrstr(const char* fileName,const char* strFind);
+	static bool writeToFile(const char* fileName,const char* buffer,unsigned int writeLen);
 };
 #endif
