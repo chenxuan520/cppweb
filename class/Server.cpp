@@ -51,7 +51,7 @@ public:
 		if(this->buffer!=NULL)
 			free(buffer);
 	}
-	bool jsonInit(unsigned int bufferLen)
+	bool init(unsigned int bufferLen)
 	{
 		if(bufferLen<=10)
 			return false;
@@ -1441,7 +1441,7 @@ public:
 private:
 	int func(int num,void* pget,void* sen,const char* defaultFile,HttpServer& server)
 	{
-		DealHttp http;
+		static DealHttp http;
 		AskType type=GET;
 		int len=0,flag=0;
 		char ask[200]={0};
@@ -2502,7 +2502,7 @@ int funcTwo(int thing,int num,int,void* pget,void* sen,ServerTcpIp& server)//mai
 		{
 			Json json;
 			char data[300]={0};
-			json.jsonInit(200);
+			json.init(200);
 			json.addKeyValue("hahah","lplplp");
 			json.addKeyValInt("dad",23);
 			printf("json:%s\n",json.endJson());
@@ -2679,7 +2679,7 @@ void func(DealHttp& http,HttpServer& server,int num,void* sen,int& len)
 	http.getWildUrl(server.recText(),"/root/",buffer,100);
 	http.getRouteValue(buffer,"name",name,30);
 	Json json;
-	json.jsonInit(300);
+	json.init(300);
 	json.addKeyValue("buffer",buffer);
 	json.addKeyValInt("wuwu",90);
 	json.addKeyValue("name",name);
@@ -2692,7 +2692,7 @@ void funHa(DealHttp& http,HttpServer& server,int num,void* sen,int& len)
 {
 	char buffer[100]={0},name[30]={0};
 	Json json;
-	json.jsonInit(300);
+	json.init(300);
 	json.addKeyValue("key","op");
 	json.endJson();
 	json.jsonToFile("temp");

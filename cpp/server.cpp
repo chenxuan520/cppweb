@@ -388,7 +388,7 @@ int HttpServer::httpSend(int num,void* buffer,int sendLen)
 }
 int HttpServer::func(int num,void* pget,void* sen,const char* defaultFile,HttpServer& server)
 {
-	DealHttp http;
+	static DealHttp http;
 	AskType type=GET;
 	int len=0,flag=0;
 	char ask[200]={0};
