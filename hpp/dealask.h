@@ -10,5 +10,4 @@ public:
     void dealClientIn(ServerTcpIp&,DealHttp&,void*,void*,int);
     void dealClientOut(ServerTcpIp&,DealHttp&,void*,void*,int);
 };
-bool addHandle(HttpServer&);
 #endif

@@ -374,7 +374,7 @@ Json::~Json()
 	if(this->buffer!=NULL)
 		free(buffer);
 }
-bool Json::jsonInit(unsigned int bufferLen)
+bool Json::init(unsigned int bufferLen)
 {
 	if(bufferLen<=10)
 		return false;

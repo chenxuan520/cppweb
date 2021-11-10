@@ -57,7 +57,7 @@ public:
 	Json();
 	Json(const char* jsonText);
 	~Json();
-	bool jsonInit(unsigned int bufferLen);
+	bool init(unsigned int bufferLen);
 	bool addKeyValue(const char* key,const char* value);
 	bool addKeyValInt(const char* key,int value);
 	bool addKeyValFloat(const char* key,float value,int output);
