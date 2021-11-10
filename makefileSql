@@ -39,3 +39,4 @@ clean:
 install:
 	cp ./lib/*.h /usr/local/include/
 	cp ./lib/*.a /usr/local/lib/
+	echo 'install ok,link with -lserver -lhttp'
