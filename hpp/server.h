@@ -123,4 +123,62 @@ public:
 	}
 	static const char* getDomainBySelfEmail(const char* email,char* buffer,int bufferLen);
 };
+/********************************
+	author:chenxuan
+	date:2021/8/10
+	funtion:class for client linux
+*********************************/
+class ClientTcpIp{
+private:
+	int sock;//myself
+	sockaddr_in addrC;//server information
+	char ip[100];//server Ip
+	char* hostip;//host ip
+	char* hostname;//host name
+	char selfIp[100];
+//	SSL* ssl;
+//	SSL_CTX* ctx;
+public:
+	ClientTcpIp(const char* hostIp,unsigned short port);
+	~ClientTcpIp();
+	void addHostIp(const char* ip);
+	bool tryConnect();
+	inline int receiveHost(void* prec,int len)
+	{
+		return recv(sock,(char*)prec,len,0);
+	}
+	inline int sendHost(const void* ps,int len)
+	{
+		return send(sock,(char*)ps,len,0);
+	}
+	bool disconnectHost();
+	char* getSelfIp();
+	char* getSelfName(char* hostname,unsigned int bufferLen);
+	static bool getDnsIp(const char* name,char* ip,unsigned int ipMaxLen);
+//	bool sslInit()
+//	{
+//		const SSL_METHOD* meth=SSLv23_client_method();
+//		if(meth==NULL)
+//			return false;
+//		ctx=SSL_CTX_new(meth);
+//		if(ctx==NULL)
+//			return false;
+//		ssl=SSL_new(ctx);
+//		if(NULL==ssl)
+//			return false;
+//		SSL_set_fd(ssl,sock);
+//		int ret=SSL_connect(ssl);
+//		if(ret==-1)
+//			return false;
+//		return true;
+//	}
+//	inline int sendhostSSL(const void* psen,int len)
+//	{
+//		return SSL_write(ssl,psen,len);
+//	}
+//	inline int receiveHostSSL(void* buffer,int len)
+//	{
+//		return SSL_read(ssl,buffer,len);
+//	}
+};
 #endif

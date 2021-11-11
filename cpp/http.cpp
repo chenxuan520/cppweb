@@ -76,11 +76,14 @@ void DealHttp::createTop(FileKind kind,char* ptop,int* topLen,int fileLen)//1:ht
 			"Content-Type:image\r\n"
 			"Content-Length:%d\r\n\r\n",fileLen);
 			break;
-		case NOFOUND:
-			*topLen=sprintf(ptop,"HTTP/1.1 404 Not Found\r\n"
-			"Server LCserver/1.1\r\n"
-			"Connection: keep-alive\r\n");
-			break;
+			case NOFOUND:
+				*topLen=sprintf(ptop,"HTTP/1.1 404 Not Found\r\n"
+				"Server LCserver/1.1\r\n"
+				"Connection: keep-alive\r\n"
+				"Content-Type: text/plain\r\n"
+				"Content-Length:%d\r\n\r\n"
+				"404 no found",(int)strlen("404 no found"));
+				break;
 		case CSS:
 			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
 			"Server LCserver/1.1\r\n"

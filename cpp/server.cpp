@@ -705,3 +705,94 @@ const char* Email::getDomainBySelfEmail(const char* email,char* buffer,int buffe
 	sprintf(buffer,"smtp.%s",temp+1);
 	return buffer;
 }
+/********************************
+	author:chenxuan
+	date:2021/8/10
+	funtion:class for client linux
+*********************************/
+ClientTcpIp::ClientTcpIp(const char* hostIp,unsigned short port)
+{
+	memset(ip,0,100);
+	memset(selfIp,0,100);
+	hostip=(char*)malloc(sizeof(char)*50);
+	memset(hostip,0,sizeof(char)*50);
+	hostname=(char*)malloc(sizeof(char)*50);
+	memset(hostname,0,sizeof(char)*50);
+	if(hostIp!=NULL)
+		strcpy(ip,hostIp);
+	sock=socket(AF_INET,SOCK_STREAM,0);
+	if(hostIp!=NULL)
+		addrC.sin_addr.s_addr=inet_addr(hostIp);
+	addrC.sin_family=AF_INET;//af_intt IPv4
+	addrC.sin_port=htons(port);
+//	ssl=NULL;
+//	ctx=NULL;
+}
+ClientTcpIp::~ClientTcpIp()
+{
+//	if(ssl!=NULL)
+//	{
+//		SSL_shutdown(ssl);
+//		SSL_free(ssl);	
+//	}
+//	if(ctx!=NULL)
+//		SSL_CTX_free(ctx);
+	free(hostip);
+	free(hostname);
+	close(sock);
+}
+void ClientTcpIp::addHostIp(const char* ip)
+{
+	if(ip==NULL)
+		return;
+	strcpy(this->ip,ip);
+	addrC.sin_addr.s_addr=inet_addr(ip);
+}
+bool ClientTcpIp::tryConnect()
+{
+	if(connect(sock,(sockaddr*)&addrC,sizeof(sockaddr))==-1)
+		return false;
+	return true;
+}
+bool ClientTcpIp::disconnectHost()
+{
+	close(sock);
+	sock=socket(AF_INET,SOCK_STREAM,0);
+	if(sock==-1)
+		return false;
+	return true;
+}
+char* ClientTcpIp::getSelfIp()
+{
+	char name[300]={0};
+	gethostname(name,300);
+	hostent* phost=gethostbyname(name);
+	in_addr addr;
+	char* p=phost->h_addr_list[0];
+	memcpy(&addr.s_addr,p,phost->h_length);
+	memset(selfIp,0,sizeof(char)*100);
+	memcpy(selfIp,inet_ntoa(addr),strlen(inet_ntoa(addr)));
+	return selfIp;
+}
+char* ClientTcpIp::getSelfName(char* hostname,unsigned int bufferLen)
+{
+	char name[300]={0};
+	gethostname(name,300);
+	if(strlen(name)>=bufferLen)
+		return NULL;
+	memcpy(hostname,name,strlen(name));
+	return hostname;
+}
+bool ClientTcpIp::getDnsIp(const char* name,char* ip,unsigned int ipMaxLen)
+{
+	hostent* phost=gethostbyname(name);
+	if(phost==NULL)
+		return false;
+	in_addr addr;
+	char* p=phost->h_addr_list[0];
+	memcpy(&addr.s_addr,p,phost->h_length);
+	if(strlen(inet_ntoa(addr))>=ipMaxLen)
+		return false;
+	strcpy(ip,inet_ntoa(addr));
+	return true;
+}
