@@ -16,7 +16,7 @@ int memory=0;
 	date:2021.7.5
 	funtion:main function to deal ask
 *********************************/
-int funcTwo(int thing,int num,int,void* pget,void* sen,ServerTcpIp& server)//main deal func
+int funcTwo(ServerTcpIp::Thing thing,int num,int,void* pget,void* sen,ServerTcpIp& server)//main deal func
 {
 	char ask[200]={0};
 	static DealHttp http;
@@ -32,11 +32,11 @@ int funcTwo(int thing,int num,int,void* pget,void* sen,ServerTcpIp& server)//mai
 	// 	server.disconnectSocketEpoll(num);
 	// 	return 0;
 	// }
-	if(thing==0)
+	if(thing==ServerTcpIp::OUT)
 		dealAsk.dealClientOut(server,http,pget,sen,num);
-	if(thing==1)
+	if(thing==ServerTcpIp::IN)
 		dealAsk.dealClientIn(server,http,pget,sen,num);
-	if(thing==2)
+	if(thing==ServerTcpIp::OUT)
 	{
 		if(http.findFirst(pget,"POST")!=NULL)
 		{	
@@ -221,7 +221,7 @@ void serverHttp(int argc,char** argv)
 		exit(0);
 	printf("the server is ok\n");
 	while(1)
-		if(false==server.epollModel(&thing,&num,get,2048,sen,funcTwo))
+		if(false==server.epollModel(get,2048,sen,funcTwo))
 			break;
 	free(sen);
 }

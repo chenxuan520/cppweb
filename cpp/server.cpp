@@ -103,9 +103,10 @@ int ServerTcpIp::sendSocket(int socCli,const void* psen,int len)//send by socket
 {
 	return send(socCli,(char*)psen,len,0);
 }
-bool ServerTcpIp::selectModel(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int ,int ,int,void* ,void*,ServerTcpIp& ))
-{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
+bool ServerTcpIp::selectModel(void* pget,int len,void* pneed,int (*pfunc)(Thing ,int ,int,void* ,void*,ServerTcpIp& ))
+{//num is the num of soc,pget is rec,len is the max len of pget,pneed is others things
 	fd_set temp=fdClients;
+	Thing pthing=OUT;
 	int sign=select(fd_count+1,&temp,NULL,NULL,NULL);
 	if(sign>0)
 	{
@@ -126,12 +127,10 @@ bool ServerTcpIp::selectModel(int* pthing,int* pnum,void* pget,int len,void* pne
 							last_count=fd_count;
 							fd_count=newClient;
 						}
-						*pnum=newClient;
-						*pthing=1;
 						strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
 						if(pfunc!=NULL)
 						{
-							if(pfunc(*pthing,*pnum,0,pget,pneed,*this))
+							if(pfunc(IN,newClient,0,pget,pneed,*this))
 								return false;
 						}
 					}
@@ -141,10 +140,10 @@ bool ServerTcpIp::selectModel(int* pthing,int* pnum,void* pget,int len,void* pne
 				else
 				{
 					int sRec=recv(i,(char*)pget,len,0);
-					*pnum=i;
+					int socRec=i;
 					if(sRec>0)
 					{
-						*pthing=2;
+						pthing=SAY;
 					}
 					if(sRec<=0)
 					{
@@ -154,11 +153,11 @@ bool ServerTcpIp::selectModel(int* pthing,int* pnum,void* pget,int len,void* pne
 						if(i==fd_count)
 							fd_count=last_count;
 						*(char*) pget=0;
-						*pthing=0;
+						pthing=OUT;
 					}
 					if(pfunc!=NULL)
 					{
-						if(pfunc(*pthing,*pnum,sRec,pget,pneed,*this))
+						if(pfunc(pthing,socRec,sRec,pget,pneed,*this))
 							return false;
 					}
 				}
@@ -216,8 +215,9 @@ char* ServerTcpIp::getPeerIp(int cliSoc,int* pcliPort)//get ip and port by socke
 	*pcliPort=cliAddr.sin_port;
 	return inet_ntoa(cliAddr.sin_addr); 
 }
-bool ServerTcpIp::epollModel(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int ,int ,int ,void* ,void*,ServerTcpIp& ))
+bool ServerTcpIp::epollModel(void* pget,int len,void* pneed,int (*pfunc)(Thing,int ,int ,void* ,void*,ServerTcpIp& ))
 {//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
+	Thing thing=SAY;
 	int eventNum=epoll_wait(epfd,pevent,512,-1);
 	for(int i=0;i<eventNum;i++)
 	{
@@ -230,32 +230,30 @@ bool ServerTcpIp::epollModel(int* pthing,int* pnum,void* pget,int len,void* pnee
 			nowEvent.data.fd=newClient;
 			nowEvent.events=EPOLLIN;
 			epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
-			*pthing=1;
-			*pnum=newClient;
 			strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
 			if(pfunc!=NULL)
 			{
-				if(pfunc(*pthing,*pnum,0,pget,pneed,*this))
+				if(pfunc(IN,newClient,0,pget,pneed,*this))
 					return false;
 			}
 		}
 		else
 		{
 			int getNum=recv(temp.data.fd,(char*)pget,len,0);
-			*pnum=temp.data.fd;
+			int sockRec=temp.data.fd;
 			if(getNum>0)
-				*pthing=2;
+				thing=SAY;
 			else
 			{
 				*(char*)pget=0;
-				*pthing=0;
+				thing=OUT;
                 this->deleteFd(temp.data.fd);
 				epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
 				close(temp.data.fd);
 			}
 			if(pfunc!=NULL)
 			{
-				if(pfunc(*pthing,*pnum,getNum,pget,pneed,*this))
+				if(pfunc(thing,sockRec,getNum,pget,pneed,*this))
 					return false;
 			}
 		}

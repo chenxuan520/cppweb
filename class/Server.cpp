@@ -200,6 +200,10 @@ public:
 	funtion:this file is all class and zhushi
 *********************************/
 class ServerTcpIp{
+public:
+	enum Thing{
+		OUT=0,IN=1,SAY=2,
+	};
 protected:
 	int sizeAddr;//sizeof(sockaddr_in) connect with addr_in;
 	int backwait;//the most waiting clients ;
@@ -346,9 +350,10 @@ public:
 	{
 		return send(socCli,(char*)psen,len,0);
 	}
-	bool selectModel(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int ,int ,int,void* ,void*,ServerTcpIp& ))
+	bool selectModel(void* pget,int len,void* pneed,int (*pfunc)(Thing ,int ,int,void* ,void*,ServerTcpIp& ))
 	{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
 		fd_set temp=fdClients;
+		Thing pthing=OUT;
 		int sign=select(fd_count+1,&temp,NULL,NULL,NULL);
 		if(sign>0)
 		{
@@ -369,12 +374,10 @@ public:
 								last_count=fd_count;
 								fd_count=newClient;
 							}
-							*pnum=newClient;
-							*pthing=1;
 							strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
 							if(pfunc!=NULL)
 							{
-								if(pfunc(*pthing,*pnum,0,pget,pneed,*this))
+								if(pfunc(IN,newClient,0,pget,pneed,*this))
 									return false;
 							}
 						}
@@ -384,10 +387,10 @@ public:
 					else
 					{
 						int sRec=recv(i,(char*)pget,len,0);
-						*pnum=i;
+						int socRec=i;
 						if(sRec>0)
 						{
-							*pthing=2;
+							pthing=SAY;
 						}
 						if(sRec<=0)
 						{
@@ -397,11 +400,11 @@ public:
 							if(i==fd_count)
 								fd_count=last_count;
 							*(char*) pget=0;
-							*pthing=0;
+							pthing=OUT;
 						}
 						if(pfunc!=NULL)
 						{
-							if(pfunc(*pthing,*pnum,sRec,pget,pneed,*this))
+							if(pfunc(pthing,socRec,sRec,pget,pneed,*this))
 								return false;
 						}
 					}
@@ -459,8 +462,9 @@ public:
 		*pcliPort=cliAddr.sin_port;
 		return inet_ntoa(cliAddr.sin_addr); 
 	}
-	bool epollModel(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int ,int ,int ,void* ,void*,ServerTcpIp& ))
+	bool epollModel(void* pget,int len,void* pneed,int (*pfunc)(Thing,int ,int ,void* ,void*,ServerTcpIp& ))
 	{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
+		Thing thing=SAY;
 		int eventNum=epoll_wait(epfd,pevent,512,-1);
 		for(int i=0;i<eventNum;i++)
 		{
@@ -473,32 +477,30 @@ public:
 				nowEvent.data.fd=newClient;
 				nowEvent.events=EPOLLIN;
 				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
-				*pthing=1;
-				*pnum=newClient;
 				strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
 				if(pfunc!=NULL)
 				{
-					if(pfunc(*pthing,*pnum,0,pget,pneed,*this))
+					if(pfunc(IN,newClient,0,pget,pneed,*this))
 						return false;
 				}
 			}
 			else
 			{
 				int getNum=recv(temp.data.fd,(char*)pget,len,0);
-				*pnum=temp.data.fd;
+				int sockRec=temp.data.fd;
 				if(getNum>0)
-					*pthing=2;
+					thing=SAY;
 				else
 				{
 					*(char*)pget=0;
-					*pthing=0;
+					thing=OUT;
                     this->deleteFd(temp.data.fd);
 					epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
 					close(temp.data.fd);
 				}
 				if(pfunc!=NULL)
 				{
-					if(pfunc(*pthing,*pnum,getNum,pget,pneed,*this))
+					if(pfunc(thing,sockRec,getNum,pget,pneed,*this))
 						return false;
 				}
 			}
@@ -2475,7 +2477,7 @@ struct CliMsg{
 	int flag;
 	char chat[100];
 };
-int funcTwo(int thing,int num,int,void* pget,void* sen,ServerTcpIp& server)//main deal func
+int funcTwo(ServerPool::Thing thing,int num,int,void* pget,void* sen,ServerTcpIp& server)//main deal func
 {
 	char ask[200]={0},*pask=NULL;
 	CliMsg cli;
@@ -2555,7 +2557,7 @@ int funcTwo(int thing,int num,int,void* pget,void* sen,ServerTcpIp& server)//mai
 	parameter:thing stand what happen,num is socket,len is get len,
 	return:return 0 stand continue,other stop
 *********************************/
-int funcThree(int thing,int num,int,void* pget,void* sen,ServerTcpIp& server)//main deal func
+int funcThree(ServerTcpIp::Thing thing,int num,int,void* pget,void* sen,ServerTcpIp& server)//main deal func
 {
 	char ask[200]={0},*pask=NULL;
 	DealHttp http;
@@ -2633,7 +2635,7 @@ void selectTry()
 		exit(0);
 	printf("server ip is:%s\nthe server is ok\n",server.getHostIp());
 	while(1)
-		server.selectModel(&thing,&num,get,2048,sen,funcThree);
+		server.selectModel(get,2048,sen,funcThree);
 	free(sen);
 }
 /********************************
@@ -2666,7 +2668,7 @@ void serverHttp()
 		exit(0);
 	printf("server ip is:%s\nthe server is ok\n",server.getHostIp());
 	while(1)
-		if(false==server.epollModel(&thing,&num,get,2048,sen,funcTwo))
+		if(false==server.epollModel(get,2048,sen,funcTwo))
 			break;
 	free(sen);
 }
@@ -2709,10 +2711,10 @@ void funHa(DealHttp& http,HttpServer& server,int num,void* sen,int& len)
 *********************************/
 int main(int argc, char** argv) 
 {
-//	serverHttp();
-	HttpServer server(5201,true);
-	server.routeHandle(HttpServer::GET,HttpServer::WILD,"/root/",func);
-	server.routeHandle(HttpServer::ALL,HttpServer::ONEWAY,"/key/",funHa);
-	server.run(1 ,"./index.html");
+	serverHttp();
+//	HttpServer server(5201,true);
+//	server.routeHandle(HttpServer::GET,HttpServer::WILD,"/root/",func);
+//	server.routeHandle(HttpServer::ALL,HttpServer::ONEWAY,"/key/",funHa);
+//	server.run(1 ,"./index.html");
 	return 0;
 }

@@ -12,7 +12,16 @@
 #include<netdb.h>
 #include<iostream>
 using namespace std;
+/********************************
+	author:chenxuan
+	date:2021/11/11
+	funtion:the server class
+*********************************/
 class ServerTcpIp{
+public:
+	enum Thing{
+		OUT=0,IN=1,SAY=2,
+	};
 protected:
 	int sizeAddr;//sizeof(sockaddr_in) connect with addr_in;
 	int backwait;//the most waiting clients ;
@@ -47,13 +56,13 @@ public:
 	int sendClientOne(const void* psen,int len);//model one
 	void sendEverySocket(void* psen,int len);
 	int sendSocket(int socCli,const void* psen,int len);//send by socket
-	bool selectModel(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int ,int ,int,void* ,void*,ServerTcpIp& ));
+	bool selectModel(void* pget,int len,void* pneed,int (*pfunc)(Thing ,int ,int,void* ,void*,ServerTcpIp& ));
 	bool updateSocket(int* array,int* pcount);//get epoll array
 	bool findSocket(int cliSoc);//find if socket is connect
 	char* getHostName();//get self name
 	char* getHostIp();//get self ip
 	char* getPeerIp(int cliSoc,int* pcliPort);//get ip and port by socket
-	bool epollModel(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int ,int ,int ,void* ,void*,ServerTcpIp& ));
+	bool epollModel(void* pget,int len,void* pneed,int (*pfunc)(Thing,int ,int ,void* ,void*,ServerTcpIp& ));
 	bool disconnectSocket(int clisock);//disconnect from socket
 };
 class HttpServer:private ServerTcpIp{
