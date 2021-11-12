@@ -103,9 +103,10 @@ int ServerTcpIp::sendSocket(int socCli,const void* psen,int len)//send by socket
 {
 	return send(socCli,(char*)psen,len,0);
 }
-bool ServerTcpIp::selectModel(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int ,int ,int,void* ,void*,ServerTcpIp& ))
-{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
+bool ServerTcpIp::selectModel(void* pget,int len,void* pneed,int (*pfunc)(Thing ,int ,int,void* ,void*,ServerTcpIp& ))
+{//num is the num of soc,pget is rec,len is the max len of pget,pneed is others things
 	fd_set temp=fdClients;
+	Thing pthing=OUT;
 	int sign=select(fd_count+1,&temp,NULL,NULL,NULL);
 	if(sign>0)
 	{
@@ -126,12 +127,10 @@ bool ServerTcpIp::selectModel(int* pthing,int* pnum,void* pget,int len,void* pne
 							last_count=fd_count;
 							fd_count=newClient;
 						}
-						*pnum=newClient;
-						*pthing=1;
 						strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
 						if(pfunc!=NULL)
 						{
-							if(pfunc(*pthing,*pnum,0,pget,pneed,*this))
+							if(pfunc(IN,newClient,0,pget,pneed,*this))
 								return false;
 						}
 					}
@@ -141,10 +140,10 @@ bool ServerTcpIp::selectModel(int* pthing,int* pnum,void* pget,int len,void* pne
 				else
 				{
 					int sRec=recv(i,(char*)pget,len,0);
-					*pnum=i;
+					int socRec=i;
 					if(sRec>0)
 					{
-						*pthing=2;
+						pthing=SAY;
 					}
 					if(sRec<=0)
 					{
@@ -154,11 +153,11 @@ bool ServerTcpIp::selectModel(int* pthing,int* pnum,void* pget,int len,void* pne
 						if(i==fd_count)
 							fd_count=last_count;
 						*(char*) pget=0;
-						*pthing=0;
+						pthing=OUT;
 					}
 					if(pfunc!=NULL)
 					{
-						if(pfunc(*pthing,*pnum,sRec,pget,pneed,*this))
+						if(pfunc(pthing,socRec,sRec,pget,pneed,*this))
 							return false;
 					}
 				}
@@ -216,8 +215,9 @@ char* ServerTcpIp::getPeerIp(int cliSoc,int* pcliPort)//get ip and port by socke
 	*pcliPort=cliAddr.sin_port;
 	return inet_ntoa(cliAddr.sin_addr); 
 }
-bool ServerTcpIp::epollModel(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int ,int ,int ,void* ,void*,ServerTcpIp& ))
+bool ServerTcpIp::epollModel(void* pget,int len,void* pneed,int (*pfunc)(Thing,int ,int ,void* ,void*,ServerTcpIp& ))
 {//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
+	Thing thing=SAY;
 	int eventNum=epoll_wait(epfd,pevent,512,-1);
 	for(int i=0;i<eventNum;i++)
 	{
@@ -230,32 +230,30 @@ bool ServerTcpIp::epollModel(int* pthing,int* pnum,void* pget,int len,void* pnee
 			nowEvent.data.fd=newClient;
 			nowEvent.events=EPOLLIN;
 			epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
-			*pthing=1;
-			*pnum=newClient;
 			strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
 			if(pfunc!=NULL)
 			{
-				if(pfunc(*pthing,*pnum,0,pget,pneed,*this))
+				if(pfunc(IN,newClient,0,pget,pneed,*this))
 					return false;
 			}
 		}
 		else
 		{
 			int getNum=recv(temp.data.fd,(char*)pget,len,0);
-			*pnum=temp.data.fd;
+			int sockRec=temp.data.fd;
 			if(getNum>0)
-				*pthing=2;
+				thing=SAY;
 			else
 			{
 				*(char*)pget=0;
-				*pthing=0;
+				thing=OUT;
                 this->deleteFd(temp.data.fd);
 				epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
 				close(temp.data.fd);
 			}
 			if(pfunc!=NULL)
 			{
-				if(pfunc(*pthing,*pnum,getNum,pget,pneed,*this))
+				if(pfunc(thing,sockRec,getNum,pget,pneed,*this))
 					return false;
 			}
 		}
@@ -435,7 +433,10 @@ int HttpServer::func(int num,void* pget,void* sen,const char* defaultFile,HttpSe
 		strcpy(ask,http.analysisHttpAsk(pget));
 		flag=http.autoAnalysisGet((char*)pget,(char*)sen,defaultFile,&len);
 		if(flag==2&&isDebug)
+		{
+			LogSystem::recordFileError(ask);
 			printf("404 get %s wrong\n",ask);
+		}
 	}
 	if(false==server.sendSocket(num,sen,len))
 	{
@@ -704,4 +705,95 @@ const char* Email::getDomainBySelfEmail(const char* email,char* buffer,int buffe
 		return NULL;
 	sprintf(buffer,"smtp.%s",temp+1);
 	return buffer;
+}
+/********************************
+	author:chenxuan
+	date:2021/8/10
+	funtion:class for client linux
+*********************************/
+ClientTcpIp::ClientTcpIp(const char* hostIp,unsigned short port)
+{
+	memset(ip,0,100);
+	memset(selfIp,0,100);
+	hostip=(char*)malloc(sizeof(char)*50);
+	memset(hostip,0,sizeof(char)*50);
+	hostname=(char*)malloc(sizeof(char)*50);
+	memset(hostname,0,sizeof(char)*50);
+	if(hostIp!=NULL)
+		strcpy(ip,hostIp);
+	sock=socket(AF_INET,SOCK_STREAM,0);
+	if(hostIp!=NULL)
+		addrC.sin_addr.s_addr=inet_addr(hostIp);
+	addrC.sin_family=AF_INET;//af_intt IPv4
+	addrC.sin_port=htons(port);
+//	ssl=NULL;
+//	ctx=NULL;
+}
+ClientTcpIp::~ClientTcpIp()
+{
+//	if(ssl!=NULL)
+//	{
+//		SSL_shutdown(ssl);
+//		SSL_free(ssl);	
+//	}
+//	if(ctx!=NULL)
+//		SSL_CTX_free(ctx);
+	free(hostip);
+	free(hostname);
+	close(sock);
+}
+void ClientTcpIp::addHostIp(const char* ip)
+{
+	if(ip==NULL)
+		return;
+	strcpy(this->ip,ip);
+	addrC.sin_addr.s_addr=inet_addr(ip);
+}
+bool ClientTcpIp::tryConnect()
+{
+	if(connect(sock,(sockaddr*)&addrC,sizeof(sockaddr))==-1)
+		return false;
+	return true;
+}
+bool ClientTcpIp::disconnectHost()
+{
+	close(sock);
+	sock=socket(AF_INET,SOCK_STREAM,0);
+	if(sock==-1)
+		return false;
+	return true;
+}
+char* ClientTcpIp::getSelfIp()
+{
+	char name[300]={0};
+	gethostname(name,300);
+	hostent* phost=gethostbyname(name);
+	in_addr addr;
+	char* p=phost->h_addr_list[0];
+	memcpy(&addr.s_addr,p,phost->h_length);
+	memset(selfIp,0,sizeof(char)*100);
+	memcpy(selfIp,inet_ntoa(addr),strlen(inet_ntoa(addr)));
+	return selfIp;
+}
+char* ClientTcpIp::getSelfName(char* hostname,unsigned int bufferLen)
+{
+	char name[300]={0};
+	gethostname(name,300);
+	if(strlen(name)>=bufferLen)
+		return NULL;
+	memcpy(hostname,name,strlen(name));
+	return hostname;
+}
+bool ClientTcpIp::getDnsIp(const char* name,char* ip,unsigned int ipMaxLen)
+{
+	hostent* phost=gethostbyname(name);
+	if(phost==NULL)
+		return false;
+	in_addr addr;
+	char* p=phost->h_addr_list[0];
+	memcpy(&addr.s_addr,p,phost->h_length);
+	if(strlen(inet_ntoa(addr))>=ipMaxLen)
+		return false;
+	strcpy(ip,inet_ntoa(addr));
+	return true;
 }

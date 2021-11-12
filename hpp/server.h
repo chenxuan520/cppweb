@@ -1,6 +1,10 @@
 #ifndef _SERVER_H_
 #define _SERVER_H_
 #include"./http.h"
+#include<string.h>
+#include<iostream>
+//linux env
+#ifndef _WIN32
 #include<netinet/in.h>
 #include<arpa/inet.h>
 #include<sys/socket.h>
@@ -8,11 +12,25 @@
 #include<sys/epoll.h>
 #include<sys/types.h>
 #include<unistd.h>
-#include<string.h>
 #include<netdb.h>
-#include<iostream>
+//windows env
+#else
+#include<winsock2.h>
+#endif
+
 using namespace std;
+//linux env
+#ifndef _WIN32
+/********************************
+	author:chenxuan
+	date:2021/11/11
+	funtion:the server class
+*********************************/
 class ServerTcpIp{
+public:
+	enum Thing{
+		OUT=0,IN=1,SAY=2,
+	};
 protected:
 	int sizeAddr;//sizeof(sockaddr_in) connect with addr_in;
 	int backwait;//the most waiting clients ;
@@ -47,13 +65,13 @@ public:
 	int sendClientOne(const void* psen,int len);//model one
 	void sendEverySocket(void* psen,int len);
 	int sendSocket(int socCli,const void* psen,int len);//send by socket
-	bool selectModel(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int ,int ,int,void* ,void*,ServerTcpIp& ));
+	bool selectModel(void* pget,int len,void* pneed,int (*pfunc)(Thing ,int ,int,void* ,void*,ServerTcpIp& ));
 	bool updateSocket(int* array,int* pcount);//get epoll array
 	bool findSocket(int cliSoc);//find if socket is connect
 	char* getHostName();//get self name
 	char* getHostIp();//get self ip
 	char* getPeerIp(int cliSoc,int* pcliPort);//get ip and port by socket
-	bool epollModel(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int ,int ,int ,void* ,void*,ServerTcpIp& ));
+	bool epollModel(void* pget,int len,void* pneed,int (*pfunc)(Thing,int ,int ,void* ,void*,ServerTcpIp& ));
 	bool disconnectSocket(int clisock);//disconnect from socket
 };
 class HttpServer:private ServerTcpIp{
@@ -95,6 +113,10 @@ public:
 	{
 		return error;
 	}
+	inline bool disconnect(int soc)
+	{
+		return this->disconnectSocket(soc);
+	}
 private:
 	int func(int num,void* pget,void* sen,const char* defaultFile,HttpServer& server);
 	void epollHttp(void* pget,int len,void* pneed,const char* defaultFile);
@@ -123,4 +145,66 @@ public:
 	}
 	static const char* getDomainBySelfEmail(const char* email,char* buffer,int bufferLen);
 };
+/********************************
+	author:chenxuan
+	date:2021/8/10
+	funtion:class for client linux
+*********************************/
+class ClientTcpIp{
+private:
+	int sock;//myself
+	sockaddr_in addrC;//server information
+	char ip[100];//server Ip
+	char* hostip;//host ip
+	char* hostname;//host name
+	char selfIp[100];
+//	SSL* ssl;
+//	SSL_CTX* ctx;
+public:
+	ClientTcpIp(const char* hostIp,unsigned short port);
+	~ClientTcpIp();
+	void addHostIp(const char* ip);
+	bool tryConnect();
+	inline int receiveHost(void* prec,int len)
+	{
+		return recv(sock,(char*)prec,len,0);
+	}
+	inline int sendHost(const void* ps,int len)
+	{
+		return send(sock,(char*)ps,len,0);
+	}
+	bool disconnectHost();
+	char* getSelfIp();
+	char* getSelfName(char* hostname,unsigned int bufferLen);
+	static bool getDnsIp(const char* name,char* ip,unsigned int ipMaxLen);
+//	bool sslInit()
+//	{
+//		const SSL_METHOD* meth=SSLv23_client_method();
+//		if(meth==NULL)
+//			return false;
+//		ctx=SSL_CTX_new(meth);
+//		if(ctx==NULL)
+//			return false;
+//		ssl=SSL_new(ctx);
+//		if(NULL==ssl)
+//			return false;
+//		SSL_set_fd(ssl,sock);
+//		int ret=SSL_connect(ssl);
+//		if(ret==-1)
+//			return false;
+//		return true;
+//	}
+//	inline int sendhostSSL(const void* psen,int len)
+//	{
+//		return SSL_write(ssl,psen,len);
+//	}
+//	inline int receiveHostSSL(void* buffer,int len)
+//	{
+//		return SSL_read(ssl,buffer,len);
+//	}
+};
+#elif
+//windows class
+
+#endif
 #endif

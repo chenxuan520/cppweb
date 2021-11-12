@@ -2027,25 +2027,24 @@ void serverHttp()
 {
 	unsigned int port=80;
 	chooseModel(&port);
-	HttpServer server(port,true);
-		server.routeHandle(HttpServer::GET,HttpServer::WILD,"/login/",func);
-	server.run(10,indexName);
-//	ServerTcpIp server(port);
-//	int thing=0,num=0;
-//	char get[2048]={0};
-//	char* sen=(char*)malloc(sizeof(char)*10000000);
-//	if(sen==NULL)
-//		printf("memory wrong\n");
-	system("title web server");
-//	if(false==server.bondhost())
-//		exit(0);
-//	if(false==server.setlisten())
-//		exit(0);
-//	printf("server ip is:%s\nthe server is ok\n",server.getHostIp());
-//	while(1)
-//		if(false==server.selectModel(&thing,&num,get,2048,sen,funcTwo))
-//			break;
-//	free(sen);
+//	HttpServer server(port,true);
+//		server.routeHandle(HttpServer::GET,HttpServer::WILD,"/login/",func);
+//	server.run(10,indexName);
+	ServerTcpIp server(port);
+	int thing=0,num=0;
+	char get[2048]={0};
+	char* sen=(char*)malloc(sizeof(char)*10000000);
+	if(sen==NULL)
+		printf("memory wrong\n");
+	if(false==server.bondhost())
+		exit(0);
+	if(false==server.setlisten())
+		exit(0);
+	printf("server ip is:%s\nthe server is ok\n",server.getHostIp());
+	while(1)
+		if(false==server.selectModel(&thing,&num,get,2048,sen,funcTwo))
+			break;
+	free(sen);
 }
 int main(int argc, char** argv) 
 {

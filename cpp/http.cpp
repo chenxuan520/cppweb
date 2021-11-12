@@ -1,6 +1,7 @@
 #include"../hpp/http.h"
 #include<iostream>
 #include<string.h>
+#include<stdio.h>
 using namespace std;
 DealHttp::DealHttp()
 {
@@ -79,7 +80,10 @@ void DealHttp::createTop(FileKind kind,char* ptop,int* topLen,int fileLen)//1:ht
 		case NOFOUND:
 			*topLen=sprintf(ptop,"HTTP/1.1 404 Not Found\r\n"
 			"Server LCserver/1.1\r\n"
-			"Connection: keep-alive\r\n");
+			"Connection: keep-alive\r\n"
+			"Content-Type: text/plain\r\n"
+			"Content-Length:%d\r\n\r\n"
+			"404 no found",(int)strlen("404 no found"));
 			break;
 		case CSS:
 			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
@@ -314,7 +318,7 @@ void DealHttp::dealUrl(const char* url,char* urlTop,char* urlEnd)
 		sscanf(url+len+7,"%s",urlEnd);
 	}
 }
-bool  DealAttack::dealAttack(int isUpdate,int socketCli,int maxTime)//check if accket
+bool LogSystem::dealAttack(int isUpdate,int socketCli,int maxTime)//check if accket
 {
     static CliLog cli[41];
     if(isUpdate==1)
@@ -338,7 +342,19 @@ bool  DealAttack::dealAttack(int isUpdate,int socketCli,int maxTime)//check if a
     }
     return true;
 }
-bool DealAttack::attackLog(int port,const char* ip,const char* pfileName)//log accket
+bool LogSystem::recordFileError(const char* fileName)
+{
+	FILE* fp=fopen("wrong.log","r+");
+	if(fp==NULL)
+		fp=fopen("wrong.log","w+");
+	if(fp==NULL)
+		return false;
+	fseek(fp,0,SEEK_END);
+	fprintf(fp,"open file %s wrong\n",fileName);
+	fclose(fp);
+	return true;
+}
+bool LogSystem::attackLog(int port,const char* ip,const char* pfileName)//log accket
 {
     time_t temp=time(NULL);
     struct tm* pt=localtime(&temp);

@@ -1,4 +1,4 @@
-all:main init guard main2.0 libserver.a libhttp.a libthreadpool.a
+all:main init guard main2.0 libserver.a libhttp.a
 
 init:init.o
 	g++ init.o -o init
@@ -10,7 +10,7 @@ guard.o:
 	g++ -c ./cpp/guardHttp.cpp -o guard.o
 main:main.o sql.o server.o http.o dealask.o
 	g++ main.o sql.o server.o http.o dealask.o -o main -lmysqlclient
-main2.0:main2.0.o sql.o server.o http.o dealask.o route.o
+main2.0:main2.0.o sql.o server.o http.o dealask.o
 	g++ main2.0.o sql.o server.o http.o dealask.o -o main2.0 -lmysqlclient
 main2.0.o:./cpp/main2.0.cpp
 	g++ -c ./cpp/main2.0.cpp -o main2.0.o
@@ -18,8 +18,6 @@ libserver.a:
 	ar rcs ./lib/libserver.a server.o
 libhttp.a:
 	ar rcs ./lib/libhttp.a http.o
-libthreadpool.a:thread.o
-	ar rcs ./lib/libthreadpool.a thread.o
 main.o:./cpp/main.cpp 
 	g++ -c ./cpp/main.cpp -o main.o
 sql.o:./cpp/sql.cpp
@@ -30,15 +28,5 @@ http.o:./cpp/http.cpp
 	g++ -c ./cpp/http.cpp -o http.o
 dealask.o:./cpp/dealask.cpp
 	g++ -c ./cpp/dealask.cpp -o dealask.o
-thread.o:./cpp/thread.cpp
-	g++ -c ./cpp/thread.cpp -o thread.o
-route.o:./hpp/route.h
-	g++ -c ./hpp/route.h -o route.o
 clean:
 	rm -f *.o 
-install:
-	cp ./lib/*.h /usr/local/include/
-	cp ./lib/*.a /usr/local/lib/
-uninstall:
-	rm /usr/local/include/server.h /usr/local/include/http.h 
-	rm /usr/local/lib/libhttp.a /usr/local/lib/libserver.a /usr/local/lib/libthreadpool.a

@@ -138,7 +138,6 @@ void serverHttp(int argc,char** argv)
 	}
 	HttpServer server(port,true);
 	addHandle(server);
-	printf("the server is ok\n");
 	server.run(memory,"./index.html");
 }
 int main(int argc, char** argv) 

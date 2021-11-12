@@ -1,4 +1,4 @@
-all:main init guard main2.0 libserver.a libhttp.a libthreadpoll.a
+all:main init guard main2.0 libserver.a libhttp.a libthreadpool.a
 
 init:init.o
 	g++ init.o -o init
@@ -16,8 +16,8 @@ libserver.a:server.o
 	ar rcs ./lib/libserver.a server.o
 libhttp.a:http.o
 	ar rcs ./lib/libhttp.a http.o
-libthreadpoll.a:thread.o
-	ar rcs ./lib/libthreadpoll.a thread.o
+libthreadpool.a:thread.o
+	ar rcs ./lib/libthreadpool.a thread.o
 main:main.o server.o http.o dealask.o
 	g++ main.o server.o http.o dealask.o -o main
 main.o:./cpp/main.cpp  
@@ -37,3 +37,6 @@ clean:
 install:
 	cp ./lib/*.h /usr/local/include/
 	cp ./lib/*.a /usr/local/lib/
+uninstall:
+	rm /usr/local/include/server.h /usr/local/include/http.h /usr/local/include/thread.h
+	rm /usr/local/lib/libhttp.a /usr/local/lib/libserver.a /usr/local/lib/libthreadpool.a
