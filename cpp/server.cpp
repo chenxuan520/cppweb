@@ -433,7 +433,10 @@ int HttpServer::func(int num,void* pget,void* sen,const char* defaultFile,HttpSe
 		strcpy(ask,http.analysisHttpAsk(pget));
 		flag=http.autoAnalysisGet((char*)pget,(char*)sen,defaultFile,&len);
 		if(flag==2&&isDebug)
+		{
+			LogSystem::recordFileError(ask);
 			printf("404 get %s wrong\n",ask);
+		}
 	}
 	if(false==server.sendSocket(num,sen,len))
 	{

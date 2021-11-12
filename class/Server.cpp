@@ -1327,6 +1327,70 @@ public:
 };
 /********************************
 	author:chenxuan
+	date:2021/8/10
+	funtion:class to deal ddos
+*********************************/
+class LogSystem{
+public:
+	struct CliLog{
+		int socketCli;
+		int time;
+		char ip[20];
+	};
+	static bool dealAttack(int isUpdate,int socketCli,int maxTime)//check if accket
+	{
+		static CliLog cli[41];
+		if(isUpdate==1)
+		{
+			cli[socketCli%41].socketCli=socketCli;
+			cli[socketCli%41].time=1;
+			return true;
+		}
+		else if(isUpdate==2)
+		{
+			cli[socketCli%41].time++;
+			if(cli[socketCli%41].time>maxTime)
+				return false;
+			return true;
+		}
+		else if(isUpdate==0)
+		{
+			cli[socketCli%41].socketCli=0;
+			cli[socketCli%41].time=0;
+			return true;
+		}
+		return true;
+	}
+	static bool attackLog(int port,const char* ip,const char* pfileName)//log accket
+	{
+		time_t temp=time(NULL);
+		struct tm* pt=localtime(&temp);
+		FILE* fp=fopen(pfileName,"a+");
+		if(fp==NULL)
+			if((fp=fopen(pfileName,"w+"))==NULL)		
+				return false;
+			else
+				fprintf(fp,"server attacked log\n");
+		fprintf(fp,"%d year%d month%d day%d hour%d min%d sec:",pt->tm_year+1900,pt->tm_mon+1,pt->tm_mday,pt->tm_hour,pt->tm_min,pt->tm_sec);
+		fprintf(fp,"%s:%d port attack server\n",ip,port);
+		fclose(fp);
+		return true;
+	}
+	static bool recordFileError(const char* fileName)
+	{
+		FILE* fp=fopen("wrong.log","r+");
+		if(fp==NULL)
+			fp=fopen("wrong.log","w+");
+		if(fp==NULL)
+			return false;
+		fseek(fp,0,SEEK_END);
+		fprintf(fp,"open file %s wrong\n",fileName);
+		fclose(fp);
+		return true;
+	}
+};
+/********************************
+	author:chenxuan
 	date:2021/11/4
 	funtion:the http server for new
 *********************************/
@@ -1410,7 +1474,7 @@ public:
 	}
 	void run(int memory,const char* defaultFile)
 	{
-		char get[3000]={0};
+		char get[4000]={0};
 		char* sen=(char*)malloc(sizeof(char)*memory*1024*1024);
 		if(sen==NULL)
 			throw NULL;
@@ -1429,7 +1493,7 @@ public:
 		if(isDebug)
 			printf("server is ok\n");
 		while(1)
-			this->epollHttp(get,3000,sen,defaultFile);
+			this->epollHttp(get,4000,sen,defaultFile);
 	}
 	int httpSend(int num,void* buffer,int sendLen)
 	{
@@ -1442,6 +1506,10 @@ public:
 	inline const char* lastError()
 	{
 		return error;
+	}
+	inline bool disconnect(int soc)
+	{
+		return this->disconnectSocket(soc);
 	}
 private:
 	int func(int num,void* pget,void* sen,const char* defaultFile,HttpServer& server)
@@ -1494,7 +1562,10 @@ private:
 				strcpy(ask,http.analysisHttpAsk(pget));
 			flag=http.autoAnalysisGet((char*)pget,(char*)sen,defaultFile,&len);
 			if(flag==2&&isDebug)
+			{
+				LogSystem::recordFileError(ask);
 				printf("404 get %s wrong\n",ask);
+			}
 		}
 		if(false==server.sendSocket(num,sen,len))
 		{
@@ -1609,58 +1680,6 @@ public:
     	if(mysql_error(this->mysql)!=NULL)
 			strcpy(errorSay,mysql_error(this->mysql));
 		return errorSay;
-	}
-};
-/********************************
-	author:chenxuan
-	date:2021/8/10
-	funtion:class to deal ddos
-*********************************/
-class DealAttack{
-public:
-	struct CliLog{
-		int socketCli;
-		int time;
-		char ip[20];
-	};
-	static bool dealAttack(int isUpdate,int socketCli,int maxTime)//check if accket
-	{
-		static CliLog cli[41];
-		if(isUpdate==1)
-		{
-			cli[socketCli%41].socketCli=socketCli;
-			cli[socketCli%41].time=1;
-			return true;
-		}
-		else if(isUpdate==2)
-		{
-			cli[socketCli%41].time++;
-			if(cli[socketCli%41].time>maxTime)
-				return false;
-			return true;
-		}
-		else if(isUpdate==0)
-		{
-			cli[socketCli%41].socketCli=0;
-			cli[socketCli%41].time=0;
-			return true;
-		}
-		return true;
-	}
-	static bool attackLog(int port,const char* ip,const char* pfileName)//log accket
-	{
-		time_t temp=time(NULL);
-		struct tm* pt=localtime(&temp);
-		FILE* fp=fopen(pfileName,"a+");
-		if(fp==NULL)
-			if((fp=fopen(pfileName,"w+"))==NULL)		
-				return false;
-			else
-				fprintf(fp,"server attacked log\n");
-		fprintf(fp,"%d year%d month%d day%d hour%d min%d sec:",pt->tm_year+1900,pt->tm_mon+1,pt->tm_mday,pt->tm_hour,pt->tm_min,pt->tm_sec);
-		fprintf(fp,"%s:%d port attack server\n",ip,port);
-		fclose(fp);
-		return true;
 	}
 };
 /********************************
@@ -2488,9 +2507,9 @@ int funcTwo(ServerPool::Thing thing,int num,int,void* pget,void* sen,ServerTcpIp
 	if(sen==NULL)
 		return -1;
 	memset(sen,0,sizeof(char)*10000000);
-	if(false==DealAttack::dealAttack(thing,num,200))
+	if(false==LogSystem::dealAttack(thing,num,200))
 	{
-		DealAttack::attackLog(port,server.getPeerIp(num,&port),"./rec/attackLog.txt");
+		LogSystem::attackLog(port,server.getPeerIp(num,&port),"./rec/attackLog.txt");
 		server.disconnectSocket(num);
 		return 0;
 	}
@@ -2567,9 +2586,9 @@ int funcThree(ServerTcpIp::Thing thing,int num,int,void* pget,void* sen,ServerTc
 	if(sen==NULL)
 		return -1;
 	memset(sen,0,sizeof(char)*10000000);
-	if(false==DealAttack::dealAttack(thing,num,200))
+	if(false==LogSystem::dealAttack(thing,num,200))
 	{
-		DealAttack::attackLog(port,server.getPeerIp(num,&port),"./rec/attackLog.txt");
+		LogSystem::attackLog(port,server.getPeerIp(num,&port),"./rec/attackLog.txt");
 		server.disconnectSocket(num);
 		return 0;
 	}
@@ -2711,10 +2730,10 @@ void funHa(DealHttp& http,HttpServer& server,int num,void* sen,int& len)
 *********************************/
 int main(int argc, char** argv) 
 {
-	serverHttp();
-//	HttpServer server(5201,true);
-//	server.routeHandle(HttpServer::GET,HttpServer::WILD,"/root/",func);
-//	server.routeHandle(HttpServer::ALL,HttpServer::ONEWAY,"/key/",funHa);
-//	server.run(1 ,"./index.html");
+//	serverHttp();
+	HttpServer server(5201,true);
+	server.routeHandle(HttpServer::GET,HttpServer::WILD,"/root/",func);
+	server.routeHandle(HttpServer::ALL,HttpServer::ONEWAY,"/key/",funHa);
+	server.run(1 ,"./index.html");
 	return 0;
 }

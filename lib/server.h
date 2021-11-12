@@ -1,6 +1,10 @@
 #ifndef _SERVER_H_
 #define _SERVER_H_
 #include"./http.h"
+#include<string.h>
+#include<iostream>
+//linux env
+#ifndef _WIN32
 #include<netinet/in.h>
 #include<arpa/inet.h>
 #include<sys/socket.h>
@@ -8,10 +12,15 @@
 #include<sys/epoll.h>
 #include<sys/types.h>
 #include<unistd.h>
-#include<string.h>
 #include<netdb.h>
-#include<iostream>
+//windows env
+#else
+#include<winsock2.h>
+#endif
+
 using namespace std;
+//linux env
+#ifndef _WIN32
 /********************************
 	author:chenxuan
 	date:2021/11/11
@@ -104,6 +113,10 @@ public:
 	{
 		return error;
 	}
+	inline bool disconnect(int soc)
+	{
+		return this->disconnectSocket(soc);
+	}
 private:
 	int func(int num,void* pget,void* sen,const char* defaultFile,HttpServer& server);
 	void epollHttp(void* pget,int len,void* pneed,const char* defaultFile);
@@ -190,4 +203,8 @@ public:
 //		return SSL_read(ssl,buffer,len);
 //	}
 };
+#elif
+//windows class
+
+#endif
 #endif
