@@ -37,8 +37,6 @@ clean:
 install:
 	cp ./lib/*.h /usr/local/include/
 	cp ./lib/*.a /usr/local/lib/
-	echo 'install ok,link with -lserver -lhttp'
 uninstall:
-	rm /usr/local/include/server.h /usr/local/include/http.h 
-	rm /usr/local/lib/libhttp.a /usr/local/lib/libserver.a
-	echo 'uninstall successful'
+	rm /usr/local/include/server.h /usr/local/include/http.h /usr/local/include/thread.h
+	rm /usr/local/lib/libhttp.a /usr/local/lib/libserver.a /usr/local/lib/libthreadpoll.a

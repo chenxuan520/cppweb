@@ -2,7 +2,7 @@
 #define _THREAD_H_
 #include<queue>
 #include<pthread.h>
-#include"../hpp/server.h"
+#include"server.h"
 using namespace std;
 /********************************
 	author:chenxuan
