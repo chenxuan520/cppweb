@@ -200,6 +200,10 @@ public:
 	funtion:this file is all class and zhushi
 *********************************/
 class ServerTcpIp{
+public:
+	enum Thing{
+		OUT=0,IN=1,SAY=2,
+	};
 protected:
 	int sizeAddr;//sizeof(sockaddr_in) connect with addr_in;
 	int backwait;//the most waiting clients ;
@@ -346,9 +350,10 @@ public:
 	{
 		return send(socCli,(char*)psen,len,0);
 	}
-	bool selectModel(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int ,int ,int,void* ,void*,ServerTcpIp& ))
+	bool selectModel(void* pget,int len,void* pneed,int (*pfunc)(Thing ,int ,int,void* ,void*,ServerTcpIp& ))
 	{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
 		fd_set temp=fdClients;
+		Thing pthing=OUT;
 		int sign=select(fd_count+1,&temp,NULL,NULL,NULL);
 		if(sign>0)
 		{
@@ -369,12 +374,10 @@ public:
 								last_count=fd_count;
 								fd_count=newClient;
 							}
-							*pnum=newClient;
-							*pthing=1;
 							strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
 							if(pfunc!=NULL)
 							{
-								if(pfunc(*pthing,*pnum,0,pget,pneed,*this))
+								if(pfunc(IN,newClient,0,pget,pneed,*this))
 									return false;
 							}
 						}
@@ -384,10 +387,10 @@ public:
 					else
 					{
 						int sRec=recv(i,(char*)pget,len,0);
-						*pnum=i;
+						int socRec=i;
 						if(sRec>0)
 						{
-							*pthing=2;
+							pthing=SAY;
 						}
 						if(sRec<=0)
 						{
@@ -397,11 +400,11 @@ public:
 							if(i==fd_count)
 								fd_count=last_count;
 							*(char*) pget=0;
-							*pthing=0;
+							pthing=OUT;
 						}
 						if(pfunc!=NULL)
 						{
-							if(pfunc(*pthing,*pnum,sRec,pget,pneed,*this))
+							if(pfunc(pthing,socRec,sRec,pget,pneed,*this))
 								return false;
 						}
 					}
@@ -459,8 +462,9 @@ public:
 		*pcliPort=cliAddr.sin_port;
 		return inet_ntoa(cliAddr.sin_addr); 
 	}
-	bool epollModel(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int ,int ,int ,void* ,void*,ServerTcpIp& ))
+	bool epollModel(void* pget,int len,void* pneed,int (*pfunc)(Thing,int ,int ,void* ,void*,ServerTcpIp& ))
 	{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
+		Thing thing=SAY;
 		int eventNum=epoll_wait(epfd,pevent,512,-1);
 		for(int i=0;i<eventNum;i++)
 		{
@@ -473,32 +477,30 @@ public:
 				nowEvent.data.fd=newClient;
 				nowEvent.events=EPOLLIN;
 				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
-				*pthing=1;
-				*pnum=newClient;
 				strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
 				if(pfunc!=NULL)
 				{
-					if(pfunc(*pthing,*pnum,0,pget,pneed,*this))
+					if(pfunc(IN,newClient,0,pget,pneed,*this))
 						return false;
 				}
 			}
 			else
 			{
 				int getNum=recv(temp.data.fd,(char*)pget,len,0);
-				*pnum=temp.data.fd;
+				int sockRec=temp.data.fd;
 				if(getNum>0)
-					*pthing=2;
+					thing=SAY;
 				else
 				{
 					*(char*)pget=0;
-					*pthing=0;
+					thing=OUT;
                     this->deleteFd(temp.data.fd);
 					epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
 					close(temp.data.fd);
 				}
 				if(pfunc!=NULL)
 				{
-					if(pfunc(*pthing,*pnum,getNum,pget,pneed,*this))
+					if(pfunc(thing,sockRec,getNum,pget,pneed,*this))
 						return false;
 				}
 			}
@@ -742,7 +744,10 @@ public:
 			case NOFOUND:
 				*topLen=sprintf(ptop,"HTTP/1.1 404 Not Found\r\n"
 				"Server LCserver/1.1\r\n"
-				"Connection: keep-alive\r\n");
+				"Connection: keep-alive\r\n"
+				"Content-Type: text/plain\r\n"
+				"Content-Length:%d\r\n\r\n"
+				"404 no found",(int)strlen("404 no found"));
 				break;
 			case CSS:
 				*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
@@ -1322,6 +1327,70 @@ public:
 };
 /********************************
 	author:chenxuan
+	date:2021/8/10
+	funtion:class to deal ddos
+*********************************/
+class LogSystem{
+public:
+	struct CliLog{
+		int socketCli;
+		int time;
+		char ip[20];
+	};
+	static bool dealAttack(int isUpdate,int socketCli,int maxTime)//check if accket
+	{
+		static CliLog cli[41];
+		if(isUpdate==1)
+		{
+			cli[socketCli%41].socketCli=socketCli;
+			cli[socketCli%41].time=1;
+			return true;
+		}
+		else if(isUpdate==2)
+		{
+			cli[socketCli%41].time++;
+			if(cli[socketCli%41].time>maxTime)
+				return false;
+			return true;
+		}
+		else if(isUpdate==0)
+		{
+			cli[socketCli%41].socketCli=0;
+			cli[socketCli%41].time=0;
+			return true;
+		}
+		return true;
+	}
+	static bool attackLog(int port,const char* ip,const char* pfileName)//log accket
+	{
+		time_t temp=time(NULL);
+		struct tm* pt=localtime(&temp);
+		FILE* fp=fopen(pfileName,"a+");
+		if(fp==NULL)
+			if((fp=fopen(pfileName,"w+"))==NULL)		
+				return false;
+			else
+				fprintf(fp,"server attacked log\n");
+		fprintf(fp,"%d year%d month%d day%d hour%d min%d sec:",pt->tm_year+1900,pt->tm_mon+1,pt->tm_mday,pt->tm_hour,pt->tm_min,pt->tm_sec);
+		fprintf(fp,"%s:%d port attack server\n",ip,port);
+		fclose(fp);
+		return true;
+	}
+	static bool recordFileError(const char* fileName)
+	{
+		FILE* fp=fopen("wrong.log","r+");
+		if(fp==NULL)
+			fp=fopen("wrong.log","w+");
+		if(fp==NULL)
+			return false;
+		fseek(fp,0,SEEK_END);
+		fprintf(fp,"open file %s wrong\n",fileName);
+		fclose(fp);
+		return true;
+	}
+};
+/********************************
+	author:chenxuan
 	date:2021/11/4
 	funtion:the http server for new
 *********************************/
@@ -1405,7 +1474,7 @@ public:
 	}
 	void run(int memory,const char* defaultFile)
 	{
-		char get[3000]={0};
+		char get[4000]={0};
 		char* sen=(char*)malloc(sizeof(char)*memory*1024*1024);
 		if(sen==NULL)
 			throw NULL;
@@ -1424,7 +1493,7 @@ public:
 		if(isDebug)
 			printf("server is ok\n");
 		while(1)
-			this->epollHttp(get,3000,sen,defaultFile);
+			this->epollHttp(get,4000,sen,defaultFile);
 	}
 	int httpSend(int num,void* buffer,int sendLen)
 	{
@@ -1437,6 +1506,10 @@ public:
 	inline const char* lastError()
 	{
 		return error;
+	}
+	inline bool disconnect(int soc)
+	{
+		return this->disconnectSocket(soc);
 	}
 private:
 	int func(int num,void* pget,void* sen,const char* defaultFile,HttpServer& server)
@@ -1489,7 +1562,10 @@ private:
 				strcpy(ask,http.analysisHttpAsk(pget));
 			flag=http.autoAnalysisGet((char*)pget,(char*)sen,defaultFile,&len);
 			if(flag==2&&isDebug)
+			{
+				LogSystem::recordFileError(ask);
 				printf("404 get %s wrong\n",ask);
+			}
 		}
 		if(false==server.sendSocket(num,sen,len))
 		{
@@ -1604,58 +1680,6 @@ public:
     	if(mysql_error(this->mysql)!=NULL)
 			strcpy(errorSay,mysql_error(this->mysql));
 		return errorSay;
-	}
-};
-/********************************
-	author:chenxuan
-	date:2021/8/10
-	funtion:class to deal ddos
-*********************************/
-class DealAttack{
-public:
-	struct CliLog{
-		int socketCli;
-		int time;
-		char ip[20];
-	};
-	static bool dealAttack(int isUpdate,int socketCli,int maxTime)//check if accket
-	{
-		static CliLog cli[41];
-		if(isUpdate==1)
-		{
-			cli[socketCli%41].socketCli=socketCli;
-			cli[socketCli%41].time=1;
-			return true;
-		}
-		else if(isUpdate==2)
-		{
-			cli[socketCli%41].time++;
-			if(cli[socketCli%41].time>maxTime)
-				return false;
-			return true;
-		}
-		else if(isUpdate==0)
-		{
-			cli[socketCli%41].socketCli=0;
-			cli[socketCli%41].time=0;
-			return true;
-		}
-		return true;
-	}
-	static bool attackLog(int port,const char* ip,const char* pfileName)//log accket
-	{
-		time_t temp=time(NULL);
-		struct tm* pt=localtime(&temp);
-		FILE* fp=fopen(pfileName,"a+");
-		if(fp==NULL)
-			if((fp=fopen(pfileName,"w+"))==NULL)		
-				return false;
-			else
-				fprintf(fp,"server attacked log\n");
-		fprintf(fp,"%d year%d month%d day%d hour%d min%d sec:",pt->tm_year+1900,pt->tm_mon+1,pt->tm_mday,pt->tm_hour,pt->tm_min,pt->tm_sec);
-		fprintf(fp,"%s:%d port attack server\n",ip,port);
-		fclose(fp);
-		return true;
 	}
 };
 /********************************
@@ -2472,7 +2496,7 @@ struct CliMsg{
 	int flag;
 	char chat[100];
 };
-int funcTwo(int thing,int num,int,void* pget,void* sen,ServerTcpIp& server)//main deal func
+int funcTwo(ServerPool::Thing thing,int num,int,void* pget,void* sen,ServerTcpIp& server)//main deal func
 {
 	char ask[200]={0},*pask=NULL;
 	CliMsg cli;
@@ -2483,9 +2507,9 @@ int funcTwo(int thing,int num,int,void* pget,void* sen,ServerTcpIp& server)//mai
 	if(sen==NULL)
 		return -1;
 	memset(sen,0,sizeof(char)*10000000);
-	if(false==DealAttack::dealAttack(thing,num,200))
+	if(false==LogSystem::dealAttack(thing,num,200))
 	{
-		DealAttack::attackLog(port,server.getPeerIp(num,&port),"./rec/attackLog.txt");
+		LogSystem::attackLog(port,server.getPeerIp(num,&port),"./rec/attackLog.txt");
 		server.disconnectSocket(num);
 		return 0;
 	}
@@ -2552,7 +2576,7 @@ int funcTwo(int thing,int num,int,void* pget,void* sen,ServerTcpIp& server)//mai
 	parameter:thing stand what happen,num is socket,len is get len,
 	return:return 0 stand continue,other stop
 *********************************/
-int funcThree(int thing,int num,int,void* pget,void* sen,ServerTcpIp& server)//main deal func
+int funcThree(ServerTcpIp::Thing thing,int num,int,void* pget,void* sen,ServerTcpIp& server)//main deal func
 {
 	char ask[200]={0},*pask=NULL;
 	DealHttp http;
@@ -2562,9 +2586,9 @@ int funcThree(int thing,int num,int,void* pget,void* sen,ServerTcpIp& server)//m
 	if(sen==NULL)
 		return -1;
 	memset(sen,0,sizeof(char)*10000000);
-	if(false==DealAttack::dealAttack(thing,num,200))
+	if(false==LogSystem::dealAttack(thing,num,200))
 	{
-		DealAttack::attackLog(port,server.getPeerIp(num,&port),"./rec/attackLog.txt");
+		LogSystem::attackLog(port,server.getPeerIp(num,&port),"./rec/attackLog.txt");
 		server.disconnectSocket(num);
 		return 0;
 	}
@@ -2630,7 +2654,7 @@ void selectTry()
 		exit(0);
 	printf("server ip is:%s\nthe server is ok\n",server.getHostIp());
 	while(1)
-		server.selectModel(&thing,&num,get,2048,sen,funcThree);
+		server.selectModel(get,2048,sen,funcThree);
 	free(sen);
 }
 /********************************
@@ -2663,7 +2687,7 @@ void serverHttp()
 		exit(0);
 	printf("server ip is:%s\nthe server is ok\n",server.getHostIp());
 	while(1)
-		if(false==server.epollModel(&thing,&num,get,2048,sen,funcTwo))
+		if(false==server.epollModel(get,2048,sen,funcTwo))
 			break;
 	free(sen);
 }

@@ -1,17 +1,6 @@
 #ifndef _HTTP_H_
 #define _HTTP_H_
 #include<string.h>
-struct CliMsg{ 
-	char hao[20];
-	char mi[20];
-	int flag;
-	char chat[100];
-};
-struct CliLog{
-	int socketCli;
-	int time;
-	char ip[20];
-};
 class DealHttp{
 private:
 	char ask[256];
@@ -41,10 +30,17 @@ public:
 	const char* getWildUrl(const void* getText,const char* route,char* buffer,int maxLen);
 	static void dealUrl(const char* url,char* urlTop,char* urlEnd);
 };
-class DealAttack{
+class LogSystem{
+public:
+	struct CliLog{
+		int socketCli;
+		int time;
+		char ip[20];
+	};
 public:
 	static bool dealAttack(int isUpdate,int socketCli,int maxTime);//check if accket
 	static bool attackLog(int port,const char* ip,const char* pfileName);//log accket
+	static bool recordFileError(const char* filename);
 };
 class Json{
 private:
