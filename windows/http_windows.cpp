@@ -1305,6 +1305,11 @@ public:
 //		return SSL_read(ssl,buffer,len);
 //	}
 };
+/********************************
+	author:chenxuan
+	date:2021/8/10
+	funtion:class to deal easy http ask(get)
+*********************************/
 class DealHttp{
 private:
 	char ask[256];
@@ -1395,7 +1400,10 @@ public:
 			case NOFOUND:
 				*topLen=sprintf(ptop,"HTTP/1.1 404 Not Found\r\n"
 				"Server LCserver/1.1\r\n"
-				"Connection: keep-alive\r\n");
+				"Connection: keep-alive\r\n"
+				"Content-Type: text/plain\r\n"
+				"Content-Length:%d\r\n\r\n"
+				"404 no found",(int)strlen("404 no found"));
 				break;
 			case CSS:
 				*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
@@ -1574,7 +1582,7 @@ public:
 		if(ptemp==NULL)
 			return NULL;
 		ptemp+=strlen(key);
-		while(*(ptemp++)!='\n'&&i<maxLineLen)
+		while(*(ptemp++)!='\r'&&i<maxLineLen)
 			line[i++]=*ptemp;
 		line[i-1]=0;
 		return line;
@@ -1602,6 +1610,36 @@ public:
 		temp+=strlen(route);
 		sscanf(temp,"%s",buffer);
 		return buffer;
+	}
+	int getRecFile(const void* message,char* fileName,int nameLen,char* buffer,int bufferLen)
+	{
+		char tempLen[20]={0},*end=NULL,*top=NULL;
+		int result=0;
+		if(NULL==this->getKeyLine(message,"boundary",buffer,bufferLen))
+			return 0;
+		if(NULL==this->getKeyValue(message,"filename",fileName,nameLen))
+			return 0;
+		if(NULL==this->getKeyValue(message,"Content-Length",tempLen,20))
+			return 0;
+		if(0>=sscanf(tempLen,"%d",&result))
+			return 0;
+		if((top=strstr((char*)message,buffer))==NULL)
+			return 0;
+		if((top=strstr(top+strlen(buffer),buffer))==NULL)
+			return 0;
+		if((end=strstr(top+strlen(buffer),buffer))==NULL)
+			return 0;
+		if((top=strstr(top,"\r\n\r\n"))==NULL)
+			return 0;
+		if(end-top>bufferLen)
+			return 0;
+		top+=4;
+		end-=2;
+		unsigned int i=0;
+		for(i=0;top!=end;i++,top++)
+			buffer[i]=*top;
+		buffer[i+1]=0;
+		return result;
 	}
 	static void dealUrl(const char* url,char* urlTop,char* urlEnd)
 	{
@@ -1975,6 +2013,7 @@ int funcTwo(int thing,int num,int getLen,void* pget,void* sen,ServerTcpIp& serve
 {
 	DealHttp http;
 	int len=0;
+	char ask[200]={0};
 	if(sen==NULL)
 		return -1;
 	memset(sen,0,sizeof(char)*10000000);
@@ -1989,10 +2028,12 @@ int funcTwo(int thing,int num,int getLen,void* pget,void* sen,ServerTcpIp& serve
 	}
 	if(thing==2)
 	{
-		if(false==http.cutLineAsk((char*)pget,"GET"))
-			return 0;
-		printf("ask:%s",(char*)pget);
-		printf("http:%s\n",http.analysisHttpAsk(pget));
+//		printf("ask:%s",(char*)pget);
+		http.cutLineAsk((char*)pget,"GET");
+		http.getRecFile(pget,ask,200,(char*)sen,1000000);
+		printf("\r\nfile:%s\r\n",(char*)sen);
+		if(NULL==http.analysisHttpAsk(pget))
+			http.createSendMsg(DealHttp::HTML,(char*)sen,"404.html",&len);
 		if(2==http.autoAnalysisGet((char*)pget,(char*)sen,indexName,&len))
 		{
 			perror("file");	

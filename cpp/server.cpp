@@ -27,20 +27,29 @@ ServerTcpIp::ServerTcpIp(unsigned short port,int epollNum,int wait)
 	sizeAddr=sizeof(sockaddr);
 	backwait=wait;
 	numClient=0;
+	error=NULL;
 	hostip=(char*)malloc(sizeof(char)*200);
-	memset(hostip,0,sizeof(char)*200);
+	if(hostip==NULL)
+		error="hostip worng";
+	else
+		memset(hostip,0,sizeof(char)*200);
 	hostname=(char*)malloc(sizeof(char)*300);
-	memset(hostname,0,sizeof(char)*300);
+	if(hostname==NULL)
+		error="hostname wrong";
+	else
+		memset(hostname,0,sizeof(char)*300);
 	FD_ZERO(&fdClients);//clean fdClients;
 	epfd=epoll_create(epollNum);
 	if((pevent=(epoll_event*)malloc(512*sizeof(epoll_event)))==NULL)
-		throw NULL;
-	memset(pevent,0,sizeof(epoll_event)*512);
+		error="pevent wrong";
+	else
+		memset(pevent,0,sizeof(epoll_event)*512);
 	memset(&nowEvent,0,sizeof(epoll_event));
     pfdn=(int*)malloc(sizeof(int)*64);
     if(pfdn==NULL)
-        throw NULL;
-    memset(pfdn,0,sizeof(int)*64);
+        error="pfdn wrong";
+    else
+    	memset(pfdn,0,sizeof(int)*64);
     fdNumNow=0;
     fdMax=64;
 }
@@ -49,10 +58,14 @@ ServerTcpIp::~ServerTcpIp()//clean server
 	close(sock);
 	close(sockC);
 	close(epfd);
-	free(hostip);
-	free(hostname);
-	free(pevent);
-    free(pfdn);
+	if(hostip!=NULL)
+		free(hostip);
+	if(hostname!=NULL)
+		free(hostname);
+	if(pevent!=NULL)
+		free(pevent);
+	if(pfdn!=NULL)
+    	free(pfdn);
 }
 bool ServerTcpIp::bondhost()//bond myself first
 {
@@ -307,16 +320,15 @@ HttpServer::HttpServer(unsigned port,bool debug):ServerTcpIp(port)
 {
 	getText=NULL;
 	array=NULL;
-	error=NULL;
 	array=(RouteFuntion*)malloc(sizeof(RouteFuntion)*20);
 	if(array==NULL)
-		throw NULL;
-	error=(char*)malloc(sizeof(char)*100);
-	if(error==NULL)
-		throw NULL;
+		this->error="route wrong";
+	else
+		memset(array,0,sizeof(RouteFuntion)*20);
 	now=0;
 	max=20;
 	isDebug=debug;
+	textLen=0;
 	clientIn=NULL;
 	clientOut=NULL;
 }
@@ -324,8 +336,6 @@ HttpServer::~HttpServer()
 {
 	if(array!=NULL)
 		free(array);
-	if(error!=NULL)
-		free(error);
 }
 bool HttpServer::routeHandle(AskType ask,RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&))
 {
@@ -345,28 +355,34 @@ bool HttpServer::routeHandle(AskType ask,RouteType type,const char* route,void (
 	now++;
 	return true;
 }
-void HttpServer::run(int memory,const char* defaultFile)
+void HttpServer::run(unsigned int memory,unsigned int recBufLenChar,const char* defaultFile)
 {
-	char get[3000]={0};
+	char* get=(char*)malloc(sizeof(char)*recBufLenChar);
 	char* sen=(char*)malloc(sizeof(char)*memory*1024*1024);
-	if(sen==NULL)
-		throw NULL;
+	if(sen==NULL||get==NULL)
+	{
+		this->error="malloc get and sen wrong";
+		return;
+	}
+	memset(get,0,sizeof(char)*recBufLenChar);
 	memset(sen,0,sizeof(char)*memory*1024*1024);
 	if(false==this->bondhost())
 	{
-		sprintf(this->error,"bond wrong");
+		this->error="bound wrong";
 		return;
 	}
 	if(false==this->setlisten())
 	{
-		sprintf(this->error,"set listen wrong");
+		this->error="set listen wrong";
 		return;
 	}
 	this->getText=get;
 	if(isDebug)
 		printf("server is ok\n");
 	while(1)
-		this->epollHttp(get,3000,sen,defaultFile);
+		this->epollHttp(get,recBufLenChar,sen,defaultFile);
+	free(sen);
+	free(get);
 }
 bool HttpServer::clientInHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port))
 {
@@ -474,7 +490,10 @@ void HttpServer::epollHttp(void* pget,int len,void* pneed,const char* defaultFil
 		{
 			int getNum=recv(temp.data.fd,(char*)pget,len,0);
 			if(getNum>0)
+			{
+				this->textLen=getNum;
 				func(temp.data.fd,pget,pneed,defaultFile,*this);
+			}
 			else
 			{
 				if(this->clientOut!=NULL)

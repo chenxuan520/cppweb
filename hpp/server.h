@@ -40,6 +40,7 @@ protected:
 	int epfd;//file descriptor to ctrl epoll
 	char* hostip;//host IP 
 	char* hostname;//host name
+	const char* error;//error hapen
 	int sock;//file descriptor of host;
 	int sockC;//file descriptor to sign every client;
 	epoll_event nowEvent;//a temp event to get event
@@ -73,6 +74,10 @@ public:
 	char* getPeerIp(int cliSoc,int* pcliPort);//get ip and port by socket
 	bool epollModel(void* pget,int len,void* pneed,int (*pfunc)(Thing,int ,int ,void* ,void*,ServerTcpIp& ));
 	bool disconnectSocket(int clisock);//disconnect from socket
+	inline const char* getLastError()//get last error
+	{
+		return error;
+	}
 };
 class HttpServer:private ServerTcpIp{
 public:
@@ -91,9 +96,9 @@ public:
 private:
 	RouteFuntion* array;
 	void* getText;
-	char* error;
 	unsigned int max;
 	unsigned int now;
+	int textLen;
 	bool isDebug;
 	void (*clientIn)(HttpServer&,int num,void* ip,int port);
 	void (*clientOut)(HttpServer&,int num,void* ip,int port);
@@ -103,11 +108,15 @@ public:
 	bool clientOutHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port));
 	bool clientInHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port));
 	bool routeHandle(AskType ask,RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&));
-	void run(int memory,const char* defaultFile);
+	void run(unsigned int memory,unsigned int recBufLenChar,const char* defaultFile);
 	int httpSend(int num,void* buffer,int sendLen);
 	inline void* recText()
 	{
 		return this->getText;
+	}
+	inline int recLen()
+	{
+		return this->textLen;
 	}
 	inline const char* lastError()
 	{
