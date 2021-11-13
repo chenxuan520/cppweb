@@ -213,6 +213,7 @@ protected:
 	int epfd;//file descriptor to ctrl epoll
 	char* hostip;//host IP 
 	char* hostname;//host name
+	const char* error;//error hapen
 	int sock;//file descriptor of host;
 	int sockC;//file descriptor to sign every client;
 	epoll_event nowEvent;//a temp event to get event
@@ -274,20 +275,29 @@ public:
 		sizeAddr=sizeof(sockaddr);
 		backwait=wait;
 		numClient=0;
+		error=NULL;
 		hostip=(char*)malloc(sizeof(char)*200);
-		memset(hostip,0,sizeof(char)*200);
+		if(hostip==NULL)
+			error="hostip worng";
+		else
+			memset(hostip,0,sizeof(char)*200);
 		hostname=(char*)malloc(sizeof(char)*300);
-		memset(hostname,0,sizeof(char)*300);
+		if(hostname==NULL)
+			error="hostname wrong";
+		else
+			memset(hostname,0,sizeof(char)*300);
 		FD_ZERO(&fdClients);//clean fdClients;
 		epfd=epoll_create(epollNum);
 		if((pevent=(epoll_event*)malloc(512*sizeof(epoll_event)))==NULL)
-			throw NULL;
-		memset(pevent,0,sizeof(epoll_event)*512);
+			error="event wrong";
+		else
+			memset(pevent,0,sizeof(epoll_event)*512);
 		memset(&nowEvent,0,sizeof(epoll_event));
         pfdn=(int*)malloc(sizeof(int)*64);
         if(pfdn==NULL)
-            throw NULL;
-        memset(pfdn,0,sizeof(int)*64);
+            error="pfdn wrong";
+        else
+        	memset(pfdn,0,sizeof(int)*64);
         fdNumNow=0;
         fdMax=64;
 	}
@@ -296,10 +306,14 @@ public:
 		close(sock);
 		close(sockC);
 		close(epfd);
-		free(hostip);
-		free(hostname);
-		free(pevent);
-        free(pfdn);
+		if(hostip!=NULL)
+			free(hostip);
+		if(hostname!=NULL)
+			free(hostname);
+		if(pevent!=NULL)
+			free(pevent);
+		if(pfdn!=NULL)
+        	free(pfdn);
 	}
 	bool bondhost()//bond myself first
 	{
@@ -349,6 +363,10 @@ public:
 	inline int sendSocket(int socCli,const void* psen,int len)//send by socket
 	{
 		return send(socCli,(char*)psen,len,0);
+	}
+	inline const char* lastError()
+	{
+		return this->error;
 	}
 	bool selectModel(void* pget,int len,void* pneed,int (*pfunc)(Thing ,int ,int,void* ,void*,ServerTcpIp& ))
 	{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
@@ -926,7 +944,7 @@ public:
 		if(ptemp==NULL)
 			return NULL;
 		ptemp+=strlen(key);
-		while(*(ptemp++)!='\n'&&i<maxLineLen)
+		while(*(ptemp++)!='\r'&&i<maxLineLen)
 			line[i++]=*ptemp;
 		line[i-1]=0;
 		return line;
@@ -954,6 +972,36 @@ public:
 		temp+=strlen(route);
 		sscanf(temp,"%s",buffer);
 		return buffer;
+	}
+	int getRecFile(const void* message,char* fileName,int nameLen,char* buffer,int bufferLen)
+	{
+		char tempLen[20]={0},*end=NULL,*top=NULL;
+		int result=0;
+		if(NULL==this->getKeyLine(message,"boundary",buffer,bufferLen))
+			return 0;
+		if(NULL==this->getKeyValue(message,"filename",fileName,nameLen))
+			return 0;
+		if(NULL==this->getKeyValue(message,"Content-Length",tempLen,20))
+			return 0;
+		if(0>=sscanf(tempLen,"%d",&result))
+			return 0;
+		if((top=strstr((char*)message,buffer))==NULL)
+			return 0;
+		if((top=strstr(top+strlen(buffer),buffer))==NULL)
+			return 0;
+		if((end=strstr(top+strlen(buffer),buffer))==NULL)
+			return 0;
+		if((top=strstr(top,"\r\n\r\n"))==NULL)
+			return 0;
+		if(end-top>bufferLen)
+			return 0;
+		top+=4;
+		end-=2;
+		unsigned int i=0;
+		for(i=0;top!=end;i++,top++)
+			buffer[i]=*top;
+		buffer[i+1]=0;
+		return result;
 	}
 	static void dealUrl(const char* url,char* urlTop,char* urlEnd)
 	{
@@ -1411,9 +1459,9 @@ public:
 private:
 	RouteFuntion* array;
 	void* getText;
-	char* error;
 	unsigned int max;
 	unsigned int now;
+	int textLen;
 	bool isDebug;
 	void (*clientIn)(HttpServer&,int num,void* ip,int port);
 	void (*clientOut)(HttpServer&,int num,void* ip,int port);
@@ -1422,16 +1470,15 @@ public:
 	{
 		getText=NULL;
 		array=NULL;
-		error=NULL;
 		array=(RouteFuntion*)malloc(sizeof(RouteFuntion)*20);
 		if(array==NULL)
-			throw NULL;
-		error=(char*)malloc(sizeof(char)*100);
-		if(error==NULL)
-			throw NULL;
+			this->error="route wrong";
+		else
+			memset(array,0,sizeof(RouteFuntion)*20);
 		now=0;
 		max=20;
 		isDebug=debug;
+		textLen=0;
 		clientIn=NULL;
 		clientOut=NULL;
 	}
@@ -1439,8 +1486,6 @@ public:
 	{
 		if(array!=NULL)
 			free(array);
-		if(error!=NULL)
-			free(error);
 	}
 	bool routeHandle(AskType ask,RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&))
 	{
@@ -1472,28 +1517,34 @@ public:
 			return false;
 		clientOut=pfunc;
 	}
-	void run(int memory,const char* defaultFile)
+	void run(unsigned int memory,unsigned int recBufLenChar,const char* defaultFile)
 	{
-		char get[4000]={0};
+		char* get=(char*)malloc(sizeof(char)*recBufLenChar);
 		char* sen=(char*)malloc(sizeof(char)*memory*1024*1024);
-		if(sen==NULL)
-			throw NULL;
+		if(sen==NULL||get==NULL)
+		{
+			this->error="malloc get and sen wrong";
+			return;
+		}
+		memset(get,0,sizeof(char)*recBufLenChar);
 		memset(sen,0,sizeof(char)*memory*1024*1024);
 		if(false==this->bondhost())
 		{
-			sprintf(this->error,"bond wrong");
+			this->error="bound wrong";
 			return;
 		}
 		if(false==this->setlisten())
 		{
-			sprintf(this->error,"set listen wrong");
+			this->error="set listen wrong";
 			return;
 		}
 		this->getText=get;
 		if(isDebug)
 			printf("server is ok\n");
 		while(1)
-			this->epollHttp(get,4000,sen,defaultFile);
+			this->epollHttp(get,recBufLenChar,sen,defaultFile);
+		free(sen);
+		free(get);
 	}
 	int httpSend(int num,void* buffer,int sendLen)
 	{
@@ -1502,6 +1553,10 @@ public:
 	inline void* recText()
 	{
 		return this->getText;
+	}
+	inline int recLen()
+	{
+		return this->textLen;
 	}
 	inline const char* lastError()
 	{
@@ -1603,7 +1658,10 @@ private:
 			{
 				int getNum=recv(temp.data.fd,(char*)pget,len,0);
 				if(getNum>0)
+				{
+					this->textLen=getNum;
 					func(temp.data.fd,pget,pneed,defaultFile,*this);
+				}
 				else
 				{
 					if(this->clientOut!=NULL)
@@ -2734,6 +2792,6 @@ int main(int argc, char** argv)
 	HttpServer server(5201,true);
 	server.routeHandle(HttpServer::GET,HttpServer::WILD,"/root/",func);
 	server.routeHandle(HttpServer::ALL,HttpServer::ONEWAY,"/key/",funHa);
-	server.run(1 ,"./index.html");
+	server.run(1 ,4000,"./index.html");
 	return 0;
 }

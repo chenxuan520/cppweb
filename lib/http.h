@@ -28,6 +28,7 @@ public:
 	const char* getAskRoute(const void* message,const char* askWay,char* buffer,unsigned int bufferLen);
 	const char* getRouteValue(const void* routeMeg,const char* key,char* value,unsigned int valueLen);
 	const char* getWildUrl(const void* getText,const char* route,char* buffer,int maxLen);
+	int getRecFile(const void* message,char* fileName,int nameLen,char* buffer,int bufferLen);
 	static void dealUrl(const char* url,char* urlTop,char* urlEnd);
 };
 class LogSystem{
