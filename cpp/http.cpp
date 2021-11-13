@@ -262,7 +262,7 @@ const char* DealHttp::getKeyLine(const void* message,const char* key,char* line,
 	if(ptemp==NULL)
 		return NULL;
 	ptemp+=strlen(key);
-	while(*(ptemp++)!='\n'&&i<maxLineLen)
+	while(*(ptemp++)!='\r'&&i<maxLineLen)
 		line[i++]=*ptemp;
 	line[i]=0;
 	return line;
@@ -289,6 +289,36 @@ const char* DealHttp::getWildUrl(const void* getText,const char* route,char* buf
 		return NULL;
 	temp+=strlen(route);
 	sscanf(temp,"%s",buffer);
+}
+int DealHttp::getRecFile(const void* message,char* fileName,int nameLen,char* buffer,int bufferLen)
+{
+	char tempLen[20]={0},*end=NULL,*top=NULL;
+	int result=0;
+	if(NULL==this->getKeyLine(message,"boundary",buffer,bufferLen))
+		return 0;
+	if(NULL==this->getKeyValue(message,"filename",fileName,nameLen))
+		return 0;
+	if(NULL==this->getKeyValue(message,"Content-Length",tempLen,20))
+		return 0;
+	if(0>=sscanf(tempLen,"%d",&result))
+		return 0;
+	if((top=strstr((char*)message,buffer))==NULL)
+		return 0;
+	if((top=strstr(top+strlen(buffer),buffer))==NULL)
+		return 0;
+	if((end=strstr(top+strlen(buffer),buffer))==NULL)
+		return 0;
+	if((top=strstr(top,"\r\n\r\n"))==NULL)
+		return 0;
+	if(end-top>bufferLen)
+		return 0;
+	top+=4;
+	end-=2;
+	unsigned int i=0;
+	for(i=0;top!=end;i++,top++)
+		buffer[i]=*top;
+	buffer[i+1]=0;
+	return result;
 }
 void DealHttp::dealUrl(const char* url,char* urlTop,char* urlEnd)
 {
