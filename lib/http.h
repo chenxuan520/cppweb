@@ -22,7 +22,7 @@ public:
 	bool createSendMsg(FileKind kind,char* buffer,const char* pfile,int* plong);
 	char* findFileMsg(const char* pname,int* plen,char* buffer);
 	int getFileLen(const char* pname);
-	int autoAnalysisGet(const char* pask,char* psend,const char* pfirstFile,int* plen);
+	int autoAnalysisGet(const char* message,char* psend,const char* pfirstFile,int* plen);
 	const char* getKeyValue(const void* message,const char* key,char* value,int maxValueLen);
 	const char* getKeyLine(const void* message,const char* key,char* line,int maxLineLen);
 	const char* getAskRoute(const void* message,const char* askWay,char* buffer,unsigned int bufferLen);

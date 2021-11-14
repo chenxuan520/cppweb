@@ -71,7 +71,7 @@ public:
 			return false;
 		if(strlen(key)+strlen(value)>=180)
 			return false;
-		int len=sprintf(temp,"\"%s\":\"%s\";",key,value);
+		int len=sprintf(temp,"\"%s\":\"%s\",",key,value);
 		strcat(this->buffer,temp);
 		nowLen+=len;
 		return true;
@@ -83,7 +83,7 @@ public:
 			return false;
 		if(strlen(key)>=45)
 			return false;	
-		int len=sprintf(temp,"\"%s\":%d;",key,value);
+		int len=sprintf(temp,"\"%s\":%d,",key,value);
 		strcat(this->buffer,temp);
 		nowLen+=len;
 		return true;	
@@ -95,7 +95,7 @@ public:
 			return false;
 		if(strlen(key)>=45)
 			return false;	
-		int len=sprintf(temp,"\"%s\":%.*f;",key,output,value);
+		int len=sprintf(temp,"\"%s\":%.*f,",key,output,value);
 		strcat(this->buffer,temp);
 		nowLen+=len;
 		return true;		
@@ -104,7 +104,7 @@ public:
 	{
 		if(nowLen+5>maxLen)
 			return NULL;
-		strcat(buffer,"}");
+		buffer[strlen(buffer)-1]='}';
 		return this->buffer;
 	}
 	bool jsonToFile(const char* fileName)
@@ -1571,20 +1571,20 @@ private:
 	{
 		static DealHttp http;
 		AskType type=GET;
-		int len=0,flag=0;
+		int len=0,flag=2;
 		char ask[200]={0};
 		if(strstr((char*)pget,"GET")!=NULL)
 		{
 			http.getAskRoute(pget,"GET",ask,200);
 			if(isDebug)
-				printf("url:%s\n",ask);
+				printf("Get url:%s\n",ask);
 			type=GET;
 		}
 		if(strstr((char*)pget,"POST")!=NULL)
 		{
 			http.getAskRoute(pget,"POST",ask,200);
 			if(isDebug)
-				printf("url:%s\n",ask);
+				printf("POST url:%s\n",ask);
 			type=POST;
 		}
 		void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&)=NULL;
@@ -1614,8 +1614,10 @@ private:
 			if(isDebug)
 				printf("http:%s\n",http.analysisHttpAsk(pget));
 			if(http.analysisHttpAsk(pget)!=NULL)
+			{
 				strcpy(ask,http.analysisHttpAsk(pget));
-			flag=http.autoAnalysisGet((char*)pget,(char*)sen,defaultFile,&len);
+				flag=http.autoAnalysisGet((char*)pget,(char*)sen,defaultFile,&len);
+			}
 			if(flag==2&&isDebug)
 			{
 				LogSystem::recordFileError(ask);

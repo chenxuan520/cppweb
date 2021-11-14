@@ -1616,21 +1616,21 @@ public:
 		char tempLen[20]={0},*end=NULL,*top=NULL;
 		int result=0;
 		if(NULL==this->getKeyLine(message,"boundary",buffer,bufferLen))
-			return 0;
+			return 0;printf("1\n");
 		if(NULL==this->getKeyValue(message,"filename",fileName,nameLen))
-			return 0;
+			return 0;printf("2\n");
 		if(NULL==this->getKeyValue(message,"Content-Length",tempLen,20))
-			return 0;
+			return 0;printf("3\n");
 		if(0>=sscanf(tempLen,"%d",&result))
-			return 0;
+			return 0;printf("4\n");
 		if((top=strstr((char*)message,buffer))==NULL)
-			return 0;
+			return 0;printf("5\n");
 		if((top=strstr(top+strlen(buffer),buffer))==NULL)
-			return 0;
+			return 0;printf("6\n");
 		if((end=strstr(top+strlen(buffer),buffer))==NULL)
-			return 0;
+			return 0;printf("7\n");
 		if((top=strstr(top,"\r\n\r\n"))==NULL)
-			return 0;
+			return 0;printf("8\n");
 		if(end-top>bufferLen)
 			return 0;
 		top+=4;
@@ -1668,6 +1668,97 @@ public:
 			len=strlen(urlTop);
 			sscanf(url+len+7,"%s",urlEnd);
 		}
+	}
+};
+/********************************
+	author:chenxuan
+	date:2021/9/4
+	funtion:the class ti ctrl file get and len 
+*********************************/
+class FileGet{
+private:
+	char* pbuffer;
+public:
+	FileGet()
+	{
+		pbuffer=NULL;
+	}
+	~FileGet()
+	{
+		if(pbuffer!=NULL)
+		{
+			free(pbuffer);
+			pbuffer=NULL;
+		}
+	}
+	int getFileLen(const char* fileName)
+	{
+		int len=0;
+		FILE* fp=fopen(fileName,"rb");
+		if(fp==NULL)
+			return -1;
+		fseek(fp,0,SEEK_END);
+		len=ftell(fp);
+		fclose(fp);
+		return len;
+	}
+	bool getFileMsg(const char* fileName,char* buffer,unsigned int bufferLen)
+	{
+		int i=0,len=0;
+		len=this->getFileLen(fileName);
+		FILE* fp=fopen(fileName,"rb");
+		if(fp==NULL)
+			return false;
+		for(i=0;i<len&&i<bufferLen;i++)
+			buffer[i]=fgetc(fp);
+		buffer[i+1]=0;
+		fclose(fp);
+		return true;
+	}
+	bool fileStrstr(const char* fileName,const char* strFind)
+	{
+		int len=0;
+		char* pstr=NULL;
+		len=this->getFileLen(fileName);
+		if(pbuffer!=NULL)
+		{
+			free(pbuffer);
+			pbuffer=NULL;
+		}
+		FILE* fp=fopen(fileName,"r");
+		if(fp==NULL)
+			return false;
+		pbuffer=(char*)malloc(sizeof(char)*(len+10));
+		char* ptemp=pbuffer;
+		if(pbuffer==NULL)
+			return false;
+		memset(pbuffer,0,sizeof(char)*(len+5));
+		if(false==this->getFileMsg(fileName,pbuffer,sizeof(char)*(len+10)))
+			return false;
+		while((*ptemp<65||*ptemp>122)&&ptemp<pbuffer+sizeof(char)*len)
+			ptemp++;
+		pstr=strstr(ptemp,strFind);
+		if(pbuffer!=NULL)
+		{
+			free(pbuffer);
+			pbuffer=NULL;
+		}
+		fclose(fp);
+		if(pstr!=NULL)
+			return true;
+		else
+			return false;
+		return false;
+	}
+	static bool writeToFile(const char* fileName,const char* buffer,unsigned int writeLen)
+	{
+		FILE* fp=fopen(fileName,"wb+");
+		if(fp==NULL)
+			return false;
+		for(unsigned int i=0;i<writeLen;i++)
+			fputc(buffer[i],fp);
+		fclose(fp);
+		return true;
 	}
 };
 /********************************
@@ -1755,7 +1846,7 @@ public:
 	}
 	void run(int memory,const char* defaultFile)
 	{
-		char get[3000]={0};
+		char get[10000]={0};
 		char* sen=(char*)malloc(sizeof(char)*memory*1024*1024);
 		if(sen==NULL)
 			throw NULL;
@@ -1774,7 +1865,7 @@ public:
 		if(isDebug)
 			printf("server is ok\n");
 		while(1)
-			this->epollHttp(get,3000,sen,defaultFile);
+			this->epollHttp(get,10000,sen,defaultFile);
 	}
 	int httpSend(int num,void* buffer,int sendLen)
 	{
@@ -2028,15 +2119,17 @@ int funcTwo(int thing,int num,int getLen,void* pget,void* sen,ServerTcpIp& serve
 	}
 	if(thing==2)
 	{
-//		printf("ask:%s",(char*)pget);
+		printf("ask:%s",(char*)pget);
 		http.cutLineAsk((char*)pget,"GET");
-		http.getRecFile(pget,ask,200,(char*)sen,1000000);
-		printf("\r\nfile:%s\r\n",(char*)sen);
+		len=http.getRecFile(pget,ask,200,(char*)sen,1000000);
+		if(len>0)
+			FileGet::writeToFile(ask,(char*)sen,strlen((char*)sen));
+		printf("\r\nfile:%s\r\n%d",(char*)sen,len);
 		if(NULL==http.analysisHttpAsk(pget))
 			http.createSendMsg(DealHttp::HTML,(char*)sen,"404.html",&len);
 		if(2==http.autoAnalysisGet((char*)pget,(char*)sen,indexName,&len))
 		{
-			perror("file");	
+//			perror("file");	
 			printf("some thing wrong %s\n",(char*)pget);
 		}
 		else
@@ -2051,41 +2144,35 @@ int funcTwo(int thing,int num,int getLen,void* pget,void* sen,ServerTcpIp& serve
 void func(DealHttp& http,HttpServer& server,int num,void* sen,int& len)
 {
 	char buffer[100]={0},name[30]={0};
-	
-	http.getWildUrl(server.recText(),"/root/",buffer,100);
-	http.getRouteValue(buffer,"name",name,30);
-	Json json;
-	json.jsonInit(300);
-	json.addKeyValue("buffer",buffer);
-	json.addKeyValInt("wuwu",90);
-	json.addKeyValue("name",name);
-	printf("json%s\n",json.endJson());
-	json.jsonToFile("temp");
-	printf("buffer:%s\n",buffer);
-	http.createSendMsg(DealHttp::JSON,(char*)sen,"temp",&len);
+	printf("%s\n",(char*)server.recText());
+	if(http.getRecFile(server.recText(),name,30,(char*)sen,100000)!=0)
+	{
+		FileGet::writeToFile(name,(char*)sen,strlen((char*)sen));
+	}
+	http.createSendMsg(DealHttp::HTML,(char*)sen,"404.html",&len);
 }
 void serverHttp()
 {
 	unsigned int port=80;
 	chooseModel(&port);
-//	HttpServer server(port,true);
-//		server.routeHandle(HttpServer::GET,HttpServer::WILD,"/login/",func);
-//	server.run(10,indexName);
-	ServerTcpIp server(port);
-	int thing=0,num=0;
-	char get[2048]={0};
-	char* sen=(char*)malloc(sizeof(char)*10000000);
-	if(sen==NULL)
-		printf("memory wrong\n");
-	if(false==server.bondhost())
-		exit(0);
-	if(false==server.setlisten())
-		exit(0);
-	printf("server ip is:%s\nthe server is ok\n",server.getHostIp());
-	while(1)
-		if(false==server.selectModel(&thing,&num,get,2048,sen,funcTwo))
-			break;
-	free(sen);
+	HttpServer server(port,true);
+		server.routeHandle(HttpServer::POST,HttpServer::ONEWAY,"/upload",func);
+	server.run(1,indexName);
+//	ServerTcpIp server(port);
+//	int thing=0,num=0;
+//	char get[2048]={0};
+//	char* sen=(char*)malloc(sizeof(char)*10000000);
+//	if(sen==NULL)
+//		printf("memory wrong\n");
+//	if(false==server.bondhost())
+//		exit(0);
+//	if(false==server.setlisten())
+//		exit(0);
+//	printf("server ip is:%s\nthe server is ok\n",server.getHostIp());
+//	while(1)
+//		if(false==server.selectModel(&thing,&num,get,2048,sen,funcTwo))
+//			break;
+//	free(sen);
 }
 int main(int argc, char** argv) 
 {

@@ -404,20 +404,20 @@ int HttpServer::func(int num,void* pget,void* sen,const char* defaultFile,HttpSe
 {
 	static DealHttp http;
 	AskType type=GET;
-	int len=0,flag=0;
+	int len=0,flag=2;
 	char ask[200]={0};
 	if(strstr((char*)pget,"GET")!=NULL)
 	{
 		http.getAskRoute(pget,"GET",ask,200);
 		if(isDebug)
-			printf("url:%s\n",ask);
+			printf("Get url:%s\n",ask);
 		type=GET;
 	}
 	if(strstr((char*)pget,"POST")!=NULL)
 	{
 		http.getAskRoute(pget,"POST",ask,200);
 		if(isDebug)
-			printf("url:%s\n",ask);
+			printf("POST url:%s\n",ask);
 		type=POST;
 	}
 	void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&)=NULL;
@@ -446,10 +446,14 @@ int HttpServer::func(int num,void* pget,void* sen,const char* defaultFile,HttpSe
 	{
 		if(isDebug)
 			printf("http:%s\n",http.analysisHttpAsk(pget));
-		strcpy(ask,http.analysisHttpAsk(pget));
-		flag=http.autoAnalysisGet((char*)pget,(char*)sen,defaultFile,&len);
+		if(http.analysisHttpAsk(pget)!=NULL)
+		{
+			strcpy(ask,http.analysisHttpAsk(pget));
+			flag=http.autoAnalysisGet((char*)pget,(char*)sen,defaultFile,&len);
+		}
 		if(flag==2&&isDebug)
 		{
+			http.createSendMsg(DealHttp::NOFOUND,(char*)sen,NULL,&len);
 			LogSystem::recordFileError(ask);
 			printf("404 get %s wrong\n",ask);
 		}

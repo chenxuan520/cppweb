@@ -440,7 +440,7 @@ bool Json::addKeyValue(const char* key,const char* value)
 		return false;
 	if(strlen(key)+strlen(value)>=180)
 		return false;
-	int len=sprintf(temp,"\"%s\":\"%s\";",key,value);
+	int len=sprintf(temp,"\"%s\":\"%s\",",key,value);
 	strcat(this->buffer,temp);
 	nowLen+=len;
 	return true;
@@ -452,7 +452,7 @@ bool Json::addKeyValInt(const char* key,int value)
 		return false;
 	if(strlen(key)>=45)
 		return false;	
-	int len=sprintf(temp,"\"%s\":%d;",key,value);
+	int len=sprintf(temp,"\"%s\":%d,",key,value);
 	strcat(this->buffer,temp);
 	nowLen+=len;
 	return true;	
@@ -464,7 +464,7 @@ bool Json::addKeyValFloat(const char* key,float value,int output)
 		return false;
 	if(strlen(key)>=45)
 		return false;	
-	int len=sprintf(temp,"\"%s\":%.*f;",key,output,value);
+	int len=sprintf(temp,"\"%s\":%.*f,",key,output,value);
 	strcat(this->buffer,temp);
 	nowLen+=len;
 	return true;		
@@ -473,7 +473,7 @@ const char* Json::endJson()
 {
 	if(nowLen+5>maxLen)
 		return NULL;
-	strcat(buffer,"}");
+	buffer[strlen(buffer)-1]='}';
 	return this->buffer;
 }
 bool Json::jsonToFile(const char* fileName)
