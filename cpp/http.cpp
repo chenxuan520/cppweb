@@ -30,14 +30,14 @@ char* DealHttp::findBackString(char* local,int len,char* word,int maxWordLen)
 	int i=0;
 	char* ptemp=local+len+1;
 	char* pend=NULL;
-	while(1)
+	while(1)//95 _ 
 		if((*ptemp>47&&*ptemp<58)||(*ptemp>96&&*ptemp<123)||(*ptemp>64&&*ptemp<91)||*ptemp==95)
 			break;
 		else
 			ptemp++;
 	pend=ptemp;
-	while(1)
-		if((*pend>90&&*pend<97&&*pend!=95)||(*pend<48&&*pend!=46&&*pend!=47&&*pend!=45&&*pend!=43)||*pend>122||*pend==63)
+	while(1)//46 . 47 / 45 - 43 + 37 % 63 ?
+		if((*pend>90&&*pend<97&&*pend!=95)||(*pend<48&&*pend!=46&&*pend!=47&&*pend!=45&&*pend!=43&&*pend!=37)||*pend>122||*pend==63)
 			break;
 		else
 			pend++;
@@ -262,6 +262,8 @@ const char* DealHttp::getKeyLine(const void* message,const char* key,char* line,
 	if(ptemp==NULL)
 		return NULL;
 	ptemp+=strlen(key);
+	while(*ptemp==' ')
+		ptemp++;
 	while(*(ptemp++)!='\r'&&i<maxLineLen)
 		line[i++]=*ptemp;
 	line[i]=0;
