@@ -713,7 +713,7 @@ public:
 		char* ptemp=local+len+1;
 		char* pend=NULL;
 		while(1)//95 _ 
-			if((*ptemp>47&&*ptemp<58)||(*ptemp>96&&*ptemp<123)||(*ptemp>64&&*ptemp<91)||*ptemp==95)
+			if((*ptemp>47&&*ptemp<58)||(*ptemp>96&&*ptemp<123)||(*ptemp>64&&*ptemp<91)||*ptemp==95||*ptemp==37)
 				break;
 			else
 				ptemp++;
@@ -1640,6 +1640,7 @@ private:
 	}
 	void epollHttp(void* pget,int len,void* pneed,const char* defaultFile)
 	{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
+		memset(pget,0,sizeof(char)*len);
 		int eventNum=epoll_wait(epfd,pevent,512,-1);
 		for(int i=0;i<eventNum;i++)
 		{

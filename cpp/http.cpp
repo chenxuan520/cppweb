@@ -31,7 +31,7 @@ char* DealHttp::findBackString(char* local,int len,char* word,int maxWordLen)
 	char* ptemp=local+len+1;
 	char* pend=NULL;
 	while(1)//95 _ 
-		if((*ptemp>47&&*ptemp<58)||(*ptemp>96&&*ptemp<123)||(*ptemp>64&&*ptemp<91)||*ptemp==95)
+		if((*ptemp>47&&*ptemp<58)||(*ptemp>96&&*ptemp<123)||(*ptemp>64&&*ptemp<91)||*ptemp==95||*ptemp==37)
 			break;
 		else
 			ptemp++;
