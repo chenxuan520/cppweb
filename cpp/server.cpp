@@ -472,6 +472,7 @@ int HttpServer::func(int num,void* pget,void* sen,const char* defaultFile,HttpSe
 }
 void HttpServer::epollHttp(void* pget,int len,void* pneed,const char* defaultFile)
 {
+	memset(pget,0,sizeof(char)*len);
 	int eventNum=epoll_wait(epfd,pevent,512,-1);
 	for(int i=0;i<eventNum;i++)
 	{

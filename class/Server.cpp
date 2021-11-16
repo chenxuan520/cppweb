@@ -712,14 +712,14 @@ public:
 		int i=0;
 		char* ptemp=local+len+1;
 		char* pend=NULL;
-		while(1)
-			if((*ptemp>47&&*ptemp<58)||(*ptemp>96&&*ptemp<123)||(*ptemp>64&&*ptemp<91)||*ptemp==95)
+		while(1)//95 _ 
+			if((*ptemp>47&&*ptemp<58)||(*ptemp>96&&*ptemp<123)||(*ptemp>64&&*ptemp<91)||*ptemp==95||*ptemp==37)
 				break;
 			else
 				ptemp++;
 		pend=ptemp;
-		while(1)
-			if((*pend>90&&*pend<97&&*pend!=95)||(*pend<48&&*pend!=46&&*pend!=47&&*pend!=45&&*pend!=43)||*pend>122||*pend==63)
+		while(1)//46 . 47 / 45 - 43 + 37 % 63 ?
+			if((*pend>90&&*pend<97&&*pend!=95)||(*pend<48&&*pend!=46&&*pend!=47&&*pend!=45&&*pend!=43&&*pend!=37)||*pend>122||*pend==63)
 				break;
 			else
 				pend++;
@@ -944,6 +944,8 @@ public:
 		if(ptemp==NULL)
 			return NULL;
 		ptemp+=strlen(key);
+		while(*ptemp==' ')
+			ptemp++;
 		while(*(ptemp++)!='\r'&&i<maxLineLen)
 			line[i++]=*ptemp;
 		line[i-1]=0;
@@ -1638,6 +1640,7 @@ private:
 	}
 	void epollHttp(void* pget,int len,void* pneed,const char* defaultFile)
 	{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
+		memset(pget,0,sizeof(char)*len);
 		int eventNum=epoll_wait(epfd,pevent,512,-1);
 		for(int i=0;i<eventNum;i++)
 		{
@@ -2759,17 +2762,15 @@ void serverHttp()
 void func(DealHttp& http,HttpServer& server,int num,void* sen,int& len)
 {
 	char buffer[100]={0},name[30]={0};
-	
-	http.getWildUrl(server.recText(),"/root/",buffer,100);
-	http.getRouteValue(buffer,"name",name,30);
 	Json json;
 	json.init(300);
-	json.addKeyValue("buffer",buffer);
+	http.getKeyValue(server.recText(),"email",buffer,100);
+	json.addKeyValue("email",buffer);
+	http.getKeyValue(server.recText(),"password",buffer,100);
 	json.addKeyValInt("wuwu",90);
-	json.addKeyValue("name",name);
-	printf("json%s\n",json.endJson());
+	json.addKeyValue("passwd",buffer);
+	printf("%s\n",(char*)server.recText());
 	json.jsonToFile("temp");
-	printf("buffer:%s\n",buffer);
 	http.createSendMsg(DealHttp::JSON,(char*)sen,"temp",&len);
 }
 void funHa(DealHttp& http,HttpServer& server,int num,void* sen,int& len)
@@ -2792,7 +2793,7 @@ int main(int argc, char** argv)
 {
 //	serverHttp();
 	HttpServer server(5201,true);
-	server.routeHandle(HttpServer::GET,HttpServer::WILD,"/root/",func);
+	server.routeHandle(HttpServer::ALL,HttpServer::ONEWAY,"/root",func);
 	server.routeHandle(HttpServer::ALL,HttpServer::ONEWAY,"/key/",funHa);
 	server.run(1 ,4000,"./index.html");
 	return 0;
