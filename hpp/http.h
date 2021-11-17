@@ -18,6 +18,9 @@ public:
 		return strstr((char*)pask,ptofind);
 	}
 	char* findBackString(char* local,int len,char* word,int maxWordLen);
+	void* customizeAddTop(void* buffer,int bufferLen,int statusNum,int contentLen,const char* contentType,const char* connection="keep-alive");
+	void* customizeAddHead(void* buffer,int bufferLen,const char* key,const char* value);
+	int customizeAddBody(void* buffer,int bufferLen,const char* body,unsigned int bodyLen);
 	void createTop(FileKind kind,char* ptop,int* topLen,int fileLen);
 	bool createSendMsg(FileKind kind,char* buffer,const char* pfile,int* plong);
 	char* findFileMsg(const char* pname,int* plen,char* buffer);

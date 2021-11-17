@@ -728,6 +728,49 @@ public:
 		word[i]=0;
 		return word;
 	}
+	void* customizeAddTop(void* buffer,int bufferLen,int statusNum,int contentLen,const char* contentType,const char* connection="keep-alive")
+	{
+		const char* statusEng=NULL;
+		switch(statusNum)
+		{
+			case 200:
+				statusEng="OK";
+				break;
+			case 301:
+				statusEng="Moved Permanently";
+				break;
+			case 404:
+				statusEng="Not Found";
+				break;
+		}
+		sprintf((char*)buffer,"HTTP/1.1 %d %s\r\n"
+			"Server LCserver/1.1\r\n"
+			"Connection: %s\r\n"
+			"Content-Type: %s\r\n"
+			"Content-Length: %d\r\n",statusNum,statusEng,connection,contentType,contentLen);
+		return buffer;
+	}
+	void* customizeAddHead(void* buffer,int bufferLen,const char* key,const char* value)
+	{
+		strcat((char*)buffer,key);
+		strcat((char*)buffer,": ");
+		strcat((char*)buffer,value);
+		strcat((char*)buffer,"\r\n");
+	}
+	int customizeAddBody(void* buffer,int bufferLen,const char* body,unsigned int bodyLen)
+	{
+		int topLen=0;
+		strcat((char*)buffer,"\r\n");
+		unsigned int i=0;
+		topLen=strlen((char*)buffer);
+		if(bufferLen<topLen+bodyLen)
+			return -1;
+		char* temp=(char*)buffer+strlen((char*)buffer);
+		for(i=0;i<bodyLen;i++)
+			temp[i]=body[i];
+		temp[i+1]=0;
+		return topLen+bodyLen;
+	}
 	void createTop(FileKind kind,char* ptop,int* topLen,int fileLen)//1:http 2:down 3:pic
 	{
 		switch (kind)
@@ -1506,6 +1549,60 @@ public:
 		array[now].pfunc=pfunc;
 		now++;
 		return true;
+	}
+	bool get(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&))
+	{
+		if(strlen(route)>100)
+			return false;
+		if(max-now<=2)
+		{
+			array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
+			if(array=NULL)
+				return false;
+			max+=10;
+		}
+		array[now].type=type;
+		array[now].ask=GET;
+		strcpy(array[now].route,route);
+		array[now].pfunc=pfunc;
+		now++;
+		return true;	
+	}
+	bool post(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&))
+	{
+		if(strlen(route)>100)
+			return false;
+		if(max-now<=2)
+		{
+			array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
+			if(array=NULL)
+				return false;
+			max+=10;
+		}
+		array[now].type=type;
+		array[now].ask=POST;
+		strcpy(array[now].route,route);
+		array[now].pfunc=pfunc;
+		now++;
+		return true;	
+	}
+	bool all(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&))
+	{
+		if(strlen(route)>100)
+			return false;
+		if(max-now<=2)
+		{
+			array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
+			if(array=NULL)
+				return false;
+			max+=10;
+		}
+		array[now].type=type;
+		array[now].ask=ALL;
+		strcpy(array[now].route,route);
+		array[now].pfunc=pfunc;
+		now++;
+		return true;	
 	}
 	bool clientInHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port))
 	{
@@ -2793,7 +2890,7 @@ int main(int argc, char** argv)
 {
 //	serverHttp();
 	HttpServer server(5201,true);
-	server.routeHandle(HttpServer::ALL,HttpServer::ONEWAY,"/root",func);
+	server.all(HttpServer::ONEWAY,"/root",func);
 	server.routeHandle(HttpServer::ALL,HttpServer::ONEWAY,"/key/",funHa);
 	server.run(1 ,4000,"./index.html");
 	return 0;

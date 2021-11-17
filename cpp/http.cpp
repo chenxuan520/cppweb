@@ -46,6 +46,49 @@ char* DealHttp::findBackString(char* local,int len,char* word,int maxWordLen)
 	word[i]=0;
 	return word;
 }
+void* DealHttp::customizeAddTop(void* buffer,int bufferLen,int statusNum,int contentLen,const char* contentType,const char* connection)
+{
+	const char* statusEng=NULL;
+	switch(statusNum)
+	{
+		case 200:
+			statusEng="OK";
+			break;
+		case 301:
+			statusEng="Moved Permanently";
+			break;
+		case 404:
+			statusEng="Not Found";
+			break;
+	}
+	sprintf((char*)buffer,"HTTP/1.1 %d %s\r\n"
+		"Server LCserver/1.1\r\n"
+		"Connection: %s\r\n"
+		"Content-Type: %s\r\n"
+		"Content-Length: %d\r\n",statusNum,statusEng,connection,contentType,contentLen);
+	return buffer;
+}
+void* DealHttp::customizeAddHead(void* buffer,int bufferLen,const char* key,const char* value)
+{
+	strcat((char*)buffer,key);
+	strcat((char*)buffer,": ");
+	strcat((char*)buffer,value);
+	strcat((char*)buffer,"\r\n");
+}
+int DealHttp::customizeAddBody(void* buffer,int bufferLen,const char* body,unsigned int bodyLen)
+{
+	int topLen=0;
+	strcat((char*)buffer,"\r\n");
+	unsigned int i=0;
+	topLen=strlen((char*)buffer);
+	if(bufferLen<topLen+bodyLen)
+		return -1;
+	char* temp=(char*)buffer+strlen((char*)buffer);
+	for(i=0;i<bodyLen;i++)
+		temp[i]=body[i];
+	temp[i+1]=0;
+	return topLen+bodyLen;
+}
 void DealHttp::createTop(FileKind kind,char* ptop,int* topLen,int fileLen)//1:http 2:down 3:pic
 {
 	switch (kind)
