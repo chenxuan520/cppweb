@@ -51,17 +51,45 @@ private:
 	char* buffer;
 	char word[30];
 	const char* text;
+	const char* obj;
 	unsigned int nowLen;
 	unsigned int maxLen;
+public:
+	enum TypeJson{
+		INT=0,FLOAT=1,ARRAY=2,OBJ=3,STRING=4,
+	};
+	struct Object{
+		TypeJson type;
+		TypeJson arrTyp;
+		const char* key;
+		int valInt;
+		float valFlo;
+		unsigned int floOut;
+		unsigned int arrLen;
+		const char* valStr;
+		void** array;
+		Object* pobj;
+	};
 public:
 	Json();
 	Json(const char* jsonText);
 	~Json();
 	bool init(unsigned int bufferLen);
+	void addOBject(const Object& obj);
 	bool addKeyValue(const char* key,const char* value);
 	bool addKeyValInt(const char* key,int value);
+	bool addKeyObj(const char* key,const char* value);
 	bool addKeyValFloat(const char* key,float value,int output);
-	const char* endJson();
+	int createObjInt(char* pbuffer,unsigned int bufferLen,const char* key,int value);
+	int createObjFloat(char* pbuffer,unsigned int bufferLen,const char* key,float value,int output=1);
+	int createObjValue(char* pbuffer,unsigned int bufferLen,const char* key,const char* value);
+	bool createObjArray(char* pbuffer,unsigned int bufferLen,TypeJson type,const char* key,void** array,unsigned int arrLen,unsigned int floatNum=1);
+	int createObjObj(char* pbuffer,unsigned int bufferLen,const char* key,const char* value);
+	bool addArray(TypeJson type,const char* key,void** array,unsigned int arrLen,unsigned int floatNum=1);
+	inline const char* resultText()
+	{
+		return buffer;
+	}
 	bool jsonToFile(const char* fileName);
 	const char* operator[](const char* key);
 	float getValueFloat(const char* key,bool& flag);

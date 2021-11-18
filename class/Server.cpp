@@ -27,13 +27,31 @@ private:
 	char* buffer;
 	char word[30];
 	const char* text;
+	const char* obj;
 	unsigned int nowLen;
 	unsigned int maxLen;
+public:
+	enum TypeJson{
+		INT=0,FLOAT=1,ARRAY=2,OBJ=3,STRING=4,
+	};
+	struct Object{
+		TypeJson type;
+		TypeJson arrTyp;
+		const char* key;
+		int valInt;
+		float valFlo;
+		unsigned int floOut;
+		unsigned int arrLen;
+		const char* valStr;
+		void** array;
+		Object* pobj;
+	};
 public:
 	Json()
 	{
 		buffer=NULL;
 		text=NULL;
+		obj=NULL;
 		nowLen=0;
 		maxLen=0;
 		memset(this->word,0,sizeof(char)*30);
@@ -64,6 +82,32 @@ public:
 		this->nowLen+=2;
 		return true;
 	}
+	void addOBject(const Object& obj)
+	{
+		switch(obj.type)
+		{
+			case INT:
+				this->addKeyValInt(obj.key,obj.valInt);
+				break;
+			case FLOAT:
+				this->addKeyValFloat(obj.key,obj.valFlo,obj.floOut);
+				break;
+			case STRING:
+				this->addKeyValue(obj.key,obj.valStr);
+				break;
+			case ARRAY:
+				this->addArray(obj.arrTyp,obj.key,obj.array,obj.arrLen,obj.floOut);
+				break;
+			case OBJ:
+				strcat(this->buffer,"\"");
+				strcat(this->buffer,obj.key);
+				strcat(this->buffer,"\":{");
+				for(unsigned int i=0;i<obj.arrLen;i++)
+					this->addOBject(obj.pobj[0]);
+				strcat(this->buffer,"}");
+				break;
+		}
+	}
 	bool addKeyValue(const char* key,const char* value)
 	{
 		char temp[200]={0};
@@ -71,7 +115,9 @@ public:
 			return false;
 		if(strlen(key)+strlen(value)>=180)
 			return false;
-		int len=sprintf(temp,"\"%s\":\"%s\",",key,value);
+		if(buffer[strlen(buffer)-1]=='}')
+			buffer[strlen(buffer)-1]=',';
+		int len=sprintf(temp,"\"%s\":\"%s\"}",key,value);
 		strcat(this->buffer,temp);
 		nowLen+=len;
 		return true;
@@ -83,29 +129,228 @@ public:
 			return false;
 		if(strlen(key)>=45)
 			return false;	
-		int len=sprintf(temp,"\"%s\":%d,",key,value);
+		if(buffer[strlen(buffer)-1]=='}')
+			buffer[strlen(buffer)-1]=',';
+		int len=sprintf(temp,"\"%s\":%d}",key,value);
 		strcat(this->buffer,temp);
 		nowLen+=len;
 		return true;	
 	}
-	bool addKeyValFloat(const char* key,float value,int output)
+	bool addKeyObj(const char* key,const char* value)
 	{
-		char temp[50]={0};
-		if(nowLen+50>maxLen)
+		char temp[1000]={0};
+		if(nowLen+strlen(key)+strlen(value)>maxLen)
 			return false;
-		if(strlen(key)>=45)
-			return false;	
-		int len=sprintf(temp,"\"%s\":%.*f,",key,output,value);
+		if(strlen(key)+strlen(value)>=980)
+			return false;
+		if(buffer[strlen(buffer)-1]=='}')
+			buffer[strlen(buffer)-1]=',';
+		int len=sprintf(temp,"\"%s\":%s}",key,value);
 		strcat(this->buffer,temp);
 		nowLen+=len;
 		return true;		
 	}
-	const char* endJson()
+	bool addKeyValFloat(const char* key,float value,int output)
 	{
-		if(nowLen+5>maxLen)
-			return NULL;
-		buffer[strlen(buffer)-1]='}';
-		return this->buffer;
+		char temp[70]={0};
+		if(nowLen+50>maxLen)
+			return false;
+		if(strlen(key)>=45)
+			return false;
+		if(buffer[strlen(buffer)-1]=='}')
+			buffer[strlen(buffer)-1]=',';
+		int len=sprintf(temp,"\"%s\":%.*f}",key,output,value);
+		strcat(this->buffer,temp);
+		nowLen+=len;
+		return true;		
+	}
+	int createObjInt(char* pbuffer,unsigned int bufferLen,const char* key,int value)
+	{
+		if(pbuffer[strlen(pbuffer)-1]=='}')
+			pbuffer[strlen(pbuffer)-1]=',';
+		if(strlen(pbuffer)==0)
+			strcat(pbuffer,"{");
+		if(bufferLen<strlen(pbuffer)+strlen(key))
+			return -1;
+		char temp[100]={0};
+		int len=sprintf(temp,"\"%s\":%d}",key,value);
+		strcat(pbuffer,temp);
+		return len;
+	}
+	int createObjFloat(char* pbuffer,unsigned int bufferLen,const char* key,float value,int output=1)
+	{
+		if(pbuffer[strlen(pbuffer)-1]=='}')
+			pbuffer[strlen(pbuffer)-1]=',';
+		if(strlen(pbuffer)==0)
+			strcat(pbuffer,"{");
+		if(bufferLen<strlen(pbuffer)+strlen(key))
+			return -1;
+		char temp[100]={0};
+		int len=sprintf(temp,"\"%s\":%.*f}",key,output,value);
+		strcat(pbuffer,temp);
+		return len;
+	}
+	int createObjValue(char* pbuffer,unsigned int bufferLen,const char* key,const char* value)
+	{
+		char temp[200]={0};
+		if(strlen(pbuffer)+strlen(key)+strlen(value)>bufferLen)
+			return false;
+		if(strlen(key)+strlen(value)>=180)
+			return false;
+		if(pbuffer[strlen(pbuffer)-1]=='}')
+			pbuffer[strlen(pbuffer)-1]=',';
+		if(strlen(pbuffer)==0)
+			strcat(pbuffer,"{");
+		int len=sprintf(temp,"\"%s\":\"%s\"}",key,value);
+		strcat(pbuffer,temp);
+		return len;
+	}
+	bool createObjArray(char* pbuffer,unsigned int bufferLen,TypeJson type,const char* key,void** array,unsigned int arrLen,unsigned int floatNum=1)
+	{
+		char temp[200]={0};
+		if(array==NULL||arrLen==0)
+			return false;
+		if(strlen(pbuffer)+strlen(key)>bufferLen)
+			return false;
+		if(pbuffer[strlen(pbuffer)-1]=='}')
+			pbuffer[strlen(pbuffer)-1]=',';
+		if(strlen(pbuffer)==0)
+			strcat(pbuffer,"{");
+		sprintf(temp,"\"%s\":[",key);
+		strcat(pbuffer,temp);
+		int* arr=(int*)array;
+		float* arrF=(float*)array;
+		switch(type)
+		{
+			case STRING:
+				for(unsigned int i=0;i<arrLen;i++)
+				{
+					sprintf(temp,"\"%s\",",(char*)array[i]);
+					strcat(pbuffer,temp);
+				}
+				pbuffer[strlen(pbuffer)-1]=']';
+				strcat(pbuffer,"}");
+				break;
+			case INT:
+				for(unsigned int i=0;i<arrLen;i++)
+				{
+					sprintf(temp,"%d,",arr[i]);
+					strcat(pbuffer,temp);
+				}
+				pbuffer[strlen(pbuffer)-1]=']';
+				strcat(pbuffer,"}");
+				break;
+			case FLOAT:
+				for(unsigned int i=0;i<arrLen;i++)
+				{
+					sprintf(temp,"%.*f,",floatNum,arrF[i]);
+					strcat(pbuffer,temp);
+				}
+				pbuffer[strlen(pbuffer)-1]=']';
+				strcat(pbuffer,"}");
+				break;
+			default:
+				return false;
+		}
+		return true;
+	}
+	int createObjObj(char* pbuffer,unsigned int bufferLen,const char* key,const char* value)
+	{
+		char temp[500]={0};
+		if(strlen(pbuffer)+strlen(key)+strlen(value)>bufferLen)
+			return false;
+		if(strlen(key)+strlen(value)>=490)
+			return false;
+		if(pbuffer[strlen(pbuffer)-1]=='}')
+			pbuffer[strlen(pbuffer)-1]=',';
+		if(strlen(pbuffer)==0)
+			strcat(pbuffer,"{");
+		int len=sprintf(temp,"\"%s\":%s}",key,value);
+		strcat(pbuffer,temp);
+		nowLen+=len;
+		return true;
+	}
+	bool addArray(TypeJson type,const char* key,void** array,unsigned int arrLen,unsigned int floatNum=1)
+	{
+		char temp[1000]={0};
+		int len=0;
+		if(array==NULL||arrLen==0)
+			return false;
+		if(buffer[strlen(buffer)-1]=='}')
+			buffer[strlen(buffer)-1]=',';
+		sprintf(temp,"\"%s\":[",key);
+		strcat(buffer,temp);
+		int* arr=(int*)array;
+		float* arrF=(float*)array;
+		Object* pobj=(Object*)array;
+		switch(type)
+		{
+			case OBJ:
+				for(unsigned int i=0;i<arrLen;i++)
+				{
+					strcat(buffer,"{");
+					switch(pobj[i].type)
+					{
+						case OBJ:
+							this->addOBject(pobj[i]);
+							break;
+						case INT:
+							this->addKeyValInt(pobj[i].key,pobj[i].valInt);
+							break;
+						case STRING:
+							this->addKeyValue(pobj[i].key,pobj[i].valStr);
+							break;
+						case FLOAT:
+							this->addKeyValFloat(pobj[i].key,pobj[i].valFlo,pobj[i].floOut);
+							break;
+						case ARRAY:
+							this->addArray(pobj[i].arrTyp,pobj[i].key,pobj[i].array,pobj[i].arrLen,pobj[i].floOut);
+							break;
+					}
+					strcat(buffer,",");
+				}
+				buffer[strlen(buffer)-1]=']';
+				strcat(buffer,"}");
+				nowLen+=len;
+				break;
+			case STRING:
+				for(unsigned int i=0;i<arrLen;i++)
+				{
+					len=sprintf(temp,"\"%s\",",(char*)array[i]);
+					strcat(buffer,temp);
+				}
+				buffer[strlen(buffer)-1]=']';
+				strcat(buffer,"}");
+				nowLen+=len;
+				break;				
+			case INT:
+				for(unsigned int i=0;i<arrLen;i++)
+				{
+					len=sprintf(temp,"%d,",arr[i]);
+					strcat(buffer,temp);
+				}
+				buffer[strlen(buffer)-1]=']';
+				strcat(buffer,"}");
+				nowLen+=len;
+				break;
+			case FLOAT:
+				for(unsigned int i=0;i<arrLen;i++)
+				{
+					len=sprintf(temp,"%.*f,",floatNum,arrF[i]);
+					strcat(buffer,temp);
+				}
+				buffer[strlen(buffer)-1]=']';
+				strcat(buffer,"}");
+				nowLen+=len;
+				break;
+			default:
+				return false;
+		}
+		return true;
+	}
+	inline const char* resultText()
+	{
+		return buffer;
 	}
 	bool jsonToFile(const char* fileName)
 	{
@@ -2689,7 +2934,7 @@ int funcTwo(ServerPool::Thing thing,int num,int,void* pget,void* sen,ServerTcpIp
 			json.init(200);
 			json.addKeyValue("hahah","lplplp");
 			json.addKeyValInt("dad",23);
-			printf("json:%s\n",json.endJson());
+			printf("json:%s\n",json.resultText());
 			json.jsonToFile("./temp");
 			FileGet file;
 			if(false==file.getFileMsg("./temp",data,300))
@@ -2876,7 +3121,6 @@ void funHa(DealHttp& http,HttpServer& server,int num,void* sen,int& len)
 	Json json;
 	json.init(300);
 	json.addKeyValue("key","op");
-	json.endJson();
 	json.jsonToFile("temp");
 	printf("buffer:%s\n",buffer);
 	http.createSendMsg(DealHttp::JSON,(char*)sen,"temp",&len);

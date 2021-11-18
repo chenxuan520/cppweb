@@ -60,7 +60,6 @@ void getList(DealHttp & http, HttpServer & server, int , void * sen, int & len)
 		json.addKeyValue("name",begin->second.c_str());
 		begin++;
 	}
-	json.endJson();
 	json.jsonToFile("temp");
 	http.createSendMsg(DealHttp::JSON,(char*)sen,"temp",&len);
 }

@@ -514,13 +514,6 @@ bool Json::addKeyValFloat(const char* key,float value,int output)
 	nowLen+=len;
 	return true;		
 }
-const char* Json::endJson()
-{
-	if(nowLen+5>maxLen)
-		return NULL;
-	buffer[strlen(buffer)-1]='}';
-	return this->buffer;
-}
 bool Json::jsonToFile(const char* fileName)
 {
 	FILE* fp=fopen(fileName,"w+");
@@ -606,6 +599,230 @@ int Json::getValueInt(const char* key,bool& flag)
 	}
 	flag=true;
 	return value;
+}
+void Json::addOBject(const Object& obj)
+{
+	switch(obj.type)
+	{
+		case INT:
+			this->addKeyValInt(obj.key,obj.valInt);
+			break;
+		case FLOAT:
+			this->addKeyValFloat(obj.key,obj.valFlo,obj.floOut);
+			break;
+		case STRING:
+			this->addKeyValue(obj.key,obj.valStr);
+			break;
+		case ARRAY:
+			this->addArray(obj.arrTyp,obj.key,obj.array,obj.arrLen,obj.floOut);
+			break;
+		case OBJ:
+			strcat(this->buffer,"\"");
+			strcat(this->buffer,obj.key);
+			strcat(this->buffer,"\":{");
+			for(unsigned int i=0;i<obj.arrLen;i++)
+				this->addOBject(obj.pobj[0]);
+			strcat(this->buffer,"}");
+			break;
+	}
+}
+bool Json::addKeyObj(const char* key,const char* value)
+{
+	char temp[1000]={0};
+	if(nowLen+strlen(key)+strlen(value)>maxLen)
+		return false;
+	if(strlen(key)+strlen(value)>=980)
+		return false;
+	if(buffer[strlen(buffer)-1]=='}')
+		buffer[strlen(buffer)-1]=',';
+	int len=sprintf(temp,"\"%s\":%s}",key,value);
+	strcat(this->buffer,temp);
+	nowLen+=len;
+	return true;		
+}
+int Json::createObjInt(char* pbuffer,unsigned int bufferLen,const char* key,int value)
+{
+	if(pbuffer[strlen(pbuffer)-1]=='}')
+		pbuffer[strlen(pbuffer)-1]=',';
+	if(strlen(pbuffer)==0)
+		strcat(pbuffer,"{");
+	if(bufferLen<strlen(pbuffer)+strlen(key))
+		return -1;
+	char temp[100]={0};
+	int len=sprintf(temp,"\"%s\":%d}",key,value);
+	strcat(pbuffer,temp);
+	return len;
+}
+int Json::createObjFloat(char* pbuffer,unsigned int bufferLen,const char* key,float value,int output)
+{
+	if(pbuffer[strlen(pbuffer)-1]=='}')
+		pbuffer[strlen(pbuffer)-1]=',';
+	if(strlen(pbuffer)==0)
+		strcat(pbuffer,"{");
+	if(bufferLen<strlen(pbuffer)+strlen(key))
+		return -1;
+	char temp[100]={0};
+	int len=sprintf(temp,"\"%s\":%.*f}",key,output,value);
+	strcat(pbuffer,temp);
+	return len;
+}
+int Json::createObjValue(char* pbuffer,unsigned int bufferLen,const char* key,const char* value)
+{
+	char temp[200]={0};
+	if(strlen(pbuffer)+strlen(key)+strlen(value)>bufferLen)
+		return false;
+	if(strlen(key)+strlen(value)>=180)
+		return false;
+	if(pbuffer[strlen(pbuffer)-1]=='}')
+		pbuffer[strlen(pbuffer)-1]=',';
+	if(strlen(pbuffer)==0)
+		strcat(pbuffer,"{");
+	int len=sprintf(temp,"\"%s\":\"%s\"}",key,value);
+	strcat(pbuffer,temp);
+	return len;
+}
+bool Json::createObjArray(char* pbuffer,unsigned int bufferLen,TypeJson type,const char* key,void** array,unsigned int arrLen,unsigned int floatNum)
+{
+	char temp[200]={0};
+	if(array==NULL||arrLen==0)
+		return false;
+	if(strlen(pbuffer)+strlen(key)>bufferLen)
+		return false;
+	if(pbuffer[strlen(pbuffer)-1]=='}')
+		pbuffer[strlen(pbuffer)-1]=',';
+	if(strlen(pbuffer)==0)
+		strcat(pbuffer,"{");
+	sprintf(temp,"\"%s\":[",key);
+	strcat(pbuffer,temp);
+	int* arr=(int*)array;
+	float* arrF=(float*)array;
+	switch(type)
+	{
+		case STRING:
+			for(unsigned int i=0;i<arrLen;i++)
+			{
+				sprintf(temp,"\"%s\",",(char*)array[i]);
+				strcat(pbuffer,temp);
+			}
+			pbuffer[strlen(pbuffer)-1]=']';
+			strcat(pbuffer,"}");
+			break;
+		case INT:
+			for(unsigned int i=0;i<arrLen;i++)
+			{
+				sprintf(temp,"%d,",arr[i]);
+				strcat(pbuffer,temp);
+			}
+			pbuffer[strlen(pbuffer)-1]=']';
+			strcat(pbuffer,"}");
+			break;
+		case FLOAT:
+			for(unsigned int i=0;i<arrLen;i++)
+			{
+				sprintf(temp,"%.*f,",floatNum,arrF[i]);
+				strcat(pbuffer,temp);
+			}
+			pbuffer[strlen(pbuffer)-1]=']';
+			strcat(pbuffer,"}");
+			break;
+		default:
+			return false;
+	}
+	return true;
+}
+int Json::createObjObj(char* pbuffer,unsigned int bufferLen,const char* key,const char* value)
+{
+	char temp[500]={0};
+	if(strlen(pbuffer)+strlen(key)+strlen(value)>bufferLen)
+		return false;
+	if(strlen(key)+strlen(value)>=490)
+		return false;
+	if(pbuffer[strlen(pbuffer)-1]=='}')
+		pbuffer[strlen(pbuffer)-1]=',';
+	if(strlen(pbuffer)==0)
+		strcat(pbuffer,"{");
+	int len=sprintf(temp,"\"%s\":%s}",key,value);
+	strcat(pbuffer,temp);
+	nowLen+=len;
+	return true;
+}
+bool Json::addArray(TypeJson type,const char* key,void** array,unsigned int arrLen,unsigned int floatNum)
+{
+	char temp[1000]={0};
+	int len=0;
+	if(array==NULL||arrLen==0)
+		return false;
+	if(buffer[strlen(buffer)-1]=='}')
+		buffer[strlen(buffer)-1]=',';
+	sprintf(temp,"\"%s\":[",key);
+	strcat(buffer,temp);
+	int* arr=(int*)array;
+	float* arrF=(float*)array;
+	Object* pobj=(Object*)array;
+	switch(type)
+	{
+		case OBJ:
+			for(unsigned int i=0;i<arrLen;i++)
+			{
+				strcat(buffer,"{");
+				switch(pobj[i].type)
+				{
+					case OBJ:
+						this->addOBject(pobj[i]);
+						break;
+					case INT:
+						this->addKeyValInt(pobj[i].key,pobj[i].valInt);
+						break;
+					case STRING:
+						this->addKeyValue(pobj[i].key,pobj[i].valStr);
+						break;
+					case FLOAT:
+						this->addKeyValFloat(pobj[i].key,pobj[i].valFlo,pobj[i].floOut);
+						break;
+					case ARRAY:
+						this->addArray(pobj[i].arrTyp,pobj[i].key,pobj[i].array,pobj[i].arrLen,pobj[i].floOut);
+						break;
+				}
+				strcat(buffer,",");
+			}
+			buffer[strlen(buffer)-1]=']';
+			strcat(buffer,"}");
+			nowLen+=len;
+			break;
+		case STRING:
+			for(unsigned int i=0;i<arrLen;i++)
+			{
+				len=sprintf(temp,"\"%s\",",(char*)array[i]);
+				strcat(buffer,temp);
+			}
+			buffer[strlen(buffer)-1]=']';
+			strcat(buffer,"}");
+			nowLen+=len;
+			break;				
+		case INT:
+			for(unsigned int i=0;i<arrLen;i++)
+			{
+				len=sprintf(temp,"%d,",arr[i]);
+				strcat(buffer,temp);
+			}
+			buffer[strlen(buffer)-1]=']';
+			strcat(buffer,"}");
+			nowLen+=len;
+			break;
+		case FLOAT:
+			for(unsigned int i=0;i<arrLen;i++)
+			{
+				len=sprintf(temp,"%.*f,",floatNum,arrF[i]);
+				strcat(buffer,temp);
+			}
+			buffer[strlen(buffer)-1]=']';
+			strcat(buffer,"}");
+			nowLen+=len;
+			break;
+		default:
+			return false;
+	}
+	return true;
 }
 WebToken::WebToken()
 {
