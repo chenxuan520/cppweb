@@ -10,20 +10,21 @@ void addCLi(DealHttp & http, HttpServer & server, int , void * sen, int & len)
 	char strSco[20]={0},name[30]={0};
 	if(http.getKeyValue(server.recText(),"score",strSco,20)==NULL)
 	{
-		printf("get name wrong \n%s\n",server.recText());
+		printf("get name wrong \n%s\n",(char*)server.recText());
 		http.createSendMsg(DealHttp::NOFOUND,(char*)sen,NULL,&len);
 		return;
 	}
 	if(http.getKeyValue(server.recText(),"name",name,30)==NULL)
 	{
-		printf("get name wrong \n%s\n",server.recText());
+		printf("get name wrong \n%s\n",(char*)server.recText());
 		http.createSendMsg(DealHttp::NOFOUND,(char*)sen,NULL,&len);
 		return;
 	}
+	DealHttp::urlDecode(name);
 	int score=0;
 	if(0>=sscanf(strSco,"%d",&score))
 	{
-		printf("get score wrong \n%s\n",server.recText());
+		printf("get score wrong \n%s\n",(char*)server.recText());
 		http.createSendMsg(DealHttp::NOFOUND,(char*)sen,NULL,&len);
 		return;
 	}
@@ -44,24 +45,48 @@ void addCLi(DealHttp & http, HttpServer & server, int , void * sen, int & len)
 	json.init(200);
 	json.addKeyValue("name",name);
 	json.addKeyValInt("sco",score);
-	json.endJson();
 	json.jsonToFile("temp");
 	http.createSendMsg(DealHttp::JSON,(char*)sen,"temp",&len);
 }
-void getList(DealHttp & http, HttpServer & server, int , void * sen, int & len)
+void getList(DealHttp & http, HttpServer & , int , void * sen, int & len)
 {
 	auto begin=tree.begin();
+	char* buf[5]={0};
+	for(unsigned int i=0;i<5;i++)
+	{
+		buf[i]=(char*)malloc(sizeof(char)*100);
+		memset(buf[i],0,sizeof(char)*100);
+	}
 	Json json;
-	json.init(300);
+	json.init(600);
+	Json::Object score,name,array;
+	score.type=Json::INT;
+	name.type=Json::STRING;
+	score.key="score";
+	name.key="name";
+	array.type=Json::ARRAY;
+	array.key="array";
+	array.arrTyp=Json::STRUCT;
+	array.arrLen=tree.size();
+	array.array=(void**)buf;
+	unsigned int i=0;
 	while(begin!=tree.end())
 	{
 		printf("%d %s\n",begin->first,begin->second.c_str());
-		json.addKeyValInt("score",begin->first);
-		json.addKeyValue("name",begin->second.c_str());
+		score.valInt=begin->first;
+		name.valStr=begin->second.c_str();
+		json.createObject(buf[i],100,score);
+		json.createObject(buf[i],100,name);
+		cout<<buf[i]<<endl;
 		begin++;
+		i++;
 	}
+	json.addOBject(array);
+	json.addKeyValInt("len",tree.size());
 	json.jsonToFile("temp");
 	http.createSendMsg(DealHttp::JSON,(char*)sen,"temp",&len);
+	for(unsigned int i=0;i<5;i++)
+		free(buf[i]);
 }
 int main()  
 {  

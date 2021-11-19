@@ -33,6 +33,7 @@ public:
 	const char* getWildUrl(const void* getText,const char* route,char* buffer,int maxLen);
 	int getRecFile(const void* message,char* fileName,int nameLen,char* buffer,int bufferLen);
 	static void dealUrl(const char* url,char* urlTop,char* urlEnd);
+	static const char* urlDecode(char* srcString);
 };
 class LogSystem{
 public:
@@ -56,7 +57,7 @@ private:
 	unsigned int maxLen;
 public:
 	enum TypeJson{
-		INT=0,FLOAT=1,ARRAY=2,OBJ=3,STRING=4,
+		INT=0,FLOAT=1,ARRAY=2,OBJ=3,STRING=4,STRUCT=5,
 	};
 	struct Object{
 		TypeJson type;
@@ -69,6 +70,18 @@ public:
 		const char* valStr;
 		void** array;
 		Object* pobj;
+	public:
+		Object()
+		{
+			type=INT;
+			arrTyp=INT;
+			key=NULL;
+			valFlo=0;
+			valInt=0;
+			valStr=NULL;
+			array=NULL;
+			pobj=NULL;
+		}
 	};
 public:
 	Json();
@@ -80,6 +93,7 @@ public:
 	bool addKeyValInt(const char* key,int value);
 	bool addKeyObj(const char* key,const char* value);
 	bool addKeyValFloat(const char* key,float value,int output);
+	void createObject(char* pbuffer,int bufferLen,const Object& obj);
 	int createObjInt(char* pbuffer,unsigned int bufferLen,const char* key,int value);
 	int createObjFloat(char* pbuffer,unsigned int bufferLen,const char* key,float value,int output=1);
 	int createObjValue(char* pbuffer,unsigned int bufferLen,const char* key,const char* value);

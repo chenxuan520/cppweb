@@ -32,7 +32,7 @@ private:
 	unsigned int maxLen;
 public:
 	enum TypeJson{
-		INT=0,FLOAT=1,ARRAY=2,OBJ=3,STRING=4,
+		INT=0,FLOAT=1,ARRAY=2,OBJ=3,STRING=4,STRUCT=5,
 	};
 	struct Object{
 		TypeJson type;
@@ -45,6 +45,18 @@ public:
 		const char* valStr;
 		void** array;
 		Object* pobj;
+	public:
+		Object()
+		{
+			type=INT;
+			arrTyp=INT;
+			key=NULL;
+			valFlo=0;
+			valInt=0;
+			valStr=NULL;
+			array=NULL;
+			pobj=NULL;
+		}
 	};
 public:
 	Json()
@@ -99,6 +111,7 @@ public:
 				this->addArray(obj.arrTyp,obj.key,obj.array,obj.arrLen,obj.floOut);
 				break;
 			case OBJ:
+			case STRUCT:
 				strcat(this->buffer,"\"");
 				strcat(this->buffer,obj.key);
 				strcat(this->buffer,"\":{");
@@ -150,6 +163,98 @@ public:
 		nowLen+=len;
 		return true;		
 	}
+	bool addArray(TypeJson type,const char* key,void** array,unsigned int arrLen,unsigned int floatNum=1)
+	{
+		char temp[1000]={0};
+		int len=0;
+		if(array==NULL||arrLen==0)
+			return false;
+		if(buffer[strlen(buffer)-1]=='}')
+			buffer[strlen(buffer)-1]=',';
+		sprintf(temp,"\"%s\":[",key);
+		strcat(buffer,temp);
+		int* arr=(int*)array;
+		float* arrF=(float*)array;
+		Object* pobj=(Object*)array;
+		switch(type)
+		{
+			case OBJ:
+				for(unsigned int i=0;i<arrLen;i++)
+				{
+					strcat(buffer,"{");
+					switch(pobj[i].type)
+					{
+						case OBJ:
+							this->addOBject(pobj[i]);
+							break;
+						case INT:
+							this->addKeyValInt(pobj[i].key,pobj[i].valInt);
+							break;
+						case STRING:
+							this->addKeyValue(pobj[i].key,pobj[i].valStr);
+							break;
+						case FLOAT:
+							this->addKeyValFloat(pobj[i].key,pobj[i].valFlo,pobj[i].floOut);
+							break;
+						case ARRAY:
+							this->addArray(pobj[i].arrTyp,pobj[i].key,pobj[i].array,pobj[i].arrLen,pobj[i].floOut);
+							break;
+						case STRUCT:
+							strcat(buffer,pobj[i].valStr);
+							break;
+					}
+					strcat(buffer,",");
+				}
+				buffer[strlen(buffer)-1]=']';
+				strcat(buffer,"}");
+				nowLen+=len;
+				break;
+			case STRING:
+				for(unsigned int i=0;i<arrLen;i++)
+				{
+					len=sprintf(temp,"\"%s\",",(char*)array[i]);
+					strcat(buffer,temp);
+				}
+				buffer[strlen(buffer)-1]=']';
+				strcat(buffer,"}");
+				nowLen+=len;
+				break;				
+			case INT:
+				for(unsigned int i=0;i<arrLen;i++)
+				{
+					len=sprintf(temp,"%d,",arr[i]);
+					strcat(buffer,temp);
+				}
+				buffer[strlen(buffer)-1]=']';
+				strcat(buffer,"}");
+				nowLen+=len;
+				break;
+			case FLOAT:
+				for(unsigned int i=0;i<arrLen;i++)
+				{
+					len=sprintf(temp,"%.*f,",floatNum,arrF[i]);
+					strcat(buffer,temp);
+				}
+				buffer[strlen(buffer)-1]=']';
+				strcat(buffer,"}");
+				nowLen+=len;
+				break;
+			case STRUCT:
+				for(unsigned int i=0;i<arrLen;i++)
+				{
+					strcat(buffer,(char*)array[i]);
+					len+=strlen((char*)array[i]);
+					strcat(buffer,",");	
+				}
+				buffer[strlen(buffer)-1]=']';
+				strcat(buffer,"}");
+				nowLen+=len;
+				break;
+			default:
+				return false;
+		}
+		return true;
+	}
 	bool addKeyValFloat(const char* key,float value,int output)
 	{
 		char temp[70]={0};
@@ -163,6 +268,33 @@ public:
 		strcat(this->buffer,temp);
 		nowLen+=len;
 		return true;		
+	}
+	void createObject(char* pbuffer,int bufferLen,const Object& obj)
+	{
+		switch(obj.type)
+		{
+			case INT:
+				this->createObjInt(pbuffer,bufferLen,obj.key,obj.valInt);
+				break;
+			case FLOAT:
+				this->createObjFloat(pbuffer,bufferLen,obj.key,obj.valFlo,obj.floOut);
+				break;
+			case STRING:
+				this->createObjValue(pbuffer,bufferLen,obj.key,obj.valStr);
+				break;
+			case ARRAY:
+				this->createObjArray(pbuffer,bufferLen,obj.arrTyp,obj.key,obj.array,obj.arrLen,obj.floOut);
+				break;
+			case OBJ:
+			case STRUCT:
+				strcat(this->buffer,"\"");
+				strcat(this->buffer,obj.key);
+				strcat(this->buffer,"\":{");
+				for(unsigned int i=0;i<obj.arrLen;i++)
+					this->addOBject(obj.pobj[0]);
+				strcat(this->buffer,"}");
+				break;
+		}	
 	}
 	int createObjInt(char* pbuffer,unsigned int bufferLen,const char* key,int value)
 	{
@@ -268,84 +400,6 @@ public:
 		int len=sprintf(temp,"\"%s\":%s}",key,value);
 		strcat(pbuffer,temp);
 		nowLen+=len;
-		return true;
-	}
-	bool addArray(TypeJson type,const char* key,void** array,unsigned int arrLen,unsigned int floatNum=1)
-	{
-		char temp[1000]={0};
-		int len=0;
-		if(array==NULL||arrLen==0)
-			return false;
-		if(buffer[strlen(buffer)-1]=='}')
-			buffer[strlen(buffer)-1]=',';
-		sprintf(temp,"\"%s\":[",key);
-		strcat(buffer,temp);
-		int* arr=(int*)array;
-		float* arrF=(float*)array;
-		Object* pobj=(Object*)array;
-		switch(type)
-		{
-			case OBJ:
-				for(unsigned int i=0;i<arrLen;i++)
-				{
-					strcat(buffer,"{");
-					switch(pobj[i].type)
-					{
-						case OBJ:
-							this->addOBject(pobj[i]);
-							break;
-						case INT:
-							this->addKeyValInt(pobj[i].key,pobj[i].valInt);
-							break;
-						case STRING:
-							this->addKeyValue(pobj[i].key,pobj[i].valStr);
-							break;
-						case FLOAT:
-							this->addKeyValFloat(pobj[i].key,pobj[i].valFlo,pobj[i].floOut);
-							break;
-						case ARRAY:
-							this->addArray(pobj[i].arrTyp,pobj[i].key,pobj[i].array,pobj[i].arrLen,pobj[i].floOut);
-							break;
-					}
-					strcat(buffer,",");
-				}
-				buffer[strlen(buffer)-1]=']';
-				strcat(buffer,"}");
-				nowLen+=len;
-				break;
-			case STRING:
-				for(unsigned int i=0;i<arrLen;i++)
-				{
-					len=sprintf(temp,"\"%s\",",(char*)array[i]);
-					strcat(buffer,temp);
-				}
-				buffer[strlen(buffer)-1]=']';
-				strcat(buffer,"}");
-				nowLen+=len;
-				break;				
-			case INT:
-				for(unsigned int i=0;i<arrLen;i++)
-				{
-					len=sprintf(temp,"%d,",arr[i]);
-					strcat(buffer,temp);
-				}
-				buffer[strlen(buffer)-1]=']';
-				strcat(buffer,"}");
-				nowLen+=len;
-				break;
-			case FLOAT:
-				for(unsigned int i=0;i<arrLen;i++)
-				{
-					len=sprintf(temp,"%.*f,",floatNum,arrF[i]);
-					strcat(buffer,temp);
-				}
-				buffer[strlen(buffer)-1]=']';
-				strcat(buffer,"}");
-				nowLen+=len;
-				break;
-			default:
-				return false;
-		}
 		return true;
 	}
 	inline const char* resultText()
@@ -1320,6 +1374,31 @@ public:
 			len=strlen(urlTop);
 			sscanf(url+len+7,"%s",urlEnd);
 		}
+	}
+	static const char* urlDecode(char* srcString)
+	{
+		char ch=0;
+		int temp=0;
+		char* buffer=(char*)malloc(sizeof(char)*strlen(srcString));
+		if(buffer==NULL)
+			return NULL;
+		memset(buffer,0,sizeof(char)*strlen(srcString));
+		for (unsigned int i=0; i<strlen(srcString); i++) 
+		{
+		    if (int(srcString[i])==37) 
+			{
+		        sscanf(srcString+i+1, "%x", &temp);
+		        ch=(char)temp;
+		        buffer[strlen(buffer)]=ch;
+		        buffer[strlen(buffer)+1]=0;
+		        i=i+2;
+		    } 
+			else 
+		        buffer[strlen(buffer)]=srcString[i];
+		}
+		strcpy(srcString,buffer);
+		free(buffer);
+		return srcString;
 	}
 };
 /********************************
