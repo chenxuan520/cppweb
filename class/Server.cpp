@@ -1914,12 +1914,12 @@ public:
 		now++;
 		return true;
 	}
-	bool loadStatic(const char* route,const char* staticPath)
-	{
-		char temp[100]={0};
-		sprintf(temp,"%s %s",route,staticPath);
-		this->get(WILD,temp,loadFile);
-	}
+//	bool loadStatic(const char* route,const char* staticPath)
+//	{
+//		char temp[100]={0};
+//		sprintf(temp,"%s %s",route,staticPath);
+//		this->get(WILD,temp,loadFile);
+//	}
 	bool get(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&))
 	{
 		if(strlen(route)>100)
@@ -2042,14 +2042,15 @@ private:
 		AskType type=GET;
 		int len=0,flag=2;
 		char ask[200]={0};
-		if(strstr((char*)pget,"GET")!=NULL)
+		sscanf((char*)pget,"%s",ask);
+		if(strstr(ask,"GET")!=NULL)
 		{
 			http.getAskRoute(pget,"GET",ask,200);
 			if(isDebug)
 				printf("Get url:%s\n",ask);
 			type=GET;
 		}
-		if(strstr((char*)pget,"POST")!=NULL)
+		if(strstr(ask,"POST")!=NULL)
 		{
 			http.getAskRoute(pget,"POST",ask,200);
 			if(isDebug)
@@ -2150,10 +2151,10 @@ private:
 		}
 		return ;
 	}
-	static void loadFile(DealHttp&,HttpServer&,int,void*,int&)
-	{
-		
-	}
+//	static void loadFile(DealHttp&,HttpServer&,int,void*,int&)
+//	{
+//		
+//	}
 };
 /********************************
 	author:chenxuan

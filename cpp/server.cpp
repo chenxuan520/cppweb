@@ -460,14 +460,15 @@ int HttpServer::func(int num,void* pget,void* sen,const char* defaultFile,HttpSe
 	AskType type=GET;
 	int len=0,flag=2;
 	char ask[200]={0};
-	if(strstr((char*)pget,"GET")!=NULL)
+	sscanf((char*)pget,"%s",ask);
+	if(strstr(ask,"GET")!=NULL)
 	{
 		http.getAskRoute(pget,"GET",ask,200);
 		if(isDebug)
 			printf("Get url:%s\n",ask);
 		type=GET;
 	}
-	if(strstr((char*)pget,"POST")!=NULL)
+	if(strstr(ask,"POST")!=NULL)
 	{
 		http.getAskRoute(pget,"POST",ask,200);
 		if(isDebug)
