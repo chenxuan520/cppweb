@@ -18,16 +18,17 @@ public:
 		return strstr((char*)pask,ptofind);
 	}
 	char* findBackString(char* local,int len,char* word,int maxWordLen);
-	void* customizeAddTop(void* buffer,int bufferLen,int statusNum,int contentLen,const char* contentType,const char* connection="keep-alive");
+	void* customizeAddTop(void* buffer,int bufferLen,int statusNum,int contentLen,const char* contentType="application/json",const char* connection="keep-alive");
 	void* customizeAddHead(void* buffer,int bufferLen,const char* key,const char* value);
 	int customizeAddBody(void* buffer,int bufferLen,const char* body,unsigned int bodyLen);
+	bool setCookie(void* buffer,int bufferLen,const char* key,const char* value,int liveTime=-1,const char* path=NULL,const char* domain=NULL);
 	void createTop(FileKind kind,char* ptop,int* topLen,int fileLen);
 	bool createSendMsg(FileKind kind,char* buffer,const char* pfile,int* plong);
 	char* findFileMsg(const char* pname,int* plen,char* buffer);
 	int getFileLen(const char* pname);
 	int autoAnalysisGet(const char* message,char* psend,const char* pfirstFile,int* plen);
-	const char* getKeyValue(const void* message,const char* key,char* value,int maxValueLen);
-	const char* getKeyLine(const void* message,const char* key,char* line,int maxLineLen);
+	const char* getKeyValue(const void* message,const char* key,char* value,int maxValueLen,bool onlyFromBody=false);
+	const char* getKeyLine(const void* message,const char* key,char* line,int maxLineLen,bool onlyFromBody=false);
 	const char* getAskRoute(const void* message,const char* askWay,char* buffer,unsigned int bufferLen);
 	const char* getRouteValue(const void* routeMeg,const char* key,char* value,unsigned int valueLen);
 	const char* getWildUrl(const void* getText,const char* route,char* buffer,int maxLen);

@@ -1027,7 +1027,7 @@ public:
 		word[i]=0;
 		return word;
 	}
-	void* customizeAddTop(void* buffer,int bufferLen,int statusNum,int contentLen,const char* contentType,const char* connection="keep-alive")
+	void* customizeAddTop(void* buffer,int bufferLen,int statusNum,int contentLen,const char* contentType="application/json",const char* connection="keep-alive")
 	{
 		const char* statusEng=NULL;
 		switch(statusNum)
@@ -1069,6 +1069,28 @@ public:
 			temp[i]=body[i];
 		temp[i+1]=0;
 		return topLen+bodyLen;
+	}
+	bool setCookie(void* buffer,int bufferLen,const char* key,const char* value,int liveTime=-1,const char* path=NULL,const char* domain=NULL)
+	{
+		char temp[1000]={0};
+		if(strlen(key)+strlen(value)>1000)
+			return false;
+		sprintf(temp,"Set-Cookie: %s=%s;max-age= %d;",key,value,liveTime);
+		strcat((char*)buffer,temp);
+		if(path!=NULL)
+		{
+			strcat((char*)buffer,"Path=");
+			strcat((char*)buffer,path);
+			strcat((char*)buffer,";");
+		}
+		if(domain!=NULL)
+		{
+			strcat((char*)buffer,"Domain=");
+			strcat((char*)buffer,domain);
+			strcat((char*)buffer,";");
+		}
+		strcat((char*)buffer,"\r\n");
+		return true;
 	}
 	void createTop(FileKind kind,char* ptop,int* topLen,int fileLen)//1:http 2:down 3:pic
 	{
@@ -1272,17 +1294,35 @@ public:
 		}
 	    return 1;
 	}
-	const char* getKeyValue(const void* message,const char* key,char* value,int maxValueLen)
+	const char* getKeyValue(const void* message,const char* key,char* value,int maxValueLen,bool onlyFromBody=false)
 	{
-		char* temp=strstr((char*)message,key);
+		char* temp=NULL;
+		if(onlyFromBody==false)
+			temp=strstr((char*)message,key);
+		else 
+		{
+			temp=strstr((char*)message,"\r\n\r\n");
+			if(temp==NULL)
+				return NULL;
+			temp=strstr(temp,key);
+		}
 		if(temp==NULL)
 			return NULL;
 		return this->findBackString(temp,strlen(key),value,maxValueLen);
 	}
-	const char* getKeyLine(const void* message,const char* key,char* line,int maxLineLen)
+	const char* getKeyLine(const void* message,const char* key,char* line,int maxLineLen,bool onlyFromBody=false)
 	{
 		int i=0;
-		char* ptemp=strstr((char*)message,key);
+		char* ptemp=NULL;
+		if(false==onlyFromBody)
+			ptemp=strstr((char*)message,key);
+		else
+		{
+			ptemp=strstr((char*)message,"\r\n\r\n");
+			if(ptemp==NULL)
+				return NULL;
+			ptemp=strstr(ptemp,key);
+		}
 		if(ptemp==NULL)
 			return NULL;
 		ptemp+=strlen(key);
@@ -1874,6 +1914,12 @@ public:
 		now++;
 		return true;
 	}
+	bool loadStatic(const char* route,const char* staticPath)
+	{
+		char temp[100]={0};
+		sprintf(temp,"%s %s",route,staticPath);
+		this->get(WILD,temp,loadFile);
+	}
 	bool get(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&))
 	{
 		if(strlen(route)>100)
@@ -2103,6 +2149,10 @@ private:
 			}
 		}
 		return ;
+	}
+	static void loadFile(DealHttp&,HttpServer&,int,void*,int&)
+	{
+		
 	}
 };
 /********************************

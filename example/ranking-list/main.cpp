@@ -7,14 +7,14 @@ using namespace std;
 multimap<int,string> tree;
 void addCLi(DealHttp & http, HttpServer & server, int , void * sen, int & len)
 {
-	char strSco[20]={0},name[30]={0};
-	if(http.getKeyValue(server.recText(),"score",strSco,20)==NULL)
+	char strSco[20]={0},name[50]={0};
+	if(http.getKeyValue(server.recText(),"score",strSco,20,true)==NULL)
 	{
 		printf("get name wrong \n%s\n",(char*)server.recText());
 		http.createSendMsg(DealHttp::NOFOUND,(char*)sen,NULL,&len);
 		return;
 	}
-	if(http.getKeyValue(server.recText(),"name",name,30)==NULL)
+	if(http.getKeyValue(server.recText(),"name",name,50,true)==NULL)
 	{
 		printf("get name wrong \n%s\n",(char*)server.recText());
 		http.createSendMsg(DealHttp::NOFOUND,(char*)sen,NULL,&len);
@@ -28,7 +28,7 @@ void addCLi(DealHttp & http, HttpServer & server, int , void * sen, int & len)
 		http.createSendMsg(DealHttp::NOFOUND,(char*)sen,NULL,&len);
 		return;
 	}
-	if(tree.size()<=5)
+	if(tree.size()<5)
 	{
 		printf("add success\n");
 		tree.insert(pair<int,string>{score,name});
@@ -51,8 +51,8 @@ void addCLi(DealHttp & http, HttpServer & server, int , void * sen, int & len)
 void getList(DealHttp & http, HttpServer & , int , void * sen, int & len)
 {
 	auto begin=tree.begin();
-	char* buf[5]={0};
-	for(unsigned int i=0;i<5;i++)
+	char* buf[9]={0};
+	for(unsigned int i=0;i<9;i++)
 	{
 		buf[i]=(char*)malloc(sizeof(char)*100);
 		memset(buf[i],0,sizeof(char)*100);
@@ -85,7 +85,7 @@ void getList(DealHttp & http, HttpServer & , int , void * sen, int & len)
 	json.addKeyValInt("len",tree.size());
 	json.jsonToFile("temp");
 	http.createSendMsg(DealHttp::JSON,(char*)sen,"temp",&len);
-	for(unsigned int i=0;i<5;i++)
+	for(unsigned int i=0;i<9;i++)
 		free(buf[i]);
 }
 int main()  

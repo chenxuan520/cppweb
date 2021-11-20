@@ -89,6 +89,28 @@ int DealHttp::customizeAddBody(void* buffer,int bufferLen,const char* body,unsig
 	temp[i+1]=0;
 	return topLen+bodyLen;
 }
+bool DealHttp::setCookie(void* buffer,int bufferLen,const char* key,const char* value,int liveTime,const char* path,const char* domain)
+{
+	char temp[1000]={0};
+	if(strlen(key)+strlen(value)>1000)
+		return false;
+	sprintf(temp,"Set-Cookie: %s=%s;max-age= %d;",key,value,liveTime);
+	strcat((char*)buffer,temp);
+	if(path!=NULL)
+	{
+		strcat((char*)buffer,"Path=");
+		strcat((char*)buffer,path);
+		strcat((char*)buffer,";");
+	}
+	if(domain!=NULL)
+	{
+		strcat((char*)buffer,"Domain=");
+		strcat((char*)buffer,domain);
+		strcat((char*)buffer,";");
+	}
+	strcat((char*)buffer,"\r\n");
+	return true;
+}
 void DealHttp::createTop(FileKind kind,char* ptop,int* topLen,int fileLen)//1:http 2:down 3:pic
 {
 	switch (kind)
@@ -291,17 +313,35 @@ int DealHttp::autoAnalysisGet(const char* pask,char* psend,const char* pfirstFil
 	}
     return 1;
 }
-const char* DealHttp::getKeyValue(const void* message,const char* key,char* value,int maxValueLen)
+const char* DealHttp::getKeyValue(const void* message,const char* key,char* value,int maxValueLen,bool onlyFromBody)
 {
-	char* temp=strstr((char*)message,key);
+	char* temp=NULL;
+	if(onlyFromBody==false)
+		temp=strstr((char*)message,key);
+	else 
+	{
+		temp=strstr((char*)message,"\r\n\r\n");
+		if(temp==NULL)
+			return NULL;
+		temp=strstr(temp,key);
+	}
 	if(temp==NULL)
 		return NULL;
 	return this->findBackString(temp,strlen(key),value,maxValueLen);
 }
-const char* DealHttp::getKeyLine(const void* message,const char* key,char* line,int maxLineLen)
+const char* DealHttp::getKeyLine(const void* message,const char* key,char* line,int maxLineLen,bool onlyFromBody)
 {
 	int i=0;
-	char* ptemp=strstr((char*)message,key);
+	char* ptemp=NULL;
+	if(false==onlyFromBody)
+		ptemp=strstr((char*)message,key);
+	else
+	{
+		ptemp=strstr((char*)message,"\r\n\r\n");
+		if(ptemp==NULL)
+			return NULL;
+		ptemp=strstr(ptemp,key);
+	}
 	if(ptemp==NULL)
 		return NULL;
 	ptemp+=strlen(key);
@@ -309,7 +349,7 @@ const char* DealHttp::getKeyLine(const void* message,const char* key,char* line,
 		ptemp++;
 	while(*(ptemp++)!='\r'&&i<maxLineLen)
 		line[i++]=*ptemp;
-	line[i]=0;
+	line[i-1]=0;
 	return line;
 }
 const char* DealHttp::getAskRoute(const void* message,const char* askWay,char* buffer,unsigned int bufferLen)
