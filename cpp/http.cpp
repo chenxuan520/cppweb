@@ -46,6 +46,71 @@ char* DealHttp::findBackString(char* local,int len,char* word,int maxWordLen)
 	word[i]=0;
 	return word;
 }
+void* DealHttp::customizeAddTop(void* buffer,int bufferLen,int statusNum,int contentLen,const char* contentType,const char* connection)
+{
+	const char* statusEng=NULL;
+	switch(statusNum)
+	{
+		case 200:
+			statusEng="OK";
+			break;
+		case 301:
+			statusEng="Moved Permanently";
+			break;
+		case 404:
+			statusEng="Not Found";
+			break;
+	}
+	sprintf((char*)buffer,"HTTP/1.1 %d %s\r\n"
+		"Server LCserver/1.1\r\n"
+		"Connection: %s\r\n"
+		"Content-Type: %s\r\n"
+		"Content-Length: %d\r\n",statusNum,statusEng,connection,contentType,contentLen);
+	return buffer;
+}
+void* DealHttp::customizeAddHead(void* buffer,int bufferLen,const char* key,const char* value)
+{
+	strcat((char*)buffer,key);
+	strcat((char*)buffer,": ");
+	strcat((char*)buffer,value);
+	strcat((char*)buffer,"\r\n");
+}
+int DealHttp::customizeAddBody(void* buffer,int bufferLen,const char* body,unsigned int bodyLen)
+{
+	int topLen=0;
+	strcat((char*)buffer,"\r\n");
+	unsigned int i=0;
+	topLen=strlen((char*)buffer);
+	if(bufferLen<topLen+bodyLen)
+		return -1;
+	char* temp=(char*)buffer+strlen((char*)buffer);
+	for(i=0;i<bodyLen;i++)
+		temp[i]=body[i];
+	temp[i+1]=0;
+	return topLen+bodyLen;
+}
+bool DealHttp::setCookie(void* buffer,int bufferLen,const char* key,const char* value,int liveTime,const char* path,const char* domain)
+{
+	char temp[1000]={0};
+	if(strlen(key)+strlen(value)>1000)
+		return false;
+	sprintf(temp,"Set-Cookie: %s=%s;max-age= %d;",key,value,liveTime);
+	strcat((char*)buffer,temp);
+	if(path!=NULL)
+	{
+		strcat((char*)buffer,"Path=");
+		strcat((char*)buffer,path);
+		strcat((char*)buffer,";");
+	}
+	if(domain!=NULL)
+	{
+		strcat((char*)buffer,"Domain=");
+		strcat((char*)buffer,domain);
+		strcat((char*)buffer,";");
+	}
+	strcat((char*)buffer,"\r\n");
+	return true;
+}
 void DealHttp::createTop(FileKind kind,char* ptop,int* topLen,int fileLen)//1:http 2:down 3:pic
 {
 	switch (kind)
@@ -248,17 +313,35 @@ int DealHttp::autoAnalysisGet(const char* pask,char* psend,const char* pfirstFil
 	}
     return 1;
 }
-const char* DealHttp::getKeyValue(const void* message,const char* key,char* value,int maxValueLen)
+const char* DealHttp::getKeyValue(const void* message,const char* key,char* value,int maxValueLen,bool onlyFromBody)
 {
-	char* temp=strstr((char*)message,key);
+	char* temp=NULL;
+	if(onlyFromBody==false)
+		temp=strstr((char*)message,key);
+	else 
+	{
+		temp=strstr((char*)message,"\r\n\r\n");
+		if(temp==NULL)
+			return NULL;
+		temp=strstr(temp,key);
+	}
 	if(temp==NULL)
 		return NULL;
 	return this->findBackString(temp,strlen(key),value,maxValueLen);
 }
-const char* DealHttp::getKeyLine(const void* message,const char* key,char* line,int maxLineLen)
+const char* DealHttp::getKeyLine(const void* message,const char* key,char* line,int maxLineLen,bool onlyFromBody)
 {
 	int i=0;
-	char* ptemp=strstr((char*)message,key);
+	char* ptemp=NULL;
+	if(false==onlyFromBody)
+		ptemp=strstr((char*)message,key);
+	else
+	{
+		ptemp=strstr((char*)message,"\r\n\r\n");
+		if(ptemp==NULL)
+			return NULL;
+		ptemp=strstr(ptemp,key);
+	}
 	if(ptemp==NULL)
 		return NULL;
 	ptemp+=strlen(key);
@@ -266,7 +349,7 @@ const char* DealHttp::getKeyLine(const void* message,const char* key,char* line,
 		ptemp++;
 	while(*(ptemp++)!='\r'&&i<maxLineLen)
 		line[i++]=*ptemp;
-	line[i]=0;
+	line[i-1]=0;
 	return line;
 }
 const char* DealHttp::getAskRoute(const void* message,const char* askWay,char* buffer,unsigned int bufferLen)
@@ -321,6 +404,31 @@ int DealHttp::getRecFile(const void* message,char* fileName,int nameLen,char* bu
 		buffer[i]=*top;
 	buffer[i+1]=0;
 	return result;
+}
+const char* DealHttp::urlDecode(char* srcString)
+{
+	char ch=0;
+	int temp=0;
+	char* buffer=(char*)malloc(sizeof(char)*strlen(srcString));
+	if(buffer==NULL)
+		return NULL;
+	memset(buffer,0,sizeof(char)*strlen(srcString));
+	for (unsigned int i=0; i<strlen(srcString); i++) 
+	{
+	    if (int(srcString[i])==37) 
+		{
+	        sscanf(srcString+i+1, "%x", &temp);
+	        ch=(char)temp;
+	        buffer[strlen(buffer)]=ch;
+	        buffer[strlen(buffer)+1]=0;
+	        i=i+2;
+	    } 
+		else 
+	        buffer[strlen(buffer)]=srcString[i];
+	}
+	strcpy(srcString,buffer);
+	free(buffer);
+	return srcString;
 }
 void DealHttp::dealUrl(const char* url,char* urlTop,char* urlEnd)
 {
@@ -442,7 +550,9 @@ bool Json::addKeyValue(const char* key,const char* value)
 		return false;
 	if(strlen(key)+strlen(value)>=180)
 		return false;
-	int len=sprintf(temp,"\"%s\":\"%s\",",key,value);
+	if(buffer[strlen(buffer)-1]=='}')
+		buffer[strlen(buffer)-1]=',';
+	int len=sprintf(temp,"\"%s\":\"%s\"}",key,value);
 	strcat(this->buffer,temp);
 	nowLen+=len;
 	return true;
@@ -454,29 +564,26 @@ bool Json::addKeyValInt(const char* key,int value)
 		return false;
 	if(strlen(key)>=45)
 		return false;	
-	int len=sprintf(temp,"\"%s\":%d,",key,value);
+	if(buffer[strlen(buffer)-1]=='}')
+		buffer[strlen(buffer)-1]=',';
+	int len=sprintf(temp,"\"%s\":%d}",key,value);
 	strcat(this->buffer,temp);
 	nowLen+=len;
 	return true;	
 }
 bool Json::addKeyValFloat(const char* key,float value,int output)
 {
-	char temp[50]={0};
+	char temp[70]={0};
 	if(nowLen+50>maxLen)
 		return false;
 	if(strlen(key)>=45)
-		return false;	
-	int len=sprintf(temp,"\"%s\":%.*f,",key,output,value);
+		return false;
+	if(buffer[strlen(buffer)-1]=='}')
+		buffer[strlen(buffer)-1]=',';
+	int len=sprintf(temp,"\"%s\":%.*f}",key,output,value);
 	strcat(this->buffer,temp);
 	nowLen+=len;
 	return true;		
-}
-const char* Json::endJson()
-{
-	if(nowLen+5>maxLen)
-		return NULL;
-	buffer[strlen(buffer)-1]='}';
-	return this->buffer;
 }
 bool Json::jsonToFile(const char* fileName)
 {
@@ -563,6 +670,272 @@ int Json::getValueInt(const char* key,bool& flag)
 	}
 	flag=true;
 	return value;
+}
+void Json::addOBject(const Object& obj)
+{
+	switch(obj.type)
+	{
+		case INT:
+			this->addKeyValInt(obj.key,obj.valInt);
+			break;
+		case FLOAT:
+			this->addKeyValFloat(obj.key,obj.valFlo,obj.floOut);
+			break;
+		case STRING:
+			this->addKeyValue(obj.key,obj.valStr);
+			break;
+		case ARRAY:
+			this->addArray(obj.arrTyp,obj.key,obj.array,obj.arrLen,obj.floOut);
+			break;
+		case OBJ:
+		case STRUCT:
+			strcat(this->buffer,"\"");
+			strcat(this->buffer,obj.key);
+			strcat(this->buffer,"\":{");
+			for(unsigned int i=0;i<obj.arrLen;i++)
+				this->addOBject(obj.pobj[0]);
+			strcat(this->buffer,"}");
+			break;
+	}
+}
+bool Json::addKeyObj(const char* key,const char* value)
+{
+	char temp[1000]={0};
+	if(nowLen+strlen(key)+strlen(value)>maxLen)
+		return false;
+	if(strlen(key)+strlen(value)>=980)
+		return false;
+	if(buffer[strlen(buffer)-1]=='}')
+		buffer[strlen(buffer)-1]=',';
+	int len=sprintf(temp,"\"%s\":%s}",key,value);
+	strcat(this->buffer,temp);
+	nowLen+=len;
+	return true;		
+}
+bool Json::addArray(TypeJson type,const char* key,void** array,unsigned int arrLen,unsigned int floatNum)
+{
+	char temp[1000]={0};
+	int len=0;
+	if(array==NULL||arrLen==0)
+		return false;
+	if(buffer[strlen(buffer)-1]=='}')
+		buffer[strlen(buffer)-1]=',';
+	sprintf(temp,"\"%s\":[",key);
+	strcat(buffer,temp);
+	int* arr=(int*)array;
+	float* arrF=(float*)array;
+	Object* pobj=(Object*)array;
+	switch(type)
+	{
+		case OBJ:
+			for(unsigned int i=0;i<arrLen;i++)
+			{
+				strcat(buffer,"{");
+				switch(pobj[i].type)
+				{
+					case OBJ:
+						this->addOBject(pobj[i]);
+						break;
+					case INT:
+						this->addKeyValInt(pobj[i].key,pobj[i].valInt);
+						break;
+					case STRING:
+						this->addKeyValue(pobj[i].key,pobj[i].valStr);
+						break;
+					case FLOAT:
+						this->addKeyValFloat(pobj[i].key,pobj[i].valFlo,pobj[i].floOut);
+						break;
+					case ARRAY:
+						this->addArray(pobj[i].arrTyp,pobj[i].key,pobj[i].array,pobj[i].arrLen,pobj[i].floOut);
+						break;
+					case STRUCT:
+						strcat(buffer,pobj[i].valStr);
+						break;
+				}
+				strcat(buffer,",");
+			}
+			buffer[strlen(buffer)-1]=']';
+			strcat(buffer,"}");
+			nowLen+=len;
+			break;
+		case STRING:
+			for(unsigned int i=0;i<arrLen;i++)
+			{
+				len=sprintf(temp,"\"%s\",",(char*)array[i]);
+				strcat(buffer,temp);
+			}
+			buffer[strlen(buffer)-1]=']';
+			strcat(buffer,"}");
+			nowLen+=len;
+			break;				
+		case INT:
+			for(unsigned int i=0;i<arrLen;i++)
+			{
+				len=sprintf(temp,"%d,",arr[i]);
+				strcat(buffer,temp);
+			}
+			buffer[strlen(buffer)-1]=']';
+			strcat(buffer,"}");
+			nowLen+=len;
+			break;
+		case FLOAT:
+			for(unsigned int i=0;i<arrLen;i++)
+			{
+				len=sprintf(temp,"%.*f,",floatNum,arrF[i]);
+				strcat(buffer,temp);
+			}
+			buffer[strlen(buffer)-1]=']';
+			strcat(buffer,"}");
+			nowLen+=len;
+			break;
+		case STRUCT:
+			for(unsigned int i=0;i<arrLen;i++)
+			{
+				strcat(buffer,(char*)array[i]);
+				len+=strlen((char*)array[i]);
+				strcat(buffer,",");	
+			}
+			buffer[strlen(buffer)-1]=']';
+			strcat(buffer,"}");
+			nowLen+=len;
+			break;
+		default:
+			return false;
+	}
+	return true;
+}
+void Json::createObject(char* pbuffer,int bufferLen,const Object& obj)
+{
+	switch(obj.type)
+	{
+		case INT:
+			this->createObjInt(pbuffer,bufferLen,obj.key,obj.valInt);
+			break;
+		case FLOAT:
+			this->createObjFloat(pbuffer,bufferLen,obj.key,obj.valFlo,obj.floOut);
+			break;
+		case STRING:
+			this->createObjValue(pbuffer,bufferLen,obj.key,obj.valStr);
+			break;
+		case ARRAY:
+			this->createObjArray(pbuffer,bufferLen,obj.arrTyp,obj.key,obj.array,obj.arrLen,obj.floOut);
+			break;
+		case OBJ:
+		case STRUCT:
+			strcat(this->buffer,"\"");
+			strcat(this->buffer,obj.key);
+			strcat(this->buffer,"\":{");
+			for(unsigned int i=0;i<obj.arrLen;i++)
+				this->addOBject(obj.pobj[0]);
+			strcat(this->buffer,"}");
+			break;
+	}	
+}
+int Json::createObjInt(char* pbuffer,unsigned int bufferLen,const char* key,int value)
+{
+	if(pbuffer[strlen(pbuffer)-1]=='}')
+		pbuffer[strlen(pbuffer)-1]=',';
+	if(strlen(pbuffer)==0)
+		strcat(pbuffer,"{");
+	if(bufferLen<strlen(pbuffer)+strlen(key))
+		return -1;
+	char temp[100]={0};
+	int len=sprintf(temp,"\"%s\":%d}",key,value);
+	strcat(pbuffer,temp);
+	return len;
+}
+int Json::createObjFloat(char* pbuffer,unsigned int bufferLen,const char* key,float value,int output)
+{
+	if(pbuffer[strlen(pbuffer)-1]=='}')
+		pbuffer[strlen(pbuffer)-1]=',';
+	if(strlen(pbuffer)==0)
+		strcat(pbuffer,"{");
+	if(bufferLen<strlen(pbuffer)+strlen(key))
+		return -1;
+	char temp[100]={0};
+	int len=sprintf(temp,"\"%s\":%.*f}",key,output,value);
+	strcat(pbuffer,temp);
+	return len;
+}
+int Json::createObjValue(char* pbuffer,unsigned int bufferLen,const char* key,const char* value)
+{
+	char temp[200]={0};
+	if(strlen(pbuffer)+strlen(key)+strlen(value)>bufferLen)
+		return false;
+	if(strlen(key)+strlen(value)>=180)
+		return false;
+	if(pbuffer[strlen(pbuffer)-1]=='}')
+		pbuffer[strlen(pbuffer)-1]=',';
+	if(strlen(pbuffer)==0)
+		strcat(pbuffer,"{");
+	int len=sprintf(temp,"\"%s\":\"%s\"}",key,value);
+	strcat(pbuffer,temp);
+	return len;
+}
+bool Json::createObjArray(char* pbuffer,unsigned int bufferLen,TypeJson type,const char* key,void** array,unsigned int arrLen,unsigned int floatNum)
+{
+	char temp[200]={0};
+	if(array==NULL||arrLen==0)
+		return false;
+	if(strlen(pbuffer)+strlen(key)>bufferLen)
+		return false;
+	if(pbuffer[strlen(pbuffer)-1]=='}')
+		pbuffer[strlen(pbuffer)-1]=',';
+	if(strlen(pbuffer)==0)
+		strcat(pbuffer,"{");
+	sprintf(temp,"\"%s\":[",key);
+	strcat(pbuffer,temp);
+	int* arr=(int*)array;
+	float* arrF=(float*)array;
+	switch(type)
+	{
+		case STRING:
+			for(unsigned int i=0;i<arrLen;i++)
+			{
+				sprintf(temp,"\"%s\",",(char*)array[i]);
+				strcat(pbuffer,temp);
+			}
+			pbuffer[strlen(pbuffer)-1]=']';
+			strcat(pbuffer,"}");
+			break;
+		case INT:
+			for(unsigned int i=0;i<arrLen;i++)
+			{
+				sprintf(temp,"%d,",arr[i]);
+				strcat(pbuffer,temp);
+			}
+			pbuffer[strlen(pbuffer)-1]=']';
+			strcat(pbuffer,"}");
+			break;
+		case FLOAT:
+			for(unsigned int i=0;i<arrLen;i++)
+			{
+				sprintf(temp,"%.*f,",floatNum,arrF[i]);
+				strcat(pbuffer,temp);
+			}
+			pbuffer[strlen(pbuffer)-1]=']';
+			strcat(pbuffer,"}");
+			break;
+		default:
+			return false;
+	}
+	return true;
+}
+int Json::createObjObj(char* pbuffer,unsigned int bufferLen,const char* key,const char* value)
+{
+	char temp[500]={0};
+	if(strlen(pbuffer)+strlen(key)+strlen(value)>bufferLen)
+		return false;
+	if(strlen(key)+strlen(value)>=490)
+		return false;
+	if(pbuffer[strlen(pbuffer)-1]=='}')
+		pbuffer[strlen(pbuffer)-1]=',';
+	if(strlen(pbuffer)==0)
+		strcat(pbuffer,"{");
+	int len=sprintf(temp,"\"%s\":%s}",key,value);
+	strcat(pbuffer,temp);
+	nowLen+=len;
+	return true;
 }
 WebToken::WebToken()
 {

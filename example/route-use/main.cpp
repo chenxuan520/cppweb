@@ -10,7 +10,6 @@ void pfunc(DealHttp & http, HttpServer & server, int , void * sen, int & len)
 	http.getRouteValue(url,"name",value,30);//get name value
 	json.addKeyValue("name",value);
 	json.addKeyValue("welcome","you");
-	json.endJson();
 	json.jsonToFile("temp");
 	http.createSendMsg(DealHttp::JSON,(char*)sen,"temp",&len);
 }

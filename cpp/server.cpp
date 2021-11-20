@@ -355,6 +355,60 @@ bool HttpServer::routeHandle(AskType ask,RouteType type,const char* route,void (
 	now++;
 	return true;
 }
+bool HttpServer::get(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&))
+{
+	if(strlen(route)>100)
+		return false;
+	if(max-now<=2)
+	{
+		array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
+		if(array=NULL)
+			return false;
+		max+=10;
+	}
+	array[now].type=type;
+	array[now].ask=GET;
+	strcpy(array[now].route,route);
+	array[now].pfunc=pfunc;
+	now++;
+	return true;	
+}
+bool HttpServer::post(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&))
+{
+	if(strlen(route)>100)
+		return false;
+	if(max-now<=2)
+	{
+		array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
+		if(array=NULL)
+			return false;
+		max+=10;
+	}
+	array[now].type=type;
+	array[now].ask=POST;
+	strcpy(array[now].route,route);
+	array[now].pfunc=pfunc;
+	now++;
+	return true;	
+}
+bool HttpServer::all(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&))
+{
+	if(strlen(route)>100)
+		return false;
+	if(max-now<=2)
+	{
+		array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
+		if(array=NULL)
+			return false;
+		max+=10;
+	}
+	array[now].type=type;
+	array[now].ask=ALL;
+	strcpy(array[now].route,route);
+	array[now].pfunc=pfunc;
+	now++;
+	return true;	
+}
 void HttpServer::run(unsigned int memory,unsigned int recBufLenChar,const char* defaultFile)
 {
 	char* get=(char*)malloc(sizeof(char)*recBufLenChar);
@@ -406,14 +460,15 @@ int HttpServer::func(int num,void* pget,void* sen,const char* defaultFile,HttpSe
 	AskType type=GET;
 	int len=0,flag=2;
 	char ask[200]={0};
-	if(strstr((char*)pget,"GET")!=NULL)
+	sscanf((char*)pget,"%s",ask);
+	if(strstr(ask,"GET")!=NULL)
 	{
 		http.getAskRoute(pget,"GET",ask,200);
 		if(isDebug)
 			printf("Get url:%s\n",ask);
 		type=GET;
 	}
-	if(strstr((char*)pget,"POST")!=NULL)
+	if(strstr(ask,"POST")!=NULL)
 	{
 		http.getAskRoute(pget,"POST",ask,200);
 		if(isDebug)

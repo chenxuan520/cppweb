@@ -108,6 +108,9 @@ public:
 	bool clientOutHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port));
 	bool clientInHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port));
 	bool routeHandle(AskType ask,RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&));
+	bool get(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&));
+	bool post(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&));
+	bool all(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&));
 	void run(unsigned int memory,unsigned int recBufLenChar,const char* defaultFile);
 	int httpSend(int num,void* buffer,int sendLen);
 	inline void* recText()
