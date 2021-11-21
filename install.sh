@@ -16,8 +16,7 @@ echo 'choose if use guard';
 read if_guard;
 if [ $if_sql == 'y' ]
 then
-    mv ./makefile makeNoSql;
-    mv ./makefileSql makefile
+	make sql
 fi
 make
 make clean
