@@ -1854,7 +1854,7 @@ public:
 class HttpServer:private ServerTcpIp{
 public:
 	enum RouteType{
-		ONEWAY,WILD,
+		ONEWAY,WILD,STATIC,
 	};
 	enum AskType{
 		GET,POST,ALL,
@@ -1863,10 +1863,12 @@ public:
 		AskType ask;
 		RouteType type;
 		char route[100];
+		const char* path;
 		void (*pfunc)(DealHttp&,HttpServer&,int num,void* sen,int&);
 	};
 private:
 	RouteFuntion* array;
+	RouteFuntion* pnowRoute;
 	void* getText;
 	unsigned int max;
 	unsigned int now;
@@ -1890,6 +1892,7 @@ public:
 		textLen=0;
 		clientIn=NULL;
 		clientOut=NULL;
+		pnowRoute=NULL;
 	}
 	~HttpServer()
 	{
@@ -1914,12 +1917,25 @@ public:
 		now++;
 		return true;
 	}
-//	bool loadStatic(const char* route,const char* staticPath)
-//	{
-//		char temp[100]={0};
-//		sprintf(temp,"%s %s",route,staticPath);
-//		this->get(WILD,temp,loadFile);
-//	}
+	bool loadStatic(const char* route,const char* staticPath)
+	{
+		if(strlen(route)>100)
+			return false;
+		if(max-now<=2)
+		{
+			array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
+			if(array=NULL)
+				return false;
+			max+=10;
+		}
+		array[now].type=STATIC;
+		array[now].ask=GET;
+		strcpy(array[now].route,route);
+		array[now].path=staticPath;
+		array[now].pfunc=loadFile;
+		now++;
+		return true;
+	}
 	bool get(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&))
 	{
 		if(strlen(route)>100)
@@ -2065,6 +2081,7 @@ private:
 				if(strcmp(ask,array[i].route)==0)
 				{
 					pfunc=array[i].pfunc;
+					pnowRoute=&array[i];
 					break;
 				}
 			}
@@ -2073,7 +2090,18 @@ private:
 				if(strstr(ask,array[i].route)!=NULL)
 				{
 					pfunc=array[i].pfunc;
+					pnowRoute=&array[i];
 					break;						
+				}
+			}
+			else if(array[i].type==STATIC&&type==GET)
+			{
+				if(strstr(ask,array[i].route)!=NULL)
+				{
+					pfunc=array[i].pfunc;
+					sprintf((char*)sen,"%s",array[i].path);
+					pnowRoute=&array[i];
+					break;
 				}
 			}
 		}
@@ -2088,10 +2116,11 @@ private:
 				strcpy(ask,http.analysisHttpAsk(pget));
 				flag=http.autoAnalysisGet((char*)pget,(char*)sen,defaultFile,&len);
 			}
-			if(flag==2&&isDebug)
+			if(flag==2)
 			{
 				LogSystem::recordFileError(ask);
-				printf("404 get %s wrong\n",ask);
+				if(isDebug)
+					printf("404 get %s wrong\n",ask);
 			}
 		}
 		if(false==server.sendSocket(num,sen,len))
@@ -2151,10 +2180,23 @@ private:
 		}
 		return ;
 	}
-//	static void loadFile(DealHttp&,HttpServer&,int,void*,int&)
-//	{
-//		
-//	}
+	inline RouteFuntion* getNowRoute()
+	{
+		return pnowRoute;
+	}
+	static void loadFile(DealHttp& http,HttpServer& server,int,void* sen,int& len)
+	{
+		char ask[200]={0},buf[200]={0},temp[200]={0};
+		http.getAskRoute(server.recText(),"GET",ask,200);
+		HttpServer::RouteFuntion& route=*server.getNowRoute();
+		http.getWildUrl(ask,route.route,temp,200);
+		sprintf(buf,"GET %s%s HTTP/1.1",route.path,temp);
+		if(2==http.autoAnalysisGet(buf,(char*)sen,NULL,&len))
+		{
+			LogSystem::recordFileError(ask);
+			printf("404 get %s wrong\n",buf);
+		}
+	}
 };
 /********************************
 	author:chenxuan
@@ -3264,8 +3306,10 @@ int main(int argc, char** argv)
 {
 //	serverHttp();
 	HttpServer server(5201,true);
+	server.loadStatic("/assets","/test/assets");
+	server.loadStatic("/style.css","/test/style.css");
 	server.all(HttpServer::ONEWAY,"/root",func);
 	server.routeHandle(HttpServer::ALL,HttpServer::ONEWAY,"/key/",funHa);
-	server.run(1 ,4000,"./index.html");
+	server.run(1 ,4000,"./test/index.html");
 	return 0;
 }

@@ -355,6 +355,25 @@ bool HttpServer::routeHandle(AskType ask,RouteType type,const char* route,void (
 	now++;
 	return true;
 }
+bool HttpServer::loadStatic(const char* route,const char* staticPath)
+{
+	if(strlen(route)>100)
+		return false;
+	if(max-now<=2)
+	{
+		array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
+		if(array=NULL)
+			return false;
+		max+=10;
+	}
+	array[now].type=STATIC;
+	array[now].ask=GET;
+	strcpy(array[now].route,route);
+	array[now].path=staticPath;
+	array[now].pfunc=loadFile;
+	now++;
+	return true;
+}
 bool HttpServer::get(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&))
 {
 	if(strlen(route)>100)
@@ -483,6 +502,7 @@ int HttpServer::func(int num,void* pget,void* sen,const char* defaultFile,HttpSe
 			if(strcmp(ask,array[i].route)==0)
 			{
 				pfunc=array[i].pfunc;
+				pnowRoute=&array[i];
 				break;
 			}
 		}
@@ -491,7 +511,18 @@ int HttpServer::func(int num,void* pget,void* sen,const char* defaultFile,HttpSe
 			if(strstr(ask,array[i].route)!=NULL)
 			{
 				pfunc=array[i].pfunc;
+				pnowRoute=&array[i];
 				break;						
+			}
+		}
+		else if(array[i].type==STATIC&&type==GET)
+		{
+			if(strstr(ask,array[i].route)!=NULL)
+			{
+				pfunc=array[i].pfunc;
+				sprintf((char*)sen,"%s",array[i].path);
+				pnowRoute=&array[i];
+				break;
 			}
 		}
 	}
@@ -506,11 +537,11 @@ int HttpServer::func(int num,void* pget,void* sen,const char* defaultFile,HttpSe
 			strcpy(ask,http.analysisHttpAsk(pget));
 			flag=http.autoAnalysisGet((char*)pget,(char*)sen,defaultFile,&len);
 		}
-		if(flag==2&&isDebug)
+		if(flag==2)
 		{
-			http.createSendMsg(DealHttp::NOFOUND,(char*)sen,NULL,&len);
 			LogSystem::recordFileError(ask);
-			printf("404 get %s wrong\n",ask);
+			if(isDebug)
+				printf("404 get %s wrong\n",ask);
 		}
 	}
 	if(false==server.sendSocket(num,sen,len))
@@ -569,6 +600,19 @@ void HttpServer::epollHttp(void* pget,int len,void* pneed,const char* defaultFil
 		}
 	}
 	return ;
+}
+void HttpServer::loadFile(DealHttp& http,HttpServer& server,int,void* sen,int& len)
+{
+	char ask[200]={0},buf[200]={0},temp[200]={0};
+	http.getAskRoute(server.recText(),"GET",ask,200);
+	HttpServer::RouteFuntion& route=*server.getNowRoute();
+	http.getWildUrl(ask,route.route,temp,200);
+	sprintf(buf,"GET %s%s HTTP/1.1",route.path,temp);
+	if(2==http.autoAnalysisGet(buf,(char*)sen,NULL,&len))
+	{
+		LogSystem::recordFileError(ask);
+		printf("404 get %s wrong\n",buf);
+	}
 }
 Email::Email(const char* domain,bool debug)
 {
