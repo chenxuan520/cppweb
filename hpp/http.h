@@ -54,6 +54,7 @@ private:
 	char word[30];
 	const char* text;
 	const char* obj;
+	const char* error;
 	unsigned int nowLen;
 	unsigned int maxLen;
 public:
@@ -104,6 +105,10 @@ public:
 	inline const char* resultText()
 	{
 		return buffer;
+	}
+	inline const char* getLastError()
+	{
+		return this->error;
 	}
 	bool jsonToFile(const char* fileName);
 	const char* operator[](const char* key);

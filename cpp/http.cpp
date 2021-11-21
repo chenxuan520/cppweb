@@ -54,8 +54,14 @@ void* DealHttp::customizeAddTop(void* buffer,int bufferLen,int statusNum,int con
 		case 200:
 			statusEng="OK";
 			break;
+		case 204:
+			statusEng="No Content";
+			break;
 		case 301:
 			statusEng="Moved Permanently";
+			break;
+		case 403:
+			statusEng="Forbidden";
 			break;
 		case 404:
 			statusEng="Not Found";
@@ -513,6 +519,7 @@ Json::Json()
 {
 	buffer=NULL;
 	text=NULL;
+	error=NULL;
 	nowLen=0;
 	maxLen=0;
 	memset(this->word,0,sizeof(char)*30);
@@ -546,10 +553,21 @@ bool Json::init(unsigned int bufferLen)
 bool Json::addKeyValue(const char* key,const char* value)
 {
 	char temp[200]={0};
+	if(key==NULL||value==NULL)
+	{
+		error="key or value NULL";
+		return false;
+	}
 	if(nowLen+strlen(key)+strlen(value)>maxLen)
+	{
+		error="buffer too short";
 		return false;
+	}
 	if(strlen(key)+strlen(value)>=180)
+	{
+		error="buffer too short";
 		return false;
+	}
 	if(buffer[strlen(buffer)-1]=='}')
 		buffer[strlen(buffer)-1]=',';
 	int len=sprintf(temp,"\"%s\":\"%s\"}",key,value);
@@ -560,10 +578,21 @@ bool Json::addKeyValue(const char* key,const char* value)
 bool Json::addKeyValInt(const char* key,int value)
 {
 	char temp[50]={0};
-	if(nowLen+50>maxLen)
+	if(key==NULL)
+	{
+		error="key is NULL";
 		return false;
+	}
+	if(nowLen+50>maxLen)
+	{
+		error="buffer too short";
+		return false;
+	}
 	if(strlen(key)>=45)
+	{
+		error="buffer too short";
 		return false;	
+	}
 	if(buffer[strlen(buffer)-1]=='}')
 		buffer[strlen(buffer)-1]=',';
 	int len=sprintf(temp,"\"%s\":%d}",key,value);
@@ -575,9 +604,20 @@ bool Json::addKeyValFloat(const char* key,float value,int output)
 {
 	char temp[70]={0};
 	if(nowLen+50>maxLen)
+	{
+		error="buffer too short";
 		return false;
+	}
+	if(NULL==key)
+	{
+		error="key is NULL";
+		return false;
+	}
 	if(strlen(key)>=45)
+	{
+		error="buffer too short";
 		return false;
+	}
 	if(buffer[strlen(buffer)-1]=='}')
 		buffer[strlen(buffer)-1]=',';
 	int len=sprintf(temp,"\"%s\":%.*f}",key,output,value);
@@ -616,6 +656,8 @@ const char* Json::operator[](const char* key)
 float Json::getValueFloat(const char* key,bool& flag)
 {
 	float value=0;
+	if(key==NULL)
+		return -1;
 	char* temp=strstr((char*)text,key);
 	if(temp==NULL)
 	{
@@ -645,6 +687,8 @@ float Json::getValueFloat(const char* key,bool& flag)
 int Json::getValueInt(const char* key,bool& flag)
 {
 	int value=0;
+	if(key==NULL)
+		return -1;
 	char* temp=strstr((char*)text,key);
 	if(temp==NULL)
 	{
@@ -690,7 +734,8 @@ void Json::addOBject(const Object& obj)
 		case OBJ:
 		case STRUCT:
 			strcat(this->buffer,"\"");
-			strcat(this->buffer,obj.key);
+			if(obj.key!=NULL)
+				strcat(this->buffer,obj.key);
 			strcat(this->buffer,"\":{");
 			for(unsigned int i=0;i<obj.arrLen;i++)
 				this->addOBject(obj.pobj[0]);
@@ -701,10 +746,21 @@ void Json::addOBject(const Object& obj)
 bool Json::addKeyObj(const char* key,const char* value)
 {
 	char temp[1000]={0};
+	if(key==NULL||value==NULL)
+	{
+		error="key or value NULL";
+		return false;
+	}
 	if(nowLen+strlen(key)+strlen(value)>maxLen)
+	{
+		error="buffer too short";
 		return false;
+	}
 	if(strlen(key)+strlen(value)>=980)
+	{
+		error="buffer too short";
 		return false;
+	}
 	if(buffer[strlen(buffer)-1]=='}')
 		buffer[strlen(buffer)-1]=',';
 	int len=sprintf(temp,"\"%s\":%s}",key,value);
@@ -791,8 +847,11 @@ bool Json::addArray(TypeJson type,const char* key,void** array,unsigned int arrL
 		case STRUCT:
 			for(unsigned int i=0;i<arrLen;i++)
 			{
-				strcat(buffer,(char*)array[i]);
-				len+=strlen((char*)array[i]);
+				if((char*)array[i]!=NULL)
+				{
+					strcat(buffer,(char*)array[i]);
+					len+=strlen((char*)array[i]);
+				}
 				strcat(buffer,",");	
 			}
 			buffer[strlen(buffer)-1]=']';
@@ -823,7 +882,8 @@ void Json::createObject(char* pbuffer,int bufferLen,const Object& obj)
 		case OBJ:
 		case STRUCT:
 			strcat(this->buffer,"\"");
-			strcat(this->buffer,obj.key);
+			if(obj.key!=NULL)
+				strcat(this->buffer,obj.key);
 			strcat(this->buffer,"\":{");
 			for(unsigned int i=0;i<obj.arrLen;i++)
 				this->addOBject(obj.pobj[0]);
@@ -833,12 +893,20 @@ void Json::createObject(char* pbuffer,int bufferLen,const Object& obj)
 }
 int Json::createObjInt(char* pbuffer,unsigned int bufferLen,const char* key,int value)
 {
+	if(pbuffer==NULL||key==NULL)
+	{
+		error="buffer or key NULL";
+		return -1;
+	}
 	if(pbuffer[strlen(pbuffer)-1]=='}')
 		pbuffer[strlen(pbuffer)-1]=',';
 	if(strlen(pbuffer)==0)
 		strcat(pbuffer,"{");
 	if(bufferLen<strlen(pbuffer)+strlen(key))
+	{
+		error="buffer is too short";
 		return -1;
+	}
 	char temp[100]={0};
 	int len=sprintf(temp,"\"%s\":%d}",key,value);
 	strcat(pbuffer,temp);
@@ -846,12 +914,20 @@ int Json::createObjInt(char* pbuffer,unsigned int bufferLen,const char* key,int 
 }
 int Json::createObjFloat(char* pbuffer,unsigned int bufferLen,const char* key,float value,int output)
 {
+	if(pbuffer==NULL||key==NULL)
+	{
+		error="buffer or key NULL";
+		return -1;
+	}
 	if(pbuffer[strlen(pbuffer)-1]=='}')
 		pbuffer[strlen(pbuffer)-1]=',';
 	if(strlen(pbuffer)==0)
 		strcat(pbuffer,"{");
 	if(bufferLen<strlen(pbuffer)+strlen(key))
+	{
+		error="buffer is too short";
 		return -1;
+	}
 	char temp[100]={0};
 	int len=sprintf(temp,"\"%s\":%.*f}",key,output,value);
 	strcat(pbuffer,temp);
@@ -859,11 +935,22 @@ int Json::createObjFloat(char* pbuffer,unsigned int bufferLen,const char* key,fl
 }
 int Json::createObjValue(char* pbuffer,unsigned int bufferLen,const char* key,const char* value)
 {
+	if(pbuffer==NULL||key==NULL||value==NULL)
+	{
+		error="buffer or key NULL";
+		return -1;
+	}
 	char temp[200]={0};
 	if(strlen(pbuffer)+strlen(key)+strlen(value)>bufferLen)
-		return false;
+	{
+		error="buffer is too short";
+		return -1;
+	}
 	if(strlen(key)+strlen(value)>=180)
-		return false;
+	{
+		error="buffer is too short";
+		return -1;
+	}
 	if(pbuffer[strlen(pbuffer)-1]=='}')
 		pbuffer[strlen(pbuffer)-1]=',';
 	if(strlen(pbuffer)==0)
@@ -875,10 +962,16 @@ int Json::createObjValue(char* pbuffer,unsigned int bufferLen,const char* key,co
 bool Json::createObjArray(char* pbuffer,unsigned int bufferLen,TypeJson type,const char* key,void** array,unsigned int arrLen,unsigned int floatNum)
 {
 	char temp[200]={0};
-	if(array==NULL||arrLen==0)
+	if(array==NULL||arrLen==0||pbuffer==NULL)
+	{
+		error="buffer is NULL";
 		return false;
+	}
 	if(strlen(pbuffer)+strlen(key)>bufferLen)
+	{
+		error="buffer is too short";
 		return false;
+	}
 	if(pbuffer[strlen(pbuffer)-1]=='}')
 		pbuffer[strlen(pbuffer)-1]=',';
 	if(strlen(pbuffer)==0)
@@ -924,10 +1017,21 @@ bool Json::createObjArray(char* pbuffer,unsigned int bufferLen,TypeJson type,con
 int Json::createObjObj(char* pbuffer,unsigned int bufferLen,const char* key,const char* value)
 {
 	char temp[500]={0};
+	if(pbuffer==NULL||key==NULL||value==NULL)
+	{
+		error="pbuffer NULL or key NULL or value NULL";
+		return -1;
+	}
 	if(strlen(pbuffer)+strlen(key)+strlen(value)>bufferLen)
-		return false;
+	{
+		error="buffer is too short";
+		return -1;
+	}
 	if(strlen(key)+strlen(value)>=490)
-		return false;
+	{
+		error="buffer is too short";
+		return -1;
+	}
 	if(pbuffer[strlen(pbuffer)-1]=='}')
 		pbuffer[strlen(pbuffer)-1]=',';
 	if(strlen(pbuffer)==0)
@@ -935,7 +1039,7 @@ int Json::createObjObj(char* pbuffer,unsigned int bufferLen,const char* key,cons
 	int len=sprintf(temp,"\"%s\":%s}",key,value);
 	strcat(pbuffer,temp);
 	nowLen+=len;
-	return true;
+	return nowLen;
 }
 WebToken::WebToken()
 {

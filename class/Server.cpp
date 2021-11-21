@@ -28,6 +28,7 @@ private:
 	char word[30];
 	const char* text;
 	const char* obj;
+	const char* error;
 	unsigned int nowLen;
 	unsigned int maxLen;
 public:
@@ -64,6 +65,7 @@ public:
 		buffer=NULL;
 		text=NULL;
 		obj=NULL;
+		error=NULL;
 		nowLen=0;
 		maxLen=0;
 		memset(this->word,0,sizeof(char)*30);
@@ -84,11 +86,17 @@ public:
 	bool init(unsigned int bufferLen)
 	{
 		if(bufferLen<=10)
+		{
+			error="buffer len too small";
 			return false;
+		}
 		buffer=(char*)malloc(sizeof(char)*bufferLen);
 		memset(buffer,0,sizeof(char)*bufferLen);
 		if(buffer==NULL)
+		{
+			error="malloc wrong";
 			return false;
+		}
 		this->maxLen=bufferLen;
 		strcat(this->buffer,"{");
 		this->nowLen+=2;
@@ -113,7 +121,8 @@ public:
 			case OBJ:
 			case STRUCT:
 				strcat(this->buffer,"\"");
-				strcat(this->buffer,obj.key);
+				if(obj.key!=NULL)
+					strcat(this->buffer,obj.key);
 				strcat(this->buffer,"\":{");
 				for(unsigned int i=0;i<obj.arrLen;i++)
 					this->addOBject(obj.pobj[0]);
@@ -124,10 +133,21 @@ public:
 	bool addKeyValue(const char* key,const char* value)
 	{
 		char temp[200]={0};
+		if(key==NULL||value==NULL)
+		{
+			error="key or value NULL";
+			return false;
+		}
 		if(nowLen+strlen(key)+strlen(value)>maxLen)
+		{
+			error="buffer too short";
 			return false;
+		}
 		if(strlen(key)+strlen(value)>=180)
+		{
+			error="buffer too short";
 			return false;
+		}
 		if(buffer[strlen(buffer)-1]=='}')
 			buffer[strlen(buffer)-1]=',';
 		int len=sprintf(temp,"\"%s\":\"%s\"}",key,value);
@@ -138,10 +158,21 @@ public:
 	bool addKeyValInt(const char* key,int value)
 	{
 		char temp[50]={0};
-		if(nowLen+50>maxLen)
+		if(key==NULL)
+		{
+			error="key is NULL";
 			return false;
+		}
+		if(nowLen+50>maxLen)
+		{
+			error="buffer too short";
+			return false;
+		}
 		if(strlen(key)>=45)
+		{
+			error="buffer too short";
 			return false;	
+		}
 		if(buffer[strlen(buffer)-1]=='}')
 			buffer[strlen(buffer)-1]=',';
 		int len=sprintf(temp,"\"%s\":%d}",key,value);
@@ -152,10 +183,21 @@ public:
 	bool addKeyObj(const char* key,const char* value)
 	{
 		char temp[1000]={0};
+		if(key==NULL||value==NULL)
+		{
+			error="key or value NULL";
+			return false;
+		}
 		if(nowLen+strlen(key)+strlen(value)>maxLen)
+		{
+			error="buffer too short";
 			return false;
+		}
 		if(strlen(key)+strlen(value)>=980)
+		{
+			error="buffer too short";
 			return false;
+		}
 		if(buffer[strlen(buffer)-1]=='}')
 			buffer[strlen(buffer)-1]=',';
 		int len=sprintf(temp,"\"%s\":%s}",key,value);
@@ -242,8 +284,11 @@ public:
 			case STRUCT:
 				for(unsigned int i=0;i<arrLen;i++)
 				{
-					strcat(buffer,(char*)array[i]);
-					len+=strlen((char*)array[i]);
+					if((char*)array[i]!=NULL)
+					{
+						strcat(buffer,(char*)array[i]);
+						len+=strlen((char*)array[i]);
+					}
 					strcat(buffer,",");	
 				}
 				buffer[strlen(buffer)-1]=']';
@@ -259,9 +304,20 @@ public:
 	{
 		char temp[70]={0};
 		if(nowLen+50>maxLen)
+		{
+			error="buffer too short";
 			return false;
+		}
+		if(NULL==key)
+		{
+			error="key is NULL";
+			return false;
+		}
 		if(strlen(key)>=45)
+		{
+			error="buffer too short";
 			return false;
+		}
 		if(buffer[strlen(buffer)-1]=='}')
 			buffer[strlen(buffer)-1]=',';
 		int len=sprintf(temp,"\"%s\":%.*f}",key,output,value);
@@ -288,7 +344,8 @@ public:
 			case OBJ:
 			case STRUCT:
 				strcat(this->buffer,"\"");
-				strcat(this->buffer,obj.key);
+				if(obj.key!=NULL)
+					strcat(this->buffer,obj.key);
 				strcat(this->buffer,"\":{");
 				for(unsigned int i=0;i<obj.arrLen;i++)
 					this->addOBject(obj.pobj[0]);
@@ -298,12 +355,20 @@ public:
 	}
 	int createObjInt(char* pbuffer,unsigned int bufferLen,const char* key,int value)
 	{
+		if(pbuffer==NULL||key==NULL)
+		{
+			error="buffer or key NULL";
+			return -1;
+		}
 		if(pbuffer[strlen(pbuffer)-1]=='}')
 			pbuffer[strlen(pbuffer)-1]=',';
 		if(strlen(pbuffer)==0)
 			strcat(pbuffer,"{");
 		if(bufferLen<strlen(pbuffer)+strlen(key))
+		{
+			error="buffer is too short";
 			return -1;
+		}
 		char temp[100]={0};
 		int len=sprintf(temp,"\"%s\":%d}",key,value);
 		strcat(pbuffer,temp);
@@ -311,12 +376,20 @@ public:
 	}
 	int createObjFloat(char* pbuffer,unsigned int bufferLen,const char* key,float value,int output=1)
 	{
+		if(pbuffer==NULL||key==NULL)
+		{
+			error="buffer or key NULL";
+			return -1;
+		}
 		if(pbuffer[strlen(pbuffer)-1]=='}')
 			pbuffer[strlen(pbuffer)-1]=',';
 		if(strlen(pbuffer)==0)
 			strcat(pbuffer,"{");
 		if(bufferLen<strlen(pbuffer)+strlen(key))
+		{
+			error="buffer is too short";
 			return -1;
+		}
 		char temp[100]={0};
 		int len=sprintf(temp,"\"%s\":%.*f}",key,output,value);
 		strcat(pbuffer,temp);
@@ -324,11 +397,22 @@ public:
 	}
 	int createObjValue(char* pbuffer,unsigned int bufferLen,const char* key,const char* value)
 	{
+		if(pbuffer==NULL||key==NULL||value==NULL)
+		{
+			error="buffer or key NULL";
+			return -1;
+		}
 		char temp[200]={0};
 		if(strlen(pbuffer)+strlen(key)+strlen(value)>bufferLen)
-			return false;
+		{
+			error="buffer is too short";
+			return -1;
+		}
 		if(strlen(key)+strlen(value)>=180)
-			return false;
+		{
+			error="buffer is too short";
+			return -1;
+		}
 		if(pbuffer[strlen(pbuffer)-1]=='}')
 			pbuffer[strlen(pbuffer)-1]=',';
 		if(strlen(pbuffer)==0)
@@ -340,10 +424,16 @@ public:
 	bool createObjArray(char* pbuffer,unsigned int bufferLen,TypeJson type,const char* key,void** array,unsigned int arrLen,unsigned int floatNum=1)
 	{
 		char temp[200]={0};
-		if(array==NULL||arrLen==0)
+		if(array==NULL||arrLen==0||pbuffer==NULL)
+		{
+			error="buffer is NULL";
 			return false;
+		}
 		if(strlen(pbuffer)+strlen(key)>bufferLen)
+		{
+			error="buffer is too short";
 			return false;
+		}
 		if(pbuffer[strlen(pbuffer)-1]=='}')
 			pbuffer[strlen(pbuffer)-1]=',';
 		if(strlen(pbuffer)==0)
@@ -389,10 +479,21 @@ public:
 	int createObjObj(char* pbuffer,unsigned int bufferLen,const char* key,const char* value)
 	{
 		char temp[500]={0};
+		if(pbuffer==NULL||key==NULL||value==NULL)
+		{
+			error="pbuffer NULL or key NULL or value NULL";
+			return -1;
+		}
 		if(strlen(pbuffer)+strlen(key)+strlen(value)>bufferLen)
-			return false;
+		{
+			error="buffer is too short";
+			return -1;
+		}
 		if(strlen(key)+strlen(value)>=490)
-			return false;
+		{
+			error="buffer is too short";
+			return -1;
+		}
 		if(pbuffer[strlen(pbuffer)-1]=='}')
 			pbuffer[strlen(pbuffer)-1]=',';
 		if(strlen(pbuffer)==0)
@@ -400,7 +501,7 @@ public:
 		int len=sprintf(temp,"\"%s\":%s}",key,value);
 		strcat(pbuffer,temp);
 		nowLen+=len;
-		return true;
+		return nowLen;
 	}
 	inline const char* resultText()
 	{
@@ -418,6 +519,8 @@ public:
 	const char* operator[](const char* key)
 	{
 		char* temp=NULL;
+		if(key==NULL)
+			return NULL;
 		if((temp=strstr((char*)this->text,key))==NULL)
 			return NULL;
 		temp=strchr(temp,'\"');
@@ -437,6 +540,8 @@ public:
 	float getValueFloat(const char* key,bool& flag)
 	{
 		float value=0;
+		if(key==NULL)
+			return -1;
 		char* temp=strstr((char*)text,key);
 		if(temp==NULL)
 		{
@@ -466,6 +571,8 @@ public:
 	int getValueInt(const char* key,bool& flag)
 	{
 		int value=0;
+		if(key==NULL)
+			return -1;
 		char* temp=strstr((char*)text,key);
 		if(temp==NULL)
 		{
@@ -491,6 +598,10 @@ public:
 		}
 		flag=true;
 		return value;
+	}
+	inline const char* getLastError()
+	{
+		return this->error;
 	}
 };
 /********************************
@@ -1035,8 +1146,14 @@ public:
 			case 200:
 				statusEng="OK";
 				break;
+			case 204:
+				statusEng="No Content";
+				break;
 			case 301:
 				statusEng="Moved Permanently";
+				break;
+			case 403:
+				statusEng="Forbidden";
 				break;
 			case 404:
 				statusEng="Not Found";
