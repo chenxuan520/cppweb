@@ -34,6 +34,10 @@ route.o:./hpp/route.h
 	g++ -c ./hpp/route.h -o route.o
 clean:
 	rm -f *.o 
+sql: sql.o
+	ar rcs ./lib/libsql.a sql.o
+sql.o: ./cpp/sql.cpp
+	g++ -c ./cpp/sql.cpp -o sql.o
 install:
 	cp ./lib/*.h /usr/local/include/
 	cp ./lib/*.a /usr/local/lib/

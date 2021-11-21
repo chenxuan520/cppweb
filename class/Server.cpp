@@ -1441,11 +1441,6 @@ public:
 		return srcString;
 	}
 };
-/********************************
-	author:chenxuan
-	date:2021/11/5
-	funtion:my jwt try
-*********************************/
 class WebToken{
 private:
 	char* backString;
@@ -1488,14 +1483,14 @@ public:
 		sprintf(endString,"%d",end);
 		for(unsigned int i=0;i<strlen(endString);i++)
 			endString[i]+=50;
-		sprintf(tempString,"&%s&%c",endString,encryption[0]);
+		sprintf(tempString,".%s.%c",endString,encryption[0]);
 		strcat(backString,tempString);
 		strcpy(getString,backString);
 		return getString;
 	}
 	const char* decryptToken(const char* key,const char* token,char* buffer,unsigned int bufferLen)
 	{
-		char* temp=strchr((char*)token,'&');
+		char* temp=strchr((char*)token,'.');
 		if(temp==NULL||key==NULL||token==NULL||buffer==NULL||bufferLen<strlen(token))
 		{
 			sprintf(err,"input wrong");
@@ -1506,7 +1501,7 @@ public:
 		backString=(char*)malloc(sizeof(char)*strlen(token));
 		memset(backString,0,sizeof(char)*strlen(token));
 		char endString[20]={0};
-		if(sscanf(temp+1,"%[^&]",endString)<=0)
+		if(sscanf(temp+1,"%[^.]",endString)<=0)
 		{
 			sprintf(err,"get time wrong");
 			return NULL;
