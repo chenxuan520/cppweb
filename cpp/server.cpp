@@ -473,13 +473,17 @@ int HttpServer::httpSend(int num,void* buffer,int sendLen)
 {
 	return this->sendSocket(num,buffer,sendLen);
 }
+int HttpServer::httpRecv(int num,void* buffer,int bufferLen)
+{
+	return this->receiveSocket(num,buffer,bufferLen);
+}
 int HttpServer::func(int num,void* pget,void* sen,const char* defaultFile,HttpServer& server)
 {
 	static DealHttp http;
 	AskType type=GET;
 	int len=0,flag=2;
 	char ask[200]={0};
-	sscanf((char*)pget,"%s",ask);
+	sscanf((char*)pget,"%100s",ask);
 	if(strstr(ask,"GET")!=NULL)
 	{
 		http.getAskRoute(pget,"GET",ask,200);

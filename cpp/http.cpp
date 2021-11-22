@@ -117,6 +117,24 @@ bool DealHttp::setCookie(void* buffer,int bufferLen,const char* key,const char* 
 	strcat((char*)buffer,"\r\n");
 	return true;
 }
+const char* DealHttp::getCookie(void* recText,const char* key,char* value,unsigned int valueLen)
+{
+	if(recText==NULL||key==NULL||value==NULL||valueLen==0)
+		return NULL;
+	char* temp=strstr((char*)recText,"\r\n\r\n"),*cookie=NULL;
+	if(temp==NULL)
+		return NULL;
+	*temp=0;
+	cookie=strstr((char*)recText,"Cookie");
+	if(cookie==NULL)
+		return NULL;
+	cookie=strstr(cookie,key);
+	if(cookie==NULL)
+		return NULL;
+	this->findBackString(cookie,strlen(key),value,valueLen);
+	*temp='\r';
+	return value;
+}
 void DealHttp::createTop(FileKind kind,char* ptop,int* topLen,int fileLen)//1:http 2:down 3:pic
 {
 	switch (kind)

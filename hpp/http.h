@@ -22,6 +22,7 @@ public:
 	void* customizeAddHead(void* buffer,int bufferLen,const char* key,const char* value);
 	int customizeAddBody(void* buffer,int bufferLen,const char* body,unsigned int bodyLen);
 	bool setCookie(void* buffer,int bufferLen,const char* key,const char* value,int liveTime=-1,const char* path=NULL,const char* domain=NULL);
+	const char* getCookie(void* recText,const char* key,char* value,unsigned int valueLen);
 	void createTop(FileKind kind,char* ptop,int* topLen,int fileLen);
 	bool createSendMsg(FileKind kind,char* buffer,const char* pfile,int* plong);
 	char* findFileMsg(const char* pname,int* plen,char* buffer);

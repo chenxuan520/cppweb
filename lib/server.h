@@ -116,6 +116,7 @@ public:
 	bool all(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&));
 	void run(unsigned int memory,unsigned int recBufLenChar,const char* defaultFile);
 	int httpSend(int num,void* buffer,int sendLen);
+	int httpRecv(int num,void* buffer,int bufferLen);
 	inline void* recText()
 	{
 		return this->getText;

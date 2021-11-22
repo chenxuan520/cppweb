@@ -1209,6 +1209,24 @@ public:
 		strcat((char*)buffer,"\r\n");
 		return true;
 	}
+	const char* getCookie(void* recText,const char* key,char* value,unsigned int valueLen)
+	{
+		if(recText==NULL||key==NULL||value==NULL||valueLen==0)
+			return NULL;
+		char* temp=strstr((char*)recText,"\r\n\r\n"),*cookie=NULL;
+		if(temp==NULL)
+			return NULL;
+		*temp=0;
+		cookie=strstr((char*)recText,"Cookie");
+		if(cookie==NULL)
+			return NULL;
+		cookie=strstr(cookie,key);
+		if(cookie==NULL)
+			return NULL;
+		this->findBackString(cookie,strlen(key),value,valueLen);
+		*temp='\r';
+		return value;
+	}
 	void createTop(FileKind kind,char* ptop,int* topLen,int fileLen)//1:http 2:down 3:pic
 	{
 		switch (kind)
@@ -2147,6 +2165,10 @@ public:
 	{
 		return this->sendSocket(num,buffer,sendLen);
 	}
+	int httpRecv(int num,void* buffer,int bufferLen)
+	{
+		return this->receiveSocket(num,buffer,bufferLen);
+	}
 	inline void* recText()
 	{
 		return this->getText;
@@ -2170,7 +2192,7 @@ private:
 		AskType type=GET;
 		int len=0,flag=2;
 		char ask[200]={0};
-		sscanf((char*)pget,"%s",ask);
+		sscanf((char*)pget,"%100s",ask);
 		if(strstr(ask,"GET")!=NULL)
 		{
 			http.getAskRoute(pget,"GET",ask,200);
@@ -3411,11 +3433,54 @@ void funHa(DealHttp& http,HttpServer& server,int num,void* sen,int& len)
 }
 /********************************
 	author:chenxuan
+	date:2021/11/22
+	funtion:thread poll try
+*********************************/
+void* threadDo(void* argv)
+{
+	ServerPool::ArgvSerEpoll arg=*(ServerPool::ArgvSerEpoll*)argv;
+	DealHttp http;
+	arg.server.mutexLock();
+	if(arg.thing==2)
+	{
+		printf("get %s\n",http.analysisHttpAsk(arg.pget));
+		int flag =http.autoAnalysisGet((char*)arg.pget,(char*)arg.pneed,"index.html",&arg.len);
+		if(flag==2)
+			printf("open wrong\n");
+		arg.server.sendSocket(arg.soc,arg.pneed,arg.len);
+	}
+	arg.server.mutexUnlock();
+	return NULL;
+}
+int thread()
+{
+	int thing=0,num=0;
+	ServerPool server(5200,10);
+	char get[2048]={0};
+	char* sen=(char*)malloc(sizeof(char)*10000000);
+	if(sen==NULL)
+		printf("memory wrong\n");
+	if(false==server.bondhost())
+	{
+		printf("bound wrong\n");
+		return -1;
+	}
+	if(false==server.setlisten())
+		exit(0);
+	printf("server ip is:%s\nthe server is ok\n",server.getHostIp());
+	while(1)
+		server.epollThread(&thing,&num,get,2048,sen,threadDo);
+	return 0;
+	
+}
+/********************************
+	author:chenxuan
 	date:2021/9/9
 	funtion:thank you for watching
 *********************************/
 int main(int argc, char** argv) 
 {
+//	thread();
 //	serverHttp();
 	HttpServer server(5201,true);
 	server.loadStatic("/assets","/test/assets");
