@@ -1,5 +1,3 @@
-## 
-
 ## 本文目的
 
 - 介绍httpserver类的函数和使用
@@ -14,12 +12,12 @@
    
    ```
    enum RouteType{
-        ONEWAY,WILD,
+        ONEWAY,WILD,STATIC,
     };
    ```
 - ONEWAY表示单解析 ,解析为该内容的报文
 - WILD 表示泛解析 解析该前缀所有报文 
-  
+- STATIC是内部调用的方式，外部调用不生效
   > 如/root oneway只解析/root,wild解析/root/* 
   > wild解析务必以/结尾,oneway解析尽量不以/结尾 ,除了 / 的解析 
   
@@ -126,6 +124,19 @@ HttpServer(unsigned port,bool debug=false);
   ```
 - 主动断开某个客户端连接
 - 参数为socket客户端
-  
+  ### get post all
+  ```
+  	bool get(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&));
+	bool post(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&));
+	bool all(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&));
+  ```
+- 函数是routehandle的简化版
+- 除了自动生成第一个参数外其他是一样的
+  ### loadStatic
+  ```
+  	bool loadStatic(const char* route,const char* staticPath);
+  ```
+- 路由路径替换，加载静态文件
+- 第一个是注册的路由，第二个是映射的路径
   ## 使用例子
 - 见example内的HttpServer.cpp

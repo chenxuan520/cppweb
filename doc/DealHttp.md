@@ -96,5 +96,38 @@ static void dealUrl(const char* url,char* urlTop,char* urlEnd);
 ``` 
 - 处理url的静态函数，top返回url包含的域名，end.返回附加信息
 - 一般不会调用
+### customizeAddTop
+```
+void* customizeAddTop(void* buffer,int bufferLen,int statusNum,int contentLen,const char* contentType="application/json",const char* connection="keep-alive");
+```
+- 自己创建报文
+- 第一个函数是报文的缓冲区，第二个是缓冲区长度，第四个是状态码，第四个是报文主体的长度，第四个是内容默认是json，最后一个是连接状态默认长连接
+- 返回值是返回缓冲区头部
+### customizeAddHead
+```
+void* customizeAddHead(void* buffer,int bufferLen,const char* key,const char* value);
+```
+- 加自定义的额外头部
+- 后两个参数是键值对
+### customizeAddBody
+```
+int customizeAddBody(void* buffer,int bufferLen,const char* body,unsigned int bodyLen);
+```
+- 添加自定义的body部分
+- 返回值是报文总长度
+- 参数最后一个是body的长度
+### urlDecode
+```
+static const char* urlDecode(char* srcString);
+```
+- 解决无法显示中文的问题
+- srcString是传入的字符串，会在源字符串上更改
+### setCookie
+```
+bool setCookie(void* buffer,int bufferLen,const char* key,const char* value,int liveTime=-1,const char* path=NULL,const char* domain=NULL);
+```
+- 设置cookie，函数只能用于自定义报文使用
+- 参数是一个键值对，liveTime是cookie生效时间，负数表示关闭浏览器失效，正数表示秒数，0表示立刻失效
+- path和domain可以自己在网上查。。。
 ## 使用例子
 - 在example中有使用实例

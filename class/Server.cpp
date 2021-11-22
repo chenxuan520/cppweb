@@ -28,6 +28,7 @@ private:
 	char word[30];
 	const char* text;
 	const char* obj;
+	const char* error;
 	unsigned int nowLen;
 	unsigned int maxLen;
 public:
@@ -64,6 +65,7 @@ public:
 		buffer=NULL;
 		text=NULL;
 		obj=NULL;
+		error=NULL;
 		nowLen=0;
 		maxLen=0;
 		memset(this->word,0,sizeof(char)*30);
@@ -84,11 +86,17 @@ public:
 	bool init(unsigned int bufferLen)
 	{
 		if(bufferLen<=10)
+		{
+			error="buffer len too small";
 			return false;
+		}
 		buffer=(char*)malloc(sizeof(char)*bufferLen);
 		memset(buffer,0,sizeof(char)*bufferLen);
 		if(buffer==NULL)
+		{
+			error="malloc wrong";
 			return false;
+		}
 		this->maxLen=bufferLen;
 		strcat(this->buffer,"{");
 		this->nowLen+=2;
@@ -113,7 +121,8 @@ public:
 			case OBJ:
 			case STRUCT:
 				strcat(this->buffer,"\"");
-				strcat(this->buffer,obj.key);
+				if(obj.key!=NULL)
+					strcat(this->buffer,obj.key);
 				strcat(this->buffer,"\":{");
 				for(unsigned int i=0;i<obj.arrLen;i++)
 					this->addOBject(obj.pobj[0]);
@@ -124,10 +133,21 @@ public:
 	bool addKeyValue(const char* key,const char* value)
 	{
 		char temp[200]={0};
+		if(key==NULL||value==NULL)
+		{
+			error="key or value NULL";
+			return false;
+		}
 		if(nowLen+strlen(key)+strlen(value)>maxLen)
+		{
+			error="buffer too short";
 			return false;
+		}
 		if(strlen(key)+strlen(value)>=180)
+		{
+			error="buffer too short";
 			return false;
+		}
 		if(buffer[strlen(buffer)-1]=='}')
 			buffer[strlen(buffer)-1]=',';
 		int len=sprintf(temp,"\"%s\":\"%s\"}",key,value);
@@ -138,10 +158,21 @@ public:
 	bool addKeyValInt(const char* key,int value)
 	{
 		char temp[50]={0};
-		if(nowLen+50>maxLen)
+		if(key==NULL)
+		{
+			error="key is NULL";
 			return false;
+		}
+		if(nowLen+50>maxLen)
+		{
+			error="buffer too short";
+			return false;
+		}
 		if(strlen(key)>=45)
+		{
+			error="buffer too short";
 			return false;	
+		}
 		if(buffer[strlen(buffer)-1]=='}')
 			buffer[strlen(buffer)-1]=',';
 		int len=sprintf(temp,"\"%s\":%d}",key,value);
@@ -152,10 +183,21 @@ public:
 	bool addKeyObj(const char* key,const char* value)
 	{
 		char temp[1000]={0};
+		if(key==NULL||value==NULL)
+		{
+			error="key or value NULL";
+			return false;
+		}
 		if(nowLen+strlen(key)+strlen(value)>maxLen)
+		{
+			error="buffer too short";
 			return false;
+		}
 		if(strlen(key)+strlen(value)>=980)
+		{
+			error="buffer too short";
 			return false;
+		}
 		if(buffer[strlen(buffer)-1]=='}')
 			buffer[strlen(buffer)-1]=',';
 		int len=sprintf(temp,"\"%s\":%s}",key,value);
@@ -242,8 +284,11 @@ public:
 			case STRUCT:
 				for(unsigned int i=0;i<arrLen;i++)
 				{
-					strcat(buffer,(char*)array[i]);
-					len+=strlen((char*)array[i]);
+					if((char*)array[i]!=NULL)
+					{
+						strcat(buffer,(char*)array[i]);
+						len+=strlen((char*)array[i]);
+					}
 					strcat(buffer,",");	
 				}
 				buffer[strlen(buffer)-1]=']';
@@ -259,9 +304,20 @@ public:
 	{
 		char temp[70]={0};
 		if(nowLen+50>maxLen)
+		{
+			error="buffer too short";
 			return false;
+		}
+		if(NULL==key)
+		{
+			error="key is NULL";
+			return false;
+		}
 		if(strlen(key)>=45)
+		{
+			error="buffer too short";
 			return false;
+		}
 		if(buffer[strlen(buffer)-1]=='}')
 			buffer[strlen(buffer)-1]=',';
 		int len=sprintf(temp,"\"%s\":%.*f}",key,output,value);
@@ -288,7 +344,8 @@ public:
 			case OBJ:
 			case STRUCT:
 				strcat(this->buffer,"\"");
-				strcat(this->buffer,obj.key);
+				if(obj.key!=NULL)
+					strcat(this->buffer,obj.key);
 				strcat(this->buffer,"\":{");
 				for(unsigned int i=0;i<obj.arrLen;i++)
 					this->addOBject(obj.pobj[0]);
@@ -298,12 +355,20 @@ public:
 	}
 	int createObjInt(char* pbuffer,unsigned int bufferLen,const char* key,int value)
 	{
+		if(pbuffer==NULL||key==NULL)
+		{
+			error="buffer or key NULL";
+			return -1;
+		}
 		if(pbuffer[strlen(pbuffer)-1]=='}')
 			pbuffer[strlen(pbuffer)-1]=',';
 		if(strlen(pbuffer)==0)
 			strcat(pbuffer,"{");
 		if(bufferLen<strlen(pbuffer)+strlen(key))
+		{
+			error="buffer is too short";
 			return -1;
+		}
 		char temp[100]={0};
 		int len=sprintf(temp,"\"%s\":%d}",key,value);
 		strcat(pbuffer,temp);
@@ -311,12 +376,20 @@ public:
 	}
 	int createObjFloat(char* pbuffer,unsigned int bufferLen,const char* key,float value,int output=1)
 	{
+		if(pbuffer==NULL||key==NULL)
+		{
+			error="buffer or key NULL";
+			return -1;
+		}
 		if(pbuffer[strlen(pbuffer)-1]=='}')
 			pbuffer[strlen(pbuffer)-1]=',';
 		if(strlen(pbuffer)==0)
 			strcat(pbuffer,"{");
 		if(bufferLen<strlen(pbuffer)+strlen(key))
+		{
+			error="buffer is too short";
 			return -1;
+		}
 		char temp[100]={0};
 		int len=sprintf(temp,"\"%s\":%.*f}",key,output,value);
 		strcat(pbuffer,temp);
@@ -324,11 +397,22 @@ public:
 	}
 	int createObjValue(char* pbuffer,unsigned int bufferLen,const char* key,const char* value)
 	{
+		if(pbuffer==NULL||key==NULL||value==NULL)
+		{
+			error="buffer or key NULL";
+			return -1;
+		}
 		char temp[200]={0};
 		if(strlen(pbuffer)+strlen(key)+strlen(value)>bufferLen)
-			return false;
+		{
+			error="buffer is too short";
+			return -1;
+		}
 		if(strlen(key)+strlen(value)>=180)
-			return false;
+		{
+			error="buffer is too short";
+			return -1;
+		}
 		if(pbuffer[strlen(pbuffer)-1]=='}')
 			pbuffer[strlen(pbuffer)-1]=',';
 		if(strlen(pbuffer)==0)
@@ -340,10 +424,16 @@ public:
 	bool createObjArray(char* pbuffer,unsigned int bufferLen,TypeJson type,const char* key,void** array,unsigned int arrLen,unsigned int floatNum=1)
 	{
 		char temp[200]={0};
-		if(array==NULL||arrLen==0)
+		if(array==NULL||arrLen==0||pbuffer==NULL)
+		{
+			error="buffer is NULL";
 			return false;
+		}
 		if(strlen(pbuffer)+strlen(key)>bufferLen)
+		{
+			error="buffer is too short";
 			return false;
+		}
 		if(pbuffer[strlen(pbuffer)-1]=='}')
 			pbuffer[strlen(pbuffer)-1]=',';
 		if(strlen(pbuffer)==0)
@@ -389,10 +479,21 @@ public:
 	int createObjObj(char* pbuffer,unsigned int bufferLen,const char* key,const char* value)
 	{
 		char temp[500]={0};
+		if(pbuffer==NULL||key==NULL||value==NULL)
+		{
+			error="pbuffer NULL or key NULL or value NULL";
+			return -1;
+		}
 		if(strlen(pbuffer)+strlen(key)+strlen(value)>bufferLen)
-			return false;
+		{
+			error="buffer is too short";
+			return -1;
+		}
 		if(strlen(key)+strlen(value)>=490)
-			return false;
+		{
+			error="buffer is too short";
+			return -1;
+		}
 		if(pbuffer[strlen(pbuffer)-1]=='}')
 			pbuffer[strlen(pbuffer)-1]=',';
 		if(strlen(pbuffer)==0)
@@ -400,7 +501,7 @@ public:
 		int len=sprintf(temp,"\"%s\":%s}",key,value);
 		strcat(pbuffer,temp);
 		nowLen+=len;
-		return true;
+		return nowLen;
 	}
 	inline const char* resultText()
 	{
@@ -418,6 +519,8 @@ public:
 	const char* operator[](const char* key)
 	{
 		char* temp=NULL;
+		if(key==NULL)
+			return NULL;
 		if((temp=strstr((char*)this->text,key))==NULL)
 			return NULL;
 		temp=strchr(temp,'\"');
@@ -437,6 +540,8 @@ public:
 	float getValueFloat(const char* key,bool& flag)
 	{
 		float value=0;
+		if(key==NULL)
+			return -1;
 		char* temp=strstr((char*)text,key);
 		if(temp==NULL)
 		{
@@ -466,6 +571,8 @@ public:
 	int getValueInt(const char* key,bool& flag)
 	{
 		int value=0;
+		if(key==NULL)
+			return -1;
 		char* temp=strstr((char*)text,key);
 		if(temp==NULL)
 		{
@@ -491,6 +598,10 @@ public:
 		}
 		flag=true;
 		return value;
+	}
+	inline const char* getLastError()
+	{
+		return this->error;
 	}
 };
 /********************************
@@ -1035,8 +1146,14 @@ public:
 			case 200:
 				statusEng="OK";
 				break;
+			case 204:
+				statusEng="No Content";
+				break;
 			case 301:
 				statusEng="Moved Permanently";
+				break;
+			case 403:
+				statusEng="Forbidden";
 				break;
 			case 404:
 				statusEng="Not Found";
@@ -1091,6 +1208,24 @@ public:
 		}
 		strcat((char*)buffer,"\r\n");
 		return true;
+	}
+	const char* getCookie(void* recText,const char* key,char* value,unsigned int valueLen)
+	{
+		if(recText==NULL||key==NULL||value==NULL||valueLen==0)
+			return NULL;
+		char* temp=strstr((char*)recText,"\r\n\r\n"),*cookie=NULL;
+		if(temp==NULL)
+			return NULL;
+		*temp=0;
+		cookie=strstr((char*)recText,"Cookie");
+		if(cookie==NULL)
+			return NULL;
+		cookie=strstr(cookie,key);
+		if(cookie==NULL)
+			return NULL;
+		this->findBackString(cookie,strlen(key),value,valueLen);
+		*temp='\r';
+		return value;
 	}
 	void createTop(FileKind kind,char* ptop,int* topLen,int fileLen)//1:http 2:down 3:pic
 	{
@@ -1441,11 +1576,6 @@ public:
 		return srcString;
 	}
 };
-/********************************
-	author:chenxuan
-	date:2021/11/5
-	funtion:my jwt try
-*********************************/
 class WebToken{
 private:
 	char* backString;
@@ -1488,14 +1618,14 @@ public:
 		sprintf(endString,"%d",end);
 		for(unsigned int i=0;i<strlen(endString);i++)
 			endString[i]+=50;
-		sprintf(tempString,"&%s&%c",endString,encryption[0]);
+		sprintf(tempString,".%s.%c",endString,encryption[0]);
 		strcat(backString,tempString);
 		strcpy(getString,backString);
 		return getString;
 	}
 	const char* decryptToken(const char* key,const char* token,char* buffer,unsigned int bufferLen)
 	{
-		char* temp=strchr((char*)token,'&');
+		char* temp=strchr((char*)token,'.');
 		if(temp==NULL||key==NULL||token==NULL||buffer==NULL||bufferLen<strlen(token))
 		{
 			sprintf(err,"input wrong");
@@ -1506,7 +1636,7 @@ public:
 		backString=(char*)malloc(sizeof(char)*strlen(token));
 		memset(backString,0,sizeof(char)*strlen(token));
 		char endString[20]={0};
-		if(sscanf(temp+1,"%[^&]",endString)<=0)
+		if(sscanf(temp+1,"%[^.]",endString)<=0)
 		{
 			sprintf(err,"get time wrong");
 			return NULL;
@@ -1854,7 +1984,7 @@ public:
 class HttpServer:private ServerTcpIp{
 public:
 	enum RouteType{
-		ONEWAY,WILD,
+		ONEWAY,WILD,STATIC,
 	};
 	enum AskType{
 		GET,POST,ALL,
@@ -1863,10 +1993,12 @@ public:
 		AskType ask;
 		RouteType type;
 		char route[100];
+		const char* path;
 		void (*pfunc)(DealHttp&,HttpServer&,int num,void* sen,int&);
 	};
 private:
 	RouteFuntion* array;
+	RouteFuntion* pnowRoute;
 	void* getText;
 	unsigned int max;
 	unsigned int now;
@@ -1890,6 +2022,7 @@ public:
 		textLen=0;
 		clientIn=NULL;
 		clientOut=NULL;
+		pnowRoute=NULL;
 	}
 	~HttpServer()
 	{
@@ -1914,12 +2047,25 @@ public:
 		now++;
 		return true;
 	}
-//	bool loadStatic(const char* route,const char* staticPath)
-//	{
-//		char temp[100]={0};
-//		sprintf(temp,"%s %s",route,staticPath);
-//		this->get(WILD,temp,loadFile);
-//	}
+	bool loadStatic(const char* route,const char* staticPath)
+	{
+		if(strlen(route)>100)
+			return false;
+		if(max-now<=2)
+		{
+			array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
+			if(array=NULL)
+				return false;
+			max+=10;
+		}
+		array[now].type=STATIC;
+		array[now].ask=GET;
+		strcpy(array[now].route,route);
+		array[now].path=staticPath;
+		array[now].pfunc=loadFile;
+		now++;
+		return true;
+	}
 	bool get(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&))
 	{
 		if(strlen(route)>100)
@@ -2019,6 +2165,10 @@ public:
 	{
 		return this->sendSocket(num,buffer,sendLen);
 	}
+	int httpRecv(int num,void* buffer,int bufferLen)
+	{
+		return this->receiveSocket(num,buffer,bufferLen);
+	}
 	inline void* recText()
 	{
 		return this->getText;
@@ -2042,7 +2192,7 @@ private:
 		AskType type=GET;
 		int len=0,flag=2;
 		char ask[200]={0};
-		sscanf((char*)pget,"%s",ask);
+		sscanf((char*)pget,"%100s",ask);
 		if(strstr(ask,"GET")!=NULL)
 		{
 			http.getAskRoute(pget,"GET",ask,200);
@@ -2065,6 +2215,7 @@ private:
 				if(strcmp(ask,array[i].route)==0)
 				{
 					pfunc=array[i].pfunc;
+					pnowRoute=&array[i];
 					break;
 				}
 			}
@@ -2073,7 +2224,18 @@ private:
 				if(strstr(ask,array[i].route)!=NULL)
 				{
 					pfunc=array[i].pfunc;
+					pnowRoute=&array[i];
 					break;						
+				}
+			}
+			else if(array[i].type==STATIC&&type==GET)
+			{
+				if(strstr(ask,array[i].route)!=NULL)
+				{
+					pfunc=array[i].pfunc;
+					sprintf((char*)sen,"%s",array[i].path);
+					pnowRoute=&array[i];
+					break;
 				}
 			}
 		}
@@ -2088,10 +2250,11 @@ private:
 				strcpy(ask,http.analysisHttpAsk(pget));
 				flag=http.autoAnalysisGet((char*)pget,(char*)sen,defaultFile,&len);
 			}
-			if(flag==2&&isDebug)
+			if(flag==2)
 			{
 				LogSystem::recordFileError(ask);
-				printf("404 get %s wrong\n",ask);
+				if(isDebug)
+					printf("404 get %s wrong\n",ask);
 			}
 		}
 		if(false==server.sendSocket(num,sen,len))
@@ -2151,10 +2314,23 @@ private:
 		}
 		return ;
 	}
-//	static void loadFile(DealHttp&,HttpServer&,int,void*,int&)
-//	{
-//		
-//	}
+	inline RouteFuntion* getNowRoute()
+	{
+		return pnowRoute;
+	}
+	static void loadFile(DealHttp& http,HttpServer& server,int,void* sen,int& len)
+	{
+		char ask[200]={0},buf[200]={0},temp[200]={0};
+		http.getAskRoute(server.recText(),"GET",ask,200);
+		HttpServer::RouteFuntion& route=*server.getNowRoute();
+		http.getWildUrl(ask,route.route,temp,200);
+		sprintf(buf,"GET %s%s HTTP/1.1",route.path,temp);
+		if(2==http.autoAnalysisGet(buf,(char*)sen,NULL,&len))
+		{
+			LogSystem::recordFileError(ask);
+			printf("404 get %s wrong\n",buf);
+		}
+	}
 };
 /********************************
 	author:chenxuan
@@ -3257,15 +3433,60 @@ void funHa(DealHttp& http,HttpServer& server,int num,void* sen,int& len)
 }
 /********************************
 	author:chenxuan
+	date:2021/11/22
+	funtion:thread poll try
+*********************************/
+void* threadDo(void* argv)
+{
+	ServerPool::ArgvSerEpoll arg=*(ServerPool::ArgvSerEpoll*)argv;
+	DealHttp http;
+	arg.server.mutexLock();
+	if(arg.thing==2)
+	{
+		printf("get %s\n",http.analysisHttpAsk(arg.pget));
+		int flag =http.autoAnalysisGet((char*)arg.pget,(char*)arg.pneed,"index.html",&arg.len);
+		if(flag==2)
+			printf("open wrong\n");
+		arg.server.sendSocket(arg.soc,arg.pneed,arg.len);
+	}
+	arg.server.mutexUnlock();
+	return NULL;
+}
+int thread()
+{
+	int thing=0,num=0;
+	ServerPool server(5200,10);
+	char get[2048]={0};
+	char* sen=(char*)malloc(sizeof(char)*10000000);
+	if(sen==NULL)
+		printf("memory wrong\n");
+	if(false==server.bondhost())
+	{
+		printf("bound wrong\n");
+		return -1;
+	}
+	if(false==server.setlisten())
+		exit(0);
+	printf("server ip is:%s\nthe server is ok\n",server.getHostIp());
+	while(1)
+		server.epollThread(&thing,&num,get,2048,sen,threadDo);
+	return 0;
+	
+}
+/********************************
+	author:chenxuan
 	date:2021/9/9
 	funtion:thank you for watching
 *********************************/
 int main(int argc, char** argv) 
 {
+//	thread();
 //	serverHttp();
 	HttpServer server(5201,true);
+	server.loadStatic("/assets","/test/assets");
+	server.loadStatic("/style.css","/test/style.css");
 	server.all(HttpServer::ONEWAY,"/root",func);
 	server.routeHandle(HttpServer::ALL,HttpServer::ONEWAY,"/key/",funHa);
-	server.run(1 ,4000,"./index.html");
+	server.run(1 ,4000,"./test/index.html");
 	return 0;
 }
