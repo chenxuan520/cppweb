@@ -22,6 +22,7 @@ public:
 	void* customizeAddHead(void* buffer,int bufferLen,const char* key,const char* value);
 	int customizeAddBody(void* buffer,int bufferLen,const char* body,unsigned int bodyLen);
 	bool setCookie(void* buffer,int bufferLen,const char* key,const char* value,int liveTime=-1,const char* path=NULL,const char* domain=NULL);
+	const char* getCookie(void* recText,const char* key,char* value,unsigned int valueLen);
 	void createTop(FileKind kind,char* ptop,int* topLen,int fileLen);
 	bool createSendMsg(FileKind kind,char* buffer,const char* pfile,int* plong);
 	char* findFileMsg(const char* pname,int* plen,char* buffer);
@@ -54,6 +55,7 @@ private:
 	char word[30];
 	const char* text;
 	const char* obj;
+	const char* error;
 	unsigned int nowLen;
 	unsigned int maxLen;
 public:
@@ -104,6 +106,10 @@ public:
 	inline const char* resultText()
 	{
 		return buffer;
+	}
+	inline const char* getLastError()
+	{
+		return this->error;
 	}
 	bool jsonToFile(const char* fileName);
 	const char* operator[](const char* key);

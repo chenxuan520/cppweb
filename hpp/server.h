@@ -82,7 +82,7 @@ public:
 class HttpServer:private ServerTcpIp{
 public:
 	enum RouteType{
-		ONEWAY,WILD,
+		ONEWAY,WILD,STATIC,
 	};
 	enum AskType{
 		GET,POST,ALL,
@@ -91,10 +91,12 @@ public:
 		AskType ask;
 		RouteType type;
 		char route[100];
+		const char* path;
 		void (*pfunc)(DealHttp&,HttpServer&,int num,void* sen,int&);
 	};
 private:
 	RouteFuntion* array;
+	RouteFuntion* pnowRoute;
 	void* getText;
 	unsigned int max;
 	unsigned int now;
@@ -108,11 +110,13 @@ public:
 	bool clientOutHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port));
 	bool clientInHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port));
 	bool routeHandle(AskType ask,RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&));
+	bool loadStatic(const char* route,const char* staticPath);
 	bool get(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&));
 	bool post(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&));
 	bool all(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&));
 	void run(unsigned int memory,unsigned int recBufLenChar,const char* defaultFile);
 	int httpSend(int num,void* buffer,int sendLen);
+	int httpRecv(int num,void* buffer,int bufferLen);
 	inline void* recText()
 	{
 		return this->getText;
@@ -130,8 +134,13 @@ public:
 		return this->disconnectSocket(soc);
 	}
 private:
+	inline RouteFuntion* getNowRoute()
+	{
+		return pnowRoute;
+	}
 	int func(int num,void* pget,void* sen,const char* defaultFile,HttpServer& server);
 	void epollHttp(void* pget,int len,void* pneed,const char* defaultFile);
+	static void loadFile(DealHttp& http,HttpServer& server,int,void* sen,int& len);
 };
 class Email{
 private:
