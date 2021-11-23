@@ -3066,9 +3066,9 @@ public:
 			pool->addTask(task);
 		}
 	}
-	bool epollThread(int* pthing,int* pnum,void* pget,int len,void* pneed,void* (*pfunc)(void*))
+	bool epollThread(void* pget,int len,void* pneed,void* (*pfunc)(void*))
 	{
-		int eventNum=epoll_wait(epfd,pevent,512,-1);
+		int eventNum=epoll_wait(epfd,pevent,512,-1),thing=0,num=0;
 		for(int i=0;i<eventNum;i++)
 		{
 			epoll_event temp=pevent[i];
@@ -3080,10 +3080,10 @@ public:
 				nowEvent.data.fd=newClient;
 				nowEvent.events=EPOLLIN;
 				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
-				*pthing=1;
-				*pnum=newClient;
+				thing=1;
+				num=newClient;
 				strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
-				ServerPool::ArgvSerEpoll argv={*this,*pnum,*pthing,0,pneed,pget};
+				ServerPool::ArgvSerEpoll argv={*this,num,thing,0,pneed,pget};
 				ThreadPool::Task task={pfunc,&argv};
 				if(pfunc!=NULL)
 					pool->addTask(task);
@@ -3091,64 +3091,23 @@ public:
 			else
 			{
 				int getNum=recv(temp.data.fd,(char*)pget,len,0);
-				*pnum=temp.data.fd;
+				num=temp.data.fd;
 				if(getNum>0)
-					*pthing=2;
+					thing=2;
 				else
 				{
 					*(char*)pget=0;
-					*pthing=0;
+					thing=0;
 	                this->deleteFd(temp.data.fd);
 					epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
 					close(temp.data.fd);
 				}
 				if(pfunc!=NULL)
 				{
-					ServerPool::ArgvSerEpoll argv={*this,*pnum,*pthing,getNum,pneed,pget};
+					ServerPool::ArgvSerEpoll argv={*this,num,thing,getNum,pneed,pget};
 					ThreadPool::Task task={pfunc,&argv};
 					if(pfunc!=NULL)
 						pool->addTask(task);
-				}
-			}
-		}
-		return true;
-	}
-	bool epollFork(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int thing,int num,int,void* pget,void* sen,ServerPool& server))
-	{
-		int eventNum=epoll_wait(epfd,pevent,512,-1);
-		for(int i=0;i<eventNum;i++)
-		{
-			epoll_event temp=pevent[i];
-			if(temp.data.fd==sock)
-			{
-				sockaddr_in newaddr={0};
-				int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
-	            this->addFd(newClient);
-				nowEvent.data.fd=newClient;
-				nowEvent.events=EPOLLIN;
-				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
-				*pthing=1;
-				*pnum=newClient;
-				strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
-			}
-			else
-			{
-				int getNum=recv(temp.data.fd,(char*)pget,len,0);
-				*pnum=temp.data.fd;
-				if(getNum>0)
-					*pthing=2;
-				else
-				{
-					*(char*)pget=0;
-					*pthing=0;
-	                this->deleteFd(temp.data.fd);
-					epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
-					close(temp.data.fd);
-				}
-				if(fork()==0&&*pthing==2)
-				{
-					close(sock);
-					pfunc(2,*pnum,getNum,pget,pneed,*this);
 				}
 			}
 		}
@@ -3523,9 +3482,9 @@ int thread()
 	if(false==server.setlisten())
 		exit(0);
 	printf("server ip is:%s\nthe server is ok\n",server.getHostIp());
-	while(1)
-		server.epollFork(&thing,&num,get,2048,sen,funcTwo);
-		server.epollThread(&thing,&num,get,2048,sen,threadDo);
+//	while(1)
+//		server.epollFork(&thing,&num,get,2048,sen,funcTwo);
+//		server.epollThread(&thing,&num,get,2048,sen,threadDo);
 	return 0;
 	
 }
