@@ -9,7 +9,7 @@ void cookie(DealHttp & http, HttpServer & server, int , void * sen, int & len)
 	http.getKeyValue(server.recText(),"key",buffer,100);
 	json.addKeyValue("key",buffer);
 	http.customizeAddTop(sen,1000000,200,strlen(json.resultText()));
-	if(NULL==http.getKeyValue(server.recText(),"key",buffer,100))
+	if(NULL==http.getCookie(server.recText(),"key",buffer,100))
 	{
 		http.setCookie(sen,1000000,"key","wew",10);
 	}

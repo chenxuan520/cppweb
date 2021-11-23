@@ -548,6 +548,8 @@ int HttpServer::func(int num,void* pget,void* sen,const char* defaultFile,HttpSe
 				printf("404 get %s wrong\n",ask);
 		}
 	}
+	if(len==0)
+		http.createSendMsg(DealHttp::NOFOUND,(char*)sen,NULL,&len);
 	if(false==server.sendSocket(num,sen,len))
 	{
 		if(isDebug)

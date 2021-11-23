@@ -1,0 +1,87 @@
+<html>
+  <head>
+    <meta name="generator"
+    content="HTML Tidy for HTML5 (experimental) for Windows https://github.com/w3c/tidy-html5/tree/c63cc39" />
+    <meta http-equiv="Content-Type" content="text/html;charset = utf8" />
+    <meta name="description" content="提交表单" />
+    <title>API接口请求表单</title>
+    <style type="text/css">
+                .key1{
+                        width:100px;
+                }
+                .value1{
+                        width:230px;
+                        margin:0 0 0 10px;
+                }
+                .main{
+                        margin:0 auto;
+                        width:450px;
+                        height:auto;
+                        background:lightgray;
+                        padding:40px 40px;
+                }
+                .refer{
+                        width:100px;
+                        height:24px;
+                }
+                .url{
+                        width:350px;
+                }
+        
+</style>
+  </head>
+  <body>
+    <div class="main">
+      <form target="_blank">
+        <p>请求地址：
+        <input class="url" id="url" type="text" name="curl" placeholder="API接口地址" /></p>
+        <p>参　数1： 
+        <input class="key1" type="text" id="key1" name="key1" placeholder="参数名" /></p>
+        <p>参　数2： 
+        <input class="key1" type="text" id="key2" name="key2" placeholder="参数名" /></p>
+        <p>参　数3： 
+        <input class="key1" type="text" id="key3" name="key3" placeholder="参数名" /></p>
+      </form>
+      <form target="_blank" id="form" method="post">
+        <p>参数1值 
+        <input class="value1" type="text" id="value1" name="value1" placeholder="参数值" /></p>
+        <p>参数2值 
+        <input class="value1" type="text" id="value2" name="value2" placeholder="参数值" /></p>
+        <p>参数3值 
+        <input class="value1" type="text" id="value3" name="value3" placeholder="参数值" /></p>
+        <p>请求方式: 
+        <select name="method" id="s1">
+          <option value="POST">POST</option>
+          <option value="GET">GET</option>
+        </select></p>
+        <p style="text-align:center;" ''>
+          <input class="refer" type="submit" id="sub" value="提交" />
+        </p>
+      </form>
+      <script>
+        var form=document.getElementById('form');
+		var url=document.getElementById('url');
+		var sub=document.getElementById('sub');
+		var key1=document.getElementById('key1');
+		var key2=document.getElementById('key2');
+		var key3=document.getElementById('key3');
+		var value1=document.getElementById('value1');
+		var value2=document.getElementById('value2');
+		var value3=document.getElementById('value3');
+		var select=document.getElementById('s1');
+		sub.onclick=function(){
+				form.action=url.value;
+				if(key1.value!="")
+						value1.name=key1.value;
+				if(key2.value!="")
+						value2.name=key2.value;
+				if(key3.value!="")
+						value3.name=key3.value;
+				var selectedText = select.options[select.selectedIndex].text;
+				form.method=selectedText;
+		}
+        
+		</script>
+    </div>
+  </body>
+</html>

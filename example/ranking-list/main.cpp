@@ -7,6 +7,7 @@ using namespace std;
 multimap<int,string> tree;
 void addCLi(DealHttp & http, HttpServer & server, int , void * sen, int & len)
 {
+	memset(sen,0,sizeof(char)*10000);
 	char strSco[20]={0},name[50]={0};
 	if(http.getKeyValue(server.recText(),"score",strSco,20,true)==NULL)
 	{
@@ -50,6 +51,7 @@ void addCLi(DealHttp & http, HttpServer & server, int , void * sen, int & len)
 }
 void getList(DealHttp & http, HttpServer & , int , void * sen, int & len)
 {
+	memset(sen,0,sizeof(char)*10000);
 	auto begin=tree.begin();
 	char* buf[9]={0};
 	for(unsigned int i=0;i<9;i++)
@@ -98,7 +100,7 @@ int main()
 	}
 	server.post(HttpServer::ONEWAY,"/add",addCLi);
 	server.get(HttpServer::ONEWAY,"/list",getList);
-	server.run(1,4000,"index.html");
+	server.run(1,4000,"api.html");
     return 0; 
 }  
 
