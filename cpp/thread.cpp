@@ -174,7 +174,7 @@ void ServerPool::threadModel(void* pneed,void* (*pfunc)(void*))
 }
 bool ServerPool::epollThread(int* pthing,int* pnum,void* pget,int len,void* pneed,void* (*pfunc)(void*))
 {
-	int eventNum=epoll_wait(epfd,pevent,512,-1);
+	int eventNum=epoll_wait(epfd,pevent,512,-1),thing=0,num=0;
 	for(int i=0;i<eventNum;i++)
 	{
 		epoll_event temp=pevent[i];
@@ -186,10 +186,10 @@ bool ServerPool::epollThread(int* pthing,int* pnum,void* pget,int len,void* pnee
 			nowEvent.data.fd=newClient;
 			nowEvent.events=EPOLLIN;
 			epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
-			*pthing=1;
-			*pnum=newClient;
+			thing=1;
+			num=newClient;
 			strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
-			ServerPool::ArgvSerEpoll argv={*this,*pnum,*pthing,0,pneed,pget};
+			ServerPool::ArgvSerEpoll argv={*this,num,thing,0,pneed,pget};
 			ThreadPool::Task task={pfunc,&argv};
 			if(pfunc!=NULL)
 				pool->addTask(task);
@@ -197,20 +197,20 @@ bool ServerPool::epollThread(int* pthing,int* pnum,void* pget,int len,void* pnee
 		else
 		{
 			int getNum=recv(temp.data.fd,(char*)pget,len,0);
-			*pnum=temp.data.fd;
+			num=temp.data.fd;
 			if(getNum>0)
-				*pthing=2;
+				thing=2;
 			else
 			{
 				*(char*)pget=0;
-				*pthing=0;
+				thing=0;
                 this->deleteFd(temp.data.fd);
 				epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
 				close(temp.data.fd);
 			}
 			if(pfunc!=NULL)
 			{
-				ServerPool::ArgvSerEpoll argv={*this,*pnum,*pthing,getNum,pneed,pget};
+				ServerPool::ArgvSerEpoll argv={*this,num,thing,getNum,pneed,pget};
 				ThreadPool::Task task={pfunc,&argv};
 				if(pfunc!=NULL)
 					pool->addTask(task);

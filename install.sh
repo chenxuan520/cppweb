@@ -34,4 +34,4 @@ if [ $if_guard == 'y' ]
 then 
 	./guard main 
 fi
-echo 'every thing is ok'
+echo 'every thing is ok,just enjoy it'
