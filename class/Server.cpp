@@ -1086,6 +1086,7 @@ class DealHttp{
 private:
 	char ask[256];
 	char* pfind;
+	const char* error;
 public:
 	enum FileKind{
 		UNKNOWN=0,HTML=1,EXE=2,IMAGE=3,NOFOUND=4,CSS=5,JS=6,ZIP7=7,JSON=8,
@@ -1096,9 +1097,15 @@ public:
 		for(int i=0;i<256;i++)
 			ask[i]=0;
 		pfind=NULL;
+		error=NULL;
 	}
 	bool cutLineAsk(char* pask,const char* pcutIn)
 	{
+		if(pask==NULL||pcutIn==NULL)
+		{
+			error="wrong NULL";
+			return false;
+		}
 		char* ptemp=strstr(pask,pcutIn);
 		if(ptemp==NULL)
 			return false;
@@ -1108,6 +1115,11 @@ public:
 	}
 	const char* analysisHttpAsk(void* pask,const char* pneed="GET",int needLen=3)
 	{
+		if(pask==NULL)
+		{
+			error="wrong NULL";
+			return NULL;
+		}
 		pfind=strstr((char*)pask,pneed);
 		if(pfind==NULL)
 			return NULL;
@@ -2257,6 +2269,8 @@ private:
 					printf("404 get %s wrong\n",ask);
 			}
 		}
+		if(len==0)
+			http.createSendMsg(DealHttp::NOFOUND,(char*)sen,NULL,&len);
 		if(false==server.sendSocket(num,sen,len))
 		{
 			if(isDebug)
@@ -3099,6 +3113,47 @@ public:
 		}
 		return true;
 	}
+	bool epollFork(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int thing,int num,int,void* pget,void* sen,ServerPool& server))
+	{
+		int eventNum=epoll_wait(epfd,pevent,512,-1);
+		for(int i=0;i<eventNum;i++)
+		{
+			epoll_event temp=pevent[i];
+			if(temp.data.fd==sock)
+			{
+				sockaddr_in newaddr={0};
+				int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
+	            this->addFd(newClient);
+				nowEvent.data.fd=newClient;
+				nowEvent.events=EPOLLIN;
+				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
+				*pthing=1;
+				*pnum=newClient;
+				strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
+			}
+			else
+			{
+				int getNum=recv(temp.data.fd,(char*)pget,len,0);
+				*pnum=temp.data.fd;
+				if(getNum>0)
+					*pthing=2;
+				else
+				{
+					*(char*)pget=0;
+					*pthing=0;
+	                this->deleteFd(temp.data.fd);
+					epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
+					close(temp.data.fd);
+				}
+				if(fork()==0&&*pthing==2)
+				{
+					close(sock);
+					pfunc(2,*pnum,getNum,pget,pneed,*this);
+				}
+			}
+		}
+		return true;
+	}
 	inline bool threadDeleteSoc(int clisoc)
 	{
 		close(clisoc);
@@ -3207,7 +3262,7 @@ struct CliMsg{
 	int flag;
 	char chat[100];
 };
-int funcTwo(ServerPool::Thing thing,int num,int,void* pget,void* sen,ServerTcpIp& server)//main deal func
+int funcTwo(int thing,int num,int,void* pget,void* sen,ServerPool& server)//main deal func
 {
 	char ask[200]={0},*pask=NULL;
 	CliMsg cli;
@@ -3230,27 +3285,27 @@ int funcTwo(ServerPool::Thing thing,int num,int,void* pget,void* sen,ServerTcpIp
 		printf("%s in %d\n",(char*)pget,num);
 	if(thing==2)
 	{
-		if(http.getKeyLine(pget,"Accept-Language",ask,200)!=NULL)
-			printf("\n%s\n",ask);
-		printf("url:%s\n",http.getAskRoute(pget,"GET",ask,200));
-		if(strstr(http.getAskRoute(pget,"GET",ask,200),"/user")!=NULL)
-		{
-			Json json;
-			char data[300]={0};
-			json.init(200);
-			json.addKeyValue("hahah","lplplp");
-			json.addKeyValInt("dad",23);
-			printf("json:%s\n",json.resultText());
-			json.jsonToFile("./temp");
-			FileGet file;
-			if(false==file.getFileMsg("./temp",data,300))
-				perror("file");
-			if(false==http.createSendMsg(DealHttp::JSON,(char*)sen,"./temp",&len))
-				perror("create");
-			printf("sen %s\n",(char*)sen);
-			server.sendSocket(num,sen,len);
-			return 0;
-		}
+//		if(http.getKeyLine(pget,"Accept-Language",ask,200)!=NULL)
+//			printf("\n%s\n",ask);
+//		printf("url:%s\n",http.getAskRoute(pget,"GET",ask,200));
+//		if(strstr(http.getAskRoute(pget,"GET",ask,200),"/user")!=NULL)
+//		{
+//			Json json;
+//			char data[300]={0};
+//			json.init(200);
+//			json.addKeyValue("hahah","lplplp");
+//			json.addKeyValInt("dad",23);
+//			printf("json:%s\n",json.resultText());
+//			json.jsonToFile("./temp");
+//			FileGet file;
+//			if(false==file.getFileMsg("./temp",data,300))
+//				perror("file");
+//			if(false==http.createSendMsg(DealHttp::JSON,(char*)sen,"./temp",&len))
+//				perror("create");
+//			printf("sen %s\n",(char*)sen);
+//			server.sendSocket(num,sen,len);
+//			return 0;
+//		}
 		if(false==http.cutLineAsk((char*)pget,"GET"))
 			return 0;
 		printf("ask:%s\n",(char*)pget);
@@ -3398,7 +3453,7 @@ void serverHttp()
 		exit(0);
 	printf("server ip is:%s\nthe server is ok\n",server.getHostIp());
 	while(1)
-		if(false==server.epollModel(get,2048,sen,funcTwo))
+//		if(false==server.epollModel(get,2048,sen,funcTwo))
 			break;
 	free(sen);
 }
@@ -3440,16 +3495,16 @@ void* threadDo(void* argv)
 {
 	ServerPool::ArgvSerEpoll arg=*(ServerPool::ArgvSerEpoll*)argv;
 	DealHttp http;
-	arg.server.mutexLock();
+	char temp[1000]={0};
+	strcpy(temp,(char*)arg.pget);
 	if(arg.thing==2)
 	{
-		printf("get %s\n",http.analysisHttpAsk(arg.pget));
+		printf("get %s\n",http.analysisHttpAsk(temp));
 		int flag =http.autoAnalysisGet((char*)arg.pget,(char*)arg.pneed,"index.html",&arg.len);
 		if(flag==2)
 			printf("open wrong\n");
 		arg.server.sendSocket(arg.soc,arg.pneed,arg.len);
 	}
-	arg.server.mutexUnlock();
 	return NULL;
 }
 int thread()
@@ -3469,6 +3524,7 @@ int thread()
 		exit(0);
 	printf("server ip is:%s\nthe server is ok\n",server.getHostIp());
 	while(1)
+		server.epollFork(&thing,&num,get,2048,sen,funcTwo);
 		server.epollThread(&thing,&num,get,2048,sen,threadDo);
 	return 0;
 	

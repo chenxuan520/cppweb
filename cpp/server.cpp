@@ -532,6 +532,8 @@ int HttpServer::func(int num,void* pget,void* sen,const char* defaultFile,HttpSe
 	}
 	if(pfunc!=NULL)
 		pfunc(http,*this,num,sen,len);
+	if(len==0)
+		http.createSendMsg(DealHttp::NOFOUND,(char*)sen,NULL,&len);
 	else
 	{
 		if(isDebug)

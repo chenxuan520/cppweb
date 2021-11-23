@@ -8,9 +8,15 @@ DealHttp::DealHttp()
 	for(int i=0;i<256;i++)
 		ask[i]=0;
 	pfind=NULL;
+	error=NULL;
 }
 bool DealHttp::cutLineAsk(char* pask,const char* pcutIn)
 {
+	if(pask==NULL||pcutIn==NULL)
+	{
+		error="wrong NULL";
+		return false;
+	}
 	char* ptemp=strstr(pask,pcutIn);
 	if(ptemp==NULL)
 		return false;
@@ -20,6 +26,11 @@ bool DealHttp::cutLineAsk(char* pask,const char* pcutIn)
 }
 const char* DealHttp::analysisHttpAsk(void* pask,const char* pneed,int needLen)
 {
+	if(pask==NULL)
+	{
+		error="wrong NULL";
+		return NULL;
+	}
 	pfind=strstr((char*)pask,pneed);
 	if(pfind==NULL)
 		return NULL;

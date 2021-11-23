@@ -5,6 +5,7 @@ class DealHttp{
 private:
 	char ask[256];
 	char* pfind;
+	const char* error;
 public:
 	enum FileKind{
 		UNKNOWN=0,HTML=1,EXE=2,IMAGE=3,NOFOUND=4,CSS=5,JS=6,ZIP7=7,JSON=8,
