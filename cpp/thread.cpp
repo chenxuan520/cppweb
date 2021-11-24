@@ -1,6 +1,8 @@
 #include"../hpp/thread.h"
 #include<queue>
 #include<pthread.h>
+#include<signal.h>
+#include<sys/wait.h>
 #include"../hpp/server.h"
 using namespace std;
 void* ThreadPool::worker(void* arg)//the worker for user 
@@ -142,11 +144,16 @@ ServerPool::ServerPool(unsigned short port,unsigned int threadNum):ServerTcpIp(p
 			throw NULL;
 	}
 	pthread_mutex_init(&mutex,NULL);
+	signal(SIGCHLD,sigCliDeal);
 }
 ServerPool::~ServerPool()
 {
 	delete pool;
    	pthread_mutex_destroy(&mutex);
+}
+void ServerPool::sigCliDeal(int pid)
+{
+	while(waitpid(-1, NULL, WNOHANG)>0);
 }
 bool ServerPool::mutexTryLock()
 {
@@ -214,6 +221,68 @@ bool ServerPool::epollThread(int* pthing,int* pnum,void* pget,int len,void* pnee
 				ThreadPool::Task task={pfunc,&argv};
 				if(pfunc!=NULL)
 					pool->addTask(task);
+			}
+		}
+	}
+	return true;
+}
+void ServerPool::forkModel(void* pneed,void (*pfunc)(ServerPool&,int,void*))
+{
+	while(1)
+	{
+		sockaddr_in newaddr={0};
+		int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
+		if(newClient==-1)
+			continue;
+		if(fork()==0)
+		{
+			close(sock);
+			pfunc(*this,newClient,pneed);
+		}
+		close(newClient);
+	}
+}
+bool ServerPool::forkEpoll(void* pget,int len,void* pneed,int (*pfunc)(ServerPool::Thing,int,int,void*,void*,ServerPool&))
+{
+	int eventNum=epoll_wait(epfd,pevent,512,-1),thing=0,num=0;
+	for(int i=0;i<eventNum;i++)
+	{
+		epoll_event temp=pevent[i];
+		if(temp.data.fd==sock)
+		{
+			sockaddr_in newaddr={0};
+			int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
+            this->addFd(newClient);
+			nowEvent.data.fd=newClient;
+			nowEvent.events=EPOLLIN;
+			epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
+			thing=1;
+			num=newClient;
+			strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
+		}
+		else
+		{
+			int getNum=recv(temp.data.fd,(char*)pget,len,0);
+			num=temp.data.fd;
+			if(getNum>0)
+				thing=2;
+			else
+			{
+				*(char*)pget=0;
+				thing=0;
+                this->deleteFd(temp.data.fd);
+				epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
+				close(temp.data.fd);
+			}
+			if(pfunc!=NULL&&thing==2)
+			{
+				if(fork()==0)
+				{
+					close(sock);
+					pfunc(SAY,temp.data.fd,getNum,pget,pneed,*this);
+					close(temp.data.fd);
+					exit(0);
+				}
 			}
 		}
 	}

@@ -2,8 +2,10 @@
 #include<cstdlib>
 #include<stdio.h>
 #include<time.h>
+#include<signal.h>
 #include<netinet/in.h>
 #include<arpa/inet.h>
+#include<sys/wait.h>
 #include<sys/socket.h>
 #include<sys/select.h>
 #include<sys/epoll.h>
@@ -3004,6 +3006,11 @@ class ServerPool:public ServerTcpIp{
 private:
 	ThreadPool* pool;
 	pthread_mutex_t mutex;
+private:
+	static void sigCliDeal(int pid)
+	{
+		while(waitpid(-1, NULL, WNOHANG)>0);
+	}
 public:
 	struct ArgvSer{
 		ServerPool& server;
@@ -3027,6 +3034,7 @@ public:
 			if(pool==NULL)
 				throw NULL;
 		}
+		signal(SIGCHLD,sigCliDeal);
 		pthread_mutex_init(&mutex,NULL);
 	}
 	~ServerPool()
@@ -3065,6 +3073,68 @@ public:
     		task.arg=&argv;
 			pool->addTask(task);
 		}
+	}
+	void forkModel(void* pneed,void (*pfunc)(ServerPool&,int,void*))
+	{
+		while(1)
+		{
+			sockaddr_in newaddr={0};
+			int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
+			if(newClient==-1)
+				continue;
+			if(fork()==0)
+			{
+				close(sock);
+				pfunc(*this,newClient,pneed);
+			}
+			close(newClient);
+		}
+	}
+	bool forkEpoll(void* pget,int len,void* pneed,int (*pfunc)(ServerPool::Thing,int,int,void*,void*,ServerPool&))
+	{
+		int eventNum=epoll_wait(epfd,pevent,512,-1),thing=0,num=0;
+		for(int i=0;i<eventNum;i++)
+		{
+			epoll_event temp=pevent[i];
+			if(temp.data.fd==sock)
+			{
+				sockaddr_in newaddr={0};
+				int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
+	            this->addFd(newClient);
+				nowEvent.data.fd=newClient;
+				nowEvent.events=EPOLLIN;
+				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
+				thing=1;
+				num=newClient;
+				strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
+			}
+			else
+			{
+				int getNum=recv(temp.data.fd,(char*)pget,len,0);
+				num=temp.data.fd;
+				if(getNum>0)
+					thing=2;
+				else
+				{
+					*(char*)pget=0;
+					thing=0;
+	                this->deleteFd(temp.data.fd);
+					epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
+					close(temp.data.fd);
+				}
+				if(pfunc!=NULL&&thing==2)
+				{
+					if(fork()==0)
+					{
+						close(sock);
+						pfunc(SAY,temp.data.fd,getNum,pget,pneed,*this);
+						close(temp.data.fd);
+						exit(0);
+					}
+				}
+			}
+		}
+		return true;
 	}
 	bool epollThread(void* pget,int len,void* pneed,void* (*pfunc)(void*))
 	{
@@ -3301,7 +3371,7 @@ int funcTwo(int thing,int num,int,void* pget,void* sen,ServerPool& server)//main
 	parameter:thing stand what happen,num is socket,len is get len,
 	return:return 0 stand continue,other stop
 *********************************/
-int funcThree(ServerTcpIp::Thing thing,int num,int,void* pget,void* sen,ServerTcpIp& server)//main deal func
+int funcThree(ServerPool::Thing thing,int num,int,void* pget,void* sen,ServerPool& server)//main deal func
 {
 	char ask[200]={0},*pask=NULL;
 	DealHttp http;
@@ -3311,20 +3381,20 @@ int funcThree(ServerTcpIp::Thing thing,int num,int,void* pget,void* sen,ServerTc
 	if(sen==NULL)
 		return -1;
 	memset(sen,0,sizeof(char)*10000000);
-	if(false==LogSystem::dealAttack(thing,num,200))
-	{
-		LogSystem::attackLog(port,server.getPeerIp(num,&port),"./rec/attackLog.txt");
-		server.disconnectSocket(num);
-		return 0;
-	}
-	if(thing==0)
-		printf("%d is out\n",num);
-	if(thing==1)
-		printf("%s in %d\n",(char*)pget,num);
+//	if(false==LogSystem::dealAttack(thing,num,200))
+//	{
+//		LogSystem::attackLog(port,server.getPeerIp(num,&port),"./rec/attackLog.txt");
+//		server.disconnectSocket(num);
+//		return 0;
+//	}
+//	if(thing==0)
+//		printf("%d is out\n",num);
+//	if(thing==1)
+//		printf("%s in %d\n",(char*)pget,num);
 	if(thing==2)
 	{
-		if(http.getKeyLine(pget,"Accept-Language",ask,200)!=NULL)
-			printf("\n%s\n",ask);
+//		if(http.getKeyLine(pget,"Accept-Language",ask,200)!=NULL)
+//			printf("\n%s\n",ask);
 		printf("url:%s\n",http.getAskRoute(pget,"GET",ask,200));
 		if(false==http.cutLineAsk((char*)pget,"GET"))
 			return 0;
@@ -3353,6 +3423,8 @@ int funcThree(ServerTcpIp::Thing thing,int num,int,void* pget,void* sen,ServerTc
 			printf("send success\n");
 		return 0;
 	}
+	free(sen);
+	close(num);
 	return 0;
 }
 /********************************
@@ -3379,7 +3451,7 @@ void selectTry()
 		exit(0);
 	printf("server ip is:%s\nthe server is ok\n",server.getHostIp());
 	while(1)
-		server.selectModel(get,2048,sen,funcThree);
+//		server.selectModel(get,2048,sen,funcThree);
 	free(sen);
 }
 /********************************
@@ -3466,6 +3538,28 @@ void* threadDo(void* argv)
 	}
 	return NULL;
 }
+void funcFork(ServerPool& server,int sock,void*)
+{
+	DealHttp http;
+	char get[2048]={0};
+	int len=0,flag=0;
+	char* sen=(char*)malloc(sizeof(char)*1000000);
+	if(sen==NULL)
+	{
+		close(sock);
+		printf("malloc wrong\n");
+		return;
+	}
+	while(server.receiveSocket(sock,get,2048)>=0)
+	{
+		flag=http.autoAnalysisGet(get,(char*)sen,"index.html",&len);
+		len=server.sendSocket(sock,sen,len);
+		printf("get %s %d\n",http.analysisHttpAsk(get),len);
+	}
+	free(sen);
+	close(sock);
+	return;
+}
 int thread()
 {
 	int thing=0,num=0;
@@ -3481,8 +3575,11 @@ int thread()
 	}
 	if(false==server.setlisten())
 		exit(0);
-	printf("server ip is:%s\nthe server is ok\n",server.getHostIp());
-//	while(1)
+//	printf("server ip is:%s\nthe server is ok\n",server.getHostIp());
+//	server.forkModel(sen,funcFork);
+//	free(sen);
+	while(1)
+		server.forkEpoll(get,2048,sen,funcThree);
 //		server.epollFork(&thing,&num,get,2048,sen,funcTwo);
 //		server.epollThread(&thing,&num,get,2048,sen,threadDo);
 	return 0;
@@ -3495,7 +3592,7 @@ int thread()
 *********************************/
 int main(int argc, char** argv) 
 {
-//	thread();
+	thread();
 //	serverHttp();
 	HttpServer server(5201,true);
 	server.loadStatic("/assets","/test/assets");
