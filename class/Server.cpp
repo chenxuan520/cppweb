@@ -3006,6 +3006,7 @@ class ServerPool:public ServerTcpIp{
 private:
 	ThreadPool* pool;
 	pthread_mutex_t mutex;
+	unsigned int threadNum;
 private:
 	static void sigCliDeal(int pid)
 	{
@@ -3028,13 +3029,16 @@ public:
 public:
 	ServerPool(unsigned short port,unsigned int threadNum=0):ServerTcpIp(port)
 	{
+		this->threadNum=threadNum;
 		if(threadNum>0)
 		{	
 			pool=new ThreadPool(threadNum);
 			if(pool==NULL)
-				throw NULL;
+			{
+				this->error="malloc wrong";
+				return;
+			}
 		}
-		signal(SIGCHLD,sigCliDeal);
 		pthread_mutex_init(&mutex,NULL);
 	}
 	~ServerPool()
@@ -3059,6 +3063,11 @@ public:
 	}
 	void threadModel(void* pneed,void* (*pfunc)(void*))
     {
+    	if(this->threadNum==0)
+    	{
+			this->error="thread wrong init";
+			return;
+		}
     	ServerPool::ArgvSer argv={*this,0,pneed};
     	ThreadPool::Task task={pfunc,&argv};
     	while(1)
@@ -3076,6 +3085,7 @@ public:
 	}
 	void forkModel(void* pneed,void (*pfunc)(ServerPool&,int,void*))
 	{
+		signal(SIGCHLD,sigCliDeal);
 		while(1)
 		{
 			sockaddr_in newaddr={0};
@@ -3090,54 +3100,72 @@ public:
 			close(newClient);
 		}
 	}
-	bool forkEpoll(void* pget,int len,void* pneed,int (*pfunc)(ServerPool::Thing,int,int,void*,void*,ServerPool&))
+	void forkEpoll(unsigned int senBufChar,unsigned int recBufChar,void (*pfunc)(ServerPool::Thing,int,int,void*,void*,ServerPool&))
 	{
-		int eventNum=epoll_wait(epfd,pevent,512,-1),thing=0,num=0;
-		for(int i=0;i<eventNum;i++)
+		signal(SIGCHLD,sigCliDeal);
+		char* pneed=(char*)malloc(sizeof(char)*senBufChar),*pget=(char*)malloc(sizeof(char)*recBufChar);
+		if(pneed==NULL||pget==NULL)
 		{
-			epoll_event temp=pevent[i];
-			if(temp.data.fd==sock)
+			this->error="malloc worng";
+			return;
+		}
+		memset(pneed,0,sizeof(char)*senBufChar);
+		memset(pget,0,sizeof(char)*recBufChar);
+		while(1)
+		{
+			int eventNum=epoll_wait(epfd,pevent,512,-1),thing=0,num=0;
+			for(int i=0;i<eventNum;i++)
 			{
-				sockaddr_in newaddr={0};
-				int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
-	            this->addFd(newClient);
-				nowEvent.data.fd=newClient;
-				nowEvent.events=EPOLLIN;
-				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
-				thing=1;
-				num=newClient;
-				strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
-			}
-			else
-			{
-				int getNum=recv(temp.data.fd,(char*)pget,len,0);
-				num=temp.data.fd;
-				if(getNum>0)
-					thing=2;
+				epoll_event temp=pevent[i];
+				if(temp.data.fd==sock)
+				{
+					sockaddr_in newaddr={0};
+					int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
+		            this->addFd(newClient);
+					nowEvent.data.fd=newClient;
+					nowEvent.events=EPOLLIN;
+					epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
+					num=newClient;
+					strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
+				}
 				else
 				{
-					*(char*)pget=0;
-					thing=0;
-	                this->deleteFd(temp.data.fd);
-					epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
-					close(temp.data.fd);
-				}
-				if(pfunc!=NULL&&thing==2)
-				{
-					if(fork()==0)
+					memset(pget,0,sizeof(char)*recBufChar);
+					int getNum=recv(temp.data.fd,(char*)pget,recBufChar,0);
+					num=temp.data.fd;
+					if(getNum>0)
+						thing=2;
+					else
 					{
-						close(sock);
-						pfunc(SAY,temp.data.fd,getNum,pget,pneed,*this);
+						*(char*)pget=0;
+						thing=0;
+		                this->deleteFd(temp.data.fd);
+						epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
 						close(temp.data.fd);
-						exit(0);
+					}
+					if(pfunc!=NULL&&thing==2)
+					{
+						if(fork()==0)
+						{
+							close(sock);
+							pfunc(SAY,temp.data.fd,getNum,pget,pneed,*this);
+							close(temp.data.fd);
+							free(pneed);
+							free(pget);
+							exit(0);
+						}
 					}
 				}
 			}
 		}
-		return true;
 	}
-	bool epollThread(void* pget,int len,void* pneed,void* (*pfunc)(void*))
+	void epollThread(void* pget,int len,void* pneed,void* (*pfunc)(void*))
 	{
+    	if(this->threadNum==0)
+    	{
+			this->error="thread wrong init";
+			return;
+		}
 		int eventNum=epoll_wait(epfd,pevent,512,-1),thing=0,num=0;
 		for(int i=0;i<eventNum;i++)
 		{
@@ -3181,7 +3209,7 @@ public:
 				}
 			}
 		}
-		return true;
+		return;
 	}
 	inline bool threadDeleteSoc(int clisoc)
 	{
@@ -3371,7 +3399,7 @@ int funcTwo(int thing,int num,int,void* pget,void* sen,ServerPool& server)//main
 	parameter:thing stand what happen,num is socket,len is get len,
 	return:return 0 stand continue,other stop
 *********************************/
-int funcThree(ServerPool::Thing thing,int num,int,void* pget,void* sen,ServerPool& server)//main deal func
+void funcThree(ServerPool::Thing thing,int num,int,void* pget,void* sen,ServerPool& server)//main deal func
 {
 	char ask[200]={0},*pask=NULL;
 	DealHttp http;
@@ -3379,8 +3407,8 @@ int funcThree(ServerPool::Thing thing,int num,int,void* pget,void* sen,ServerPoo
 	int port=0;
 	int flag=0;
 	if(sen==NULL)
-		return -1;
-	memset(sen,0,sizeof(char)*10000000);
+		return ;
+//	memset(sen,0,sizeof(char)*10000000);
 //	if(false==LogSystem::dealAttack(thing,num,200))
 //	{
 //		LogSystem::attackLog(port,server.getPeerIp(num,&port),"./rec/attackLog.txt");
@@ -3397,7 +3425,7 @@ int funcThree(ServerPool::Thing thing,int num,int,void* pget,void* sen,ServerPoo
 //			printf("\n%s\n",ask);
 		printf("url:%s\n",http.getAskRoute(pget,"GET",ask,200));
 		if(false==http.cutLineAsk((char*)pget,"GET"))
-			return 0;
+			return ;
 		printf("ask:%s\n",(char*)pget);
 		printf("http:%s\n",http.analysisHttpAsk(pget));
 		strcpy(ask,http.analysisHttpAsk(pget));
@@ -3412,7 +3440,7 @@ int funcThree(ServerPool::Thing thing,int num,int,void* pget,void* sen,ServerPoo
             if(fp==NULL)
                 fp=fopen("wrong.txt","w+");
             if(fp==NULL)
-                return 0;
+                return ;
             fprintf(fp,"can not open file %s\n",ask);
             printf("cannot open file %s\n",ask);
             fclose(fp);
@@ -3421,11 +3449,9 @@ int funcThree(ServerPool::Thing thing,int num,int,void* pget,void* sen,ServerPoo
 			printf("send erong\n");
 		else
 			printf("send success\n");
-		return 0;
+		return ;
 	}
-	free(sen);
-	close(num);
-	return 0;
+	return ;
 }
 /********************************
 	author:chenxuan
@@ -3563,11 +3589,11 @@ void funcFork(ServerPool& server,int sock,void*)
 int thread()
 {
 	int thing=0,num=0;
-	ServerPool server(5200,10);
-	char get[2048]={0};
-	char* sen=(char*)malloc(sizeof(char)*10000000);
-	if(sen==NULL)
-		printf("memory wrong\n");
+	ServerPool server(5200);
+//	char get[2048]={0};
+//	char* sen=(char*)malloc(sizeof(char)*10000000);
+//	if(sen==NULL)
+//		printf("memory wrong\n");
 	if(false==server.bondhost())
 	{
 		printf("bound wrong\n");
@@ -3578,8 +3604,7 @@ int thread()
 //	printf("server ip is:%s\nthe server is ok\n",server.getHostIp());
 //	server.forkModel(sen,funcFork);
 //	free(sen);
-	while(1)
-		server.forkEpoll(get,2048,sen,funcThree);
+	server.forkEpoll(1024*1024,2048,funcThree);
 //		server.epollFork(&thing,&num,get,2048,sen,funcTwo);
 //		server.epollThread(&thing,&num,get,2048,sen,threadDo);
 	return 0;
