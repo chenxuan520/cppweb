@@ -316,7 +316,7 @@ bool ServerTcpIp::deleteFd(int clisoc)
     }
     return false;
 }
-HttpServer::HttpServer(unsigned port,bool debug):ServerTcpIp(port)
+HttpServer::HttpServer(unsigned port,bool debug,bool longConnect):ServerTcpIp(port)
 {
 	getText=NULL;
 	array=NULL;
@@ -328,9 +328,11 @@ HttpServer::HttpServer(unsigned port,bool debug):ServerTcpIp(port)
 	now=0;
 	max=20;
 	isDebug=debug;
+	isLongCon=longConnect;
 	textLen=0;
 	clientIn=NULL;
 	clientOut=NULL;
+	pnowRoute=NULL;
 }
 HttpServer::~HttpServer()
 {
@@ -563,7 +565,7 @@ int HttpServer::func(int num,void* pget,void* sen,const char* defaultFile,HttpSe
 	return 0;
 }
 void HttpServer::epollHttp(void* pget,int len,void* pneed,const char* defaultFile)
-{
+{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
 	memset(pget,0,sizeof(char)*len);
 	int eventNum=epoll_wait(epfd,pevent,512,-1);
 	for(int i=0;i<eventNum;i++)
@@ -590,6 +592,12 @@ void HttpServer::epollHttp(void* pget,int len,void* pneed,const char* defaultFil
 			{
 				this->textLen=getNum;
 				func(temp.data.fd,pget,pneed,defaultFile,*this);
+				if(isLongCon==false)
+				{
+              		this->deleteFd(temp.data.fd);
+					epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
+					close(temp.data.fd);						
+				}
 			}
 			else
 			{

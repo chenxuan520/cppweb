@@ -102,10 +102,11 @@ private:
 	unsigned int now;
 	int textLen;
 	bool isDebug;
+	bool isLongCon;
 	void (*clientIn)(HttpServer&,int num,void* ip,int port);
 	void (*clientOut)(HttpServer&,int num,void* ip,int port);
 public:
-	HttpServer(unsigned port,bool debug=false);
+	HttpServer(unsigned port,bool debug=false,bool longConnect=true);
 	~HttpServer();
 	bool clientOutHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port));
 	bool clientInHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port));

@@ -2018,10 +2018,11 @@ private:
 	unsigned int now;
 	int textLen;
 	bool isDebug;
+	bool isLongCon;
 	void (*clientIn)(HttpServer&,int num,void* ip,int port);
 	void (*clientOut)(HttpServer&,int num,void* ip,int port);
 public:
-	HttpServer(unsigned port,bool debug=false):ServerTcpIp(port)
+	HttpServer(unsigned port,bool debug=false,bool longConnect=true):ServerTcpIp(port)
 	{
 		getText=NULL;
 		array=NULL;
@@ -2033,6 +2034,7 @@ public:
 		now=0;
 		max=20;
 		isDebug=debug;
+		isLongCon=longConnect;
 		textLen=0;
 		clientIn=NULL;
 		clientOut=NULL;
@@ -2313,6 +2315,12 @@ private:
 				{
 					this->textLen=getNum;
 					func(temp.data.fd,pget,pneed,defaultFile,*this);
+					if(isLongCon==false)
+					{
+                  		this->deleteFd(temp.data.fd);
+						epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
+						close(temp.data.fd);						
+					}
 				}
 				else
 				{
@@ -3617,7 +3625,7 @@ int thread()
 *********************************/
 int main(int argc, char** argv) 
 {
-	thread();
+//	thread();
 //	serverHttp();
 	HttpServer server(5201,true);
 	server.loadStatic("/assets","/test/assets");
