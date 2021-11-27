@@ -6,10 +6,10 @@ echo 'choose port to bound';
 read port;
 echo 'choose index html';
 read index;
-echo 'choose if run in background';
-read back;
 echo 'choose input memory';
 read memory;
+echo 'choose if run in background';
+read back;
 echo 'choose if use mysql';
 read if_sql;
 echo 'choose if use guard';
@@ -30,8 +30,12 @@ then
 else
 	echo 'setting wrong'
 fi
-if [ $if_guard == 'y' ]
+if [ $if_guard == 'y' -a $version == '1' ]
 then 
 	./guard main 
+fi
+if [ $if_guard == 'y' -a $version == '2' ]
+then
+	./guard main2.0
 fi
 echo 'every thing is ok,just enjoy it'
