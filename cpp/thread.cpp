@@ -1,6 +1,8 @@
 #include"../hpp/thread.h"
 #include<queue>
 #include<pthread.h>
+#include<signal.h>
+#include<sys/wait.h>
 #include"../hpp/server.h"
 using namespace std;
 void* ThreadPool::worker(void* arg)//the worker for user 
@@ -135,11 +137,15 @@ void ThreadPool::createDetachPthread(void* arg,void* (*pfunc)(void*))//create a 
 *********************************/
 ServerPool::ServerPool(unsigned short port,unsigned int threadNum):ServerTcpIp(port)
 {
+	this->threadNum=threadNum;
 	if(threadNum>0)
 	{	
 		pool=new ThreadPool(threadNum);
 		if(pool==NULL)
-			throw NULL;
+		{
+			this->error="malloc wrong";
+			return;
+		}
 	}
 	pthread_mutex_init(&mutex,NULL);
 }
@@ -147,6 +153,10 @@ ServerPool::~ServerPool()
 {
 	delete pool;
    	pthread_mutex_destroy(&mutex);
+}
+void ServerPool::sigCliDeal(int pid)
+{
+	while(waitpid(-1, NULL, WNOHANG)>0);
 }
 bool ServerPool::mutexTryLock()
 {
@@ -157,6 +167,11 @@ bool ServerPool::mutexTryLock()
 }
 void ServerPool::threadModel(void* pneed,void* (*pfunc)(void*))
 {
+	if(this->threadNum==0)
+	{
+		this->error="thread wrong init";
+		return;
+	}
 	ServerPool::ArgvSer argv={*this,0,pneed};
 	ThreadPool::Task task={pfunc,&argv};
 	while(1)
@@ -172,8 +187,13 @@ void ServerPool::threadModel(void* pneed,void* (*pfunc)(void*))
 		pool->addTask(task);
 	}
 }
-bool ServerPool::epollThread(int* pthing,int* pnum,void* pget,int len,void* pneed,void* (*pfunc)(void*))
+void ServerPool::epollThread(int* pthing,int* pnum,void* pget,int len,void* pneed,void* (*pfunc)(void*))
 {
+	if(this->threadNum==0)
+	{
+		this->error="thread wrong init";
+		return;
+	}
 	int eventNum=epoll_wait(epfd,pevent,512,-1),thing=0,num=0;
 	for(int i=0;i<eventNum;i++)
 	{
@@ -182,7 +202,7 @@ bool ServerPool::epollThread(int* pthing,int* pnum,void* pget,int len,void* pnee
 		{
 			sockaddr_in newaddr={0};
 			int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
-            this->addFd(newClient);
+			this->addFd(newClient);
 			nowEvent.data.fd=newClient;
 			nowEvent.events=EPOLLIN;
 			epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
@@ -204,7 +224,7 @@ bool ServerPool::epollThread(int* pthing,int* pnum,void* pget,int len,void* pnee
 			{
 				*(char*)pget=0;
 				thing=0;
-                this->deleteFd(temp.data.fd);
+				this->deleteFd(temp.data.fd);
 				epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
 				close(temp.data.fd);
 			}
@@ -217,5 +237,87 @@ bool ServerPool::epollThread(int* pthing,int* pnum,void* pget,int len,void* pnee
 			}
 		}
 	}
-	return true;
+	return;
+}
+void ServerPool::forkModel(void* pneed,void (*pfunc)(ServerPool&,int,void*))
+{
+	signal(SIGCHLD,sigCliDeal);
+	while(1)
+	{
+		sockaddr_in newaddr={0};
+		int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
+		if(newClient==-1)
+			continue;
+		if(fork()==0)
+		{
+			close(sock);
+			pfunc(*this,newClient,pneed);
+		}
+		close(newClient);
+	}
+}
+void ServerPool::forkEpoll(unsigned int senBufChar,unsigned int recBufChar,void (*pfunc)(ServerPool::Thing,int,int,void*,void*,ServerPool&))
+{
+	signal(SIGCHLD,sigCliDeal);
+	char* pneed=(char*)malloc(sizeof(char)*senBufChar),*pget=(char*)malloc(sizeof(char)*recBufChar);
+	if(pneed==NULL||pget==NULL)
+	{
+		this->error="malloc worng";
+		return;
+	}
+	memset(pneed,0,sizeof(char)*senBufChar);
+	memset(pget,0,sizeof(char)*recBufChar);
+	while(1)
+	{
+		int eventNum=epoll_wait(epfd,pevent,512,-1),thing=0,num=0;
+		for(int i=0;i<eventNum;i++)
+		{
+			epoll_event temp=pevent[i];
+			if(temp.data.fd==sock)
+			{
+				sockaddr_in newaddr={0};
+				int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
+				this->addFd(newClient);
+				nowEvent.data.fd=newClient;
+				nowEvent.events=EPOLLIN;
+				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
+				num=newClient;
+				strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
+			}
+			else
+			{
+				memset(pget,0,sizeof(char)*recBufChar);
+				int getNum=recv(temp.data.fd,(char*)pget,recBufChar,0);
+				num=temp.data.fd;
+				if(getNum>0)
+					thing=2;
+				else
+				{
+					*(char*)pget=0;
+					thing=0;
+					this->deleteFd(temp.data.fd);
+					epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
+					close(temp.data.fd);
+				}
+				if(pfunc!=NULL&&thing==2)
+				{
+					if(fork()==0)
+					{
+						close(sock);
+						pfunc(SAY,temp.data.fd,getNum,pget,pneed,*this);
+						close(temp.data.fd);
+						free(pneed);
+						free(pget);
+						exit(0);
+					}
+					else
+					{
+						this->deleteFd(temp.data.fd);
+						epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
+						close(temp.data.fd);
+					}
+				}
+			}
+		}
+	}
 }
