@@ -202,7 +202,7 @@ void ServerPool::epollThread(int* pthing,int* pnum,void* pget,int len,void* pnee
 		{
 			sockaddr_in newaddr={0};
 			int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
-            this->addFd(newClient);
+			this->addFd(newClient);
 			nowEvent.data.fd=newClient;
 			nowEvent.events=EPOLLIN;
 			epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
@@ -224,7 +224,7 @@ void ServerPool::epollThread(int* pthing,int* pnum,void* pget,int len,void* pnee
 			{
 				*(char*)pget=0;
 				thing=0;
-                this->deleteFd(temp.data.fd);
+				this->deleteFd(temp.data.fd);
 				epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
 				close(temp.data.fd);
 			}
@@ -277,7 +277,7 @@ void ServerPool::forkEpoll(unsigned int senBufChar,unsigned int recBufChar,void 
 			{
 				sockaddr_in newaddr={0};
 				int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
-	            this->addFd(newClient);
+				this->addFd(newClient);
 				nowEvent.data.fd=newClient;
 				nowEvent.events=EPOLLIN;
 				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
@@ -295,7 +295,7 @@ void ServerPool::forkEpoll(unsigned int senBufChar,unsigned int recBufChar,void 
 				{
 					*(char*)pget=0;
 					thing=0;
-	                this->deleteFd(temp.data.fd);
+					this->deleteFd(temp.data.fd);
 					epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
 					close(temp.data.fd);
 				}
@@ -309,6 +309,12 @@ void ServerPool::forkEpoll(unsigned int senBufChar,unsigned int recBufChar,void 
 						free(pneed);
 						free(pget);
 						exit(0);
+					}
+					else
+					{
+						this->deleteFd(temp.data.fd);
+						epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
+						close(temp.data.fd);
 					}
 				}
 			}

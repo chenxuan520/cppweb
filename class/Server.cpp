@@ -634,47 +634,47 @@ protected:
 	sockaddr_in client;//IPv4 of client;
 	fd_set  fdClients;//file descriptor
 protected:
-    int* pfdn;//pointer if file descriptor
-    int fdNumNow;//num of fd now
-    int fdMax;//fd max num
-    bool addFd(int addsoc)//add file des criptor
-    {
-        bool flag=false;
-        for(int i=0;i<fdNumNow;i++)
-        {
-            if(pfdn[i]==0)
-            {
-                pfdn[i]=addsoc;
-                flag=true;//has free room
-                break;
-            }
-        }
-        if(flag==false)//no free room
-        {
-            if(fdNumNow>=fdMax)
-            {
-                pfdn=(int*)realloc(pfdn,sizeof(int)*(fdMax+32));//try to realloc
-                if(pfdn==NULL)
-                	return false;
-                fdMax+=31;
-            }
-            pfdn[fdNumNow]=addsoc;
-            fdNumNow++;
-        }
-        return true;
-    }
-    bool deleteFd(int clisoc)//delete
-    {
-        for(int i=0;i<fdNumNow;i++)
-        {
-            if(pfdn[i]==clisoc)
-            {
-                pfdn[i]=0;
-                return true;
-            }
-        }
-        return false;
-    }
+	int* pfdn;//pointer if file descriptor
+	int fdNumNow;//num of fd now
+	int fdMax;//fd max num
+	bool addFd(int addsoc)//add file des criptor
+	{
+		bool flag=false;
+		for(int i=0;i<fdNumNow;i++)
+		{
+			if(pfdn[i]==0)
+			{
+				pfdn[i]=addsoc;
+				flag=true;//has free room
+				break;
+			}
+		}
+		if(flag==false)//no free room
+		{
+			if(fdNumNow>=fdMax)
+			{
+				pfdn=(int*)realloc(pfdn,sizeof(int)*(fdMax+32));//try to realloc
+				if(pfdn==NULL)
+					return false;
+				fdMax+=31;
+			}
+			pfdn[fdNumNow]=addsoc;
+			fdNumNow++;
+		}
+		return true;
+	}
+	bool deleteFd(int clisoc)//delete
+	{
+		for(int i=0;i<fdNumNow;i++)
+		{
+			if(pfdn[i]==clisoc)
+			{
+				pfdn[i]=0;
+				return true;
+			}
+		}
+		return false;
+	}
 public:
 	ServerTcpIp(unsigned short port=5200,int epollNum=1,int wait=5)
 	{//port is bound ,epollNum is if open epoll model,wait is listen socket max wait
@@ -705,13 +705,13 @@ public:
 		else
 			memset(pevent,0,sizeof(epoll_event)*512);
 		memset(&nowEvent,0,sizeof(epoll_event));
-        pfdn=(int*)malloc(sizeof(int)*64);
-        if(pfdn==NULL)
-            error="pfdn wrong";
-        else
-        	memset(pfdn,0,sizeof(int)*64);
-        fdNumNow=0;
-        fdMax=64;
+		pfdn=(int*)malloc(sizeof(int)*64);
+		if(pfdn==NULL)
+			error="pfdn wrong";
+		else
+			memset(pfdn,0,sizeof(int)*64);
+		fdNumNow=0;
+		fdMax=64;
 	}
 	~ServerTcpIp()//clean server
 	{
@@ -725,7 +725,7 @@ public:
 		if(pevent!=NULL)
 			free(pevent);
 		if(pfdn!=NULL)
-        	free(pfdn);
+			free(pfdn);
 	}
 	bool bondhost()//bond myself first
 	{
@@ -767,11 +767,11 @@ public:
 		return send(sockC,(char*)psen,len,0);
 	}
 	void sendEverySocket(void* psen,int len)
-    {
-        for(int i=0;i<fdNumNow;i++)
-            if(pfdn[i]!=0)
-                send(pfdn[i],psen,len,0);
-    }
+	{
+		for(int i=0;i<fdNumNow;i++)
+			if(pfdn[i]!=0)
+				send(pfdn[i],psen,len,0);
+	}
 	inline int sendSocket(int socCli,const void* psen,int len)//send by socket
 	{
 		return send(socCli,(char*)psen,len,0);
@@ -903,7 +903,7 @@ public:
 			{
 				sockaddr_in newaddr={0};
 				int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
-                this->addFd(newClient);
+				this->addFd(newClient);
 				nowEvent.data.fd=newClient;
 				nowEvent.events=EPOLLIN;
 				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
@@ -924,7 +924,7 @@ public:
 				{
 					*(char*)pget=0;
 					thing=OUT;
-                    this->deleteFd(temp.data.fd);
+					this->deleteFd(temp.data.fd);
 					epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
 					close(temp.data.fd);
 				}
@@ -938,10 +938,10 @@ public:
 		return true;
 	}
 	bool disconnectSocket(int clisock)//disconnect from socket
-    {
-        close(clisock);
-        return this->deleteFd(clisock);
-    }
+	{
+		close(clisock);
+		return this->deleteFd(clisock);
+	}
 };
 /********************************
 	author:chenxuan
@@ -1358,90 +1358,90 @@ public:
 	int autoAnalysisGet(const char* pask,char* psend,const char* pfirstFile,int* plen)
 	{
 		if(NULL==this->analysisHttpAsk((void*)pask))
-	        return 0;
-	    if(strcmp(ask,"HTTP/1.1")==0||strcmp(ask,"HTTP/1.0")==0)
-	    {
-	        if(false==this->createSendMsg(HTML,psend,pfirstFile,plen))
-	        {
-	            if(false==this->createSendMsg(NOFOUND,psend,pfirstFile,plen))
-	                return 0;
-	            else 
-	                return 2;
-	        }
-	        else
-	        	return 1;
-	    }
-	    else if(strstr(ask,".html"))
-	    {
-	        if(false==this->createSendMsg(HTML,psend,ask,plen))
-	            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
-	                return 0;
-	            else 
-	                return 2;
-	        else
-	        	return 1;
-	    }
-	    else if(strstr(ask,".exe"))
-	    {
-	        if(false==this->createSendMsg(EXE,psend,ask,plen))
-	            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
-	                return 0;
-	            else 
-	                return 2;
-	        else
-	        	return 1;	        
-	    }
-	    else if(strstr(ask,".png")||strstr(ask,".PNG")||strstr(ask,".jpg")||strstr(ask,".jpeg"))
-	    {
-	        if(false==this->createSendMsg(IMAGE,psend,ask,plen))
-	            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
-	                return 0;
-	            else 
-	                return 2;
-	        else
-	        	return 1;	                
-	    }
-	    else if(strstr(ask,".css"))
-	    {
-	        if(false==this->createSendMsg(CSS,psend,ask,plen))
-	            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
-	                return 0;
-	            else 
-	                return 2;
-	        else
-	        	return 1;	                
-	    }
-	    else if(strstr(ask,".js"))
-	    {
-	        if(false==this->createSendMsg(JS,psend,ask,plen))
-	            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
-	                return 0;
-	            else 
-	                return 2;
-	        else
-	        	return 1;
-	    }
-		else if(strstr(ask,".json"))
-	    {
-	        if(false==this->createSendMsg(JSON,psend,ask,plen))
-	            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
-	                return 0;
-	            else 
-	                return 2;
-	        else
-	        	return 1;
-	    }
-	    else 
-	    {
-	        if(false==this->createSendMsg(UNKNOWN,psend,ask,plen))
-	            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
-	                return 0;
-	            else 
-	                return 2;
-	        else
-	        	return 1;
+			return 0;
+		if(strcmp(ask,"HTTP/1.1")==0||strcmp(ask,"HTTP/1.0")==0)
+		{
+			if(false==this->createSendMsg(HTML,psend,pfirstFile,plen))
+			{
+				if(false==this->createSendMsg(NOFOUND,psend,pfirstFile,plen))
+					return 0;
+				else 
+					return 2;
+			}
+			else
+				return 1;
 		}
-	    return 1;
+		else if(strstr(ask,".html"))
+		{
+			if(false==this->createSendMsg(HTML,psend,ask,plen))
+				if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
+					return 0;
+				else 
+					return 2;
+			else
+				return 1;
+		}
+		else if(strstr(ask,".exe"))
+		{
+			if(false==this->createSendMsg(EXE,psend,ask,plen))
+				if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
+					return 0;
+				else 
+					return 2;
+			else
+				return 1;			
+		}
+		else if(strstr(ask,".png")||strstr(ask,".PNG")||strstr(ask,".jpg")||strstr(ask,".jpeg"))
+		{
+			if(false==this->createSendMsg(IMAGE,psend,ask,plen))
+				if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
+					return 0;
+				else 
+					return 2;
+			else
+				return 1;					
+		}
+		else if(strstr(ask,".css"))
+		{
+			if(false==this->createSendMsg(CSS,psend,ask,plen))
+				if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
+					return 0;
+				else 
+					return 2;
+			else
+				return 1;					
+		}
+		else if(strstr(ask,".js"))
+		{
+			if(false==this->createSendMsg(JS,psend,ask,plen))
+				if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
+					return 0;
+				else 
+					return 2;
+			else
+				return 1;
+		}
+		else if(strstr(ask,".json"))
+		{
+			if(false==this->createSendMsg(JSON,psend,ask,plen))
+				if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
+					return 0;
+				else 
+					return 2;
+			else
+				return 1;
+		}
+		else 
+		{
+			if(false==this->createSendMsg(UNKNOWN,psend,ask,plen))
+				if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
+					return 0;
+				else 
+					return 2;
+			else
+				return 1;
+		}
+		return 1;
 	}
 	const char* getKeyValue(const void* message,const char* key,char* value,int maxValueLen,bool onlyFromBody=false)
 	{
@@ -1574,16 +1574,16 @@ public:
 		memset(buffer,0,sizeof(char)*strlen(srcString));
 		for (unsigned int i=0; i<strlen(srcString); i++) 
 		{
-		    if (int(srcString[i])==37) 
+			if (int(srcString[i])==37) 
 			{
-		        sscanf(srcString+i+1, "%x", &temp);
-		        ch=(char)temp;
-		        buffer[strlen(buffer)]=ch;
-		        buffer[strlen(buffer)+1]=0;
-		        i=i+2;
-		    } 
+				sscanf(srcString+i+1, "%x", &temp);
+				ch=(char)temp;
+				buffer[strlen(buffer)]=ch;
+				buffer[strlen(buffer)+1]=0;
+				i=i+2;
+			} 
 			else 
-		        buffer[strlen(buffer)]=srcString[i];
+				buffer[strlen(buffer)]=srcString[i];
 		}
 		strcpy(srcString,buffer);
 		free(buffer);
@@ -1698,219 +1698,219 @@ private:
 	sockaddr_in their_addr;
 	bool isDebug;
 	char error[30];
-    struct Base64Date6
-    {
-        unsigned int d4 : 6;
-        unsigned int d3 : 6;
-        unsigned int d2 : 6;
-        unsigned int d1 : 6;
-    };
+	struct Base64Date6
+	{
+		unsigned int d4 : 6;
+		unsigned int d3 : 6;
+		unsigned int d2 : 6;
+		unsigned int d1 : 6;
+	};
 public:
 	Email(const char* domain,bool debug=false)
 	{
 		isDebug=debug;
 		memset(error,0,sizeof(char)*30);
-        memset(&their_addr, 0, sizeof(their_addr));
-        their_addr.sin_family = AF_INET;
-        their_addr.sin_port = htons(25);    
-        hostent* hptr = gethostbyname(domain);          
-        memcpy(&their_addr.sin_addr.s_addr, hptr->h_addr_list[0], hptr->h_length);
+		memset(&their_addr, 0, sizeof(their_addr));
+		their_addr.sin_family = AF_INET;
+		their_addr.sin_port = htons(25);	
+		hostent* hptr = gethostbyname(domain);		  
+		memcpy(&their_addr.sin_addr.s_addr, hptr->h_addr_list[0], hptr->h_length);
 	}
 	bool emailSend(const char* sendEmail,const char* passwd,const char* recEmail,const char* body)
 	{
-      	int sockfd = 0;
-      	char recBuffer[1000]={0},senBuffer[1000]={0},login[128],pass[128];
-        sockfd = socket(PF_INET, SOCK_STREAM, 0);
-        if (sockfd < 0)
-        {
-            sprintf(error,"open socket wrong");
-            return false;
-        }
-        if (connect(sockfd,(struct sockaddr *)&their_addr, sizeof(struct sockaddr)) < 0)
-        {
-            sprintf(error,"connect wrong");
-		    return false;
-        }
-        memset(recBuffer,0,sizeof(char)*1000);
-        while (recv(sockfd, recBuffer, 1000, 0) <= 0)
-        {
-            if(isDebug)
-            	printf("reconnecting\n");
-            sleep(2);
-            sockfd = socket(PF_INET, SOCK_STREAM, 0);
+	  	int sockfd = 0;
+	  	char recBuffer[1000]={0},senBuffer[1000]={0},login[128],pass[128];
+		sockfd = socket(PF_INET, SOCK_STREAM, 0);
+		if (sockfd < 0)
+		{
+			sprintf(error,"open socket wrong");
+			return false;
+		}
+		if (connect(sockfd,(struct sockaddr *)&their_addr, sizeof(struct sockaddr)) < 0)
+		{
+			sprintf(error,"connect wrong");
+			return false;
+		}
+		memset(recBuffer,0,sizeof(char)*1000);
+		while (recv(sockfd, recBuffer, 1000, 0) <= 0)
+		{
+			if(isDebug)
+				printf("reconnecting\n");
+			sleep(2);
+			sockfd = socket(PF_INET, SOCK_STREAM, 0);
 			if (sockfd < 0)
-	        {
-	            sprintf(error,"open socket wrong");
-	            return false;
-	        }
-	        if (connect(sockfd,(struct sockaddr *)&their_addr, sizeof(struct sockaddr)) < 0)
-	        {
-	            sprintf(error,"connect wrong");
-			    return false;
-	        }
-            memset(recBuffer, 0, 1000);
-        }
-        if(isDebug)
-        	printf("get:%s",recBuffer);
-        
-        memset(senBuffer, 0, 1000);
-        sprintf(senBuffer, "EHLO HYL-PC\r\n");
-        send(sockfd, senBuffer, strlen(senBuffer), 0);
-        memset(recBuffer, 0, 1000);
-        recv(sockfd, recBuffer, 1000, 0);
-        if(isDebug)
-        	printf("EHLO REceive:%s\n",recBuffer);
-        
-        memset(senBuffer, 0, 1000);
-        sprintf(senBuffer, "AUTH LOGIN\r\n");
-        send(sockfd, senBuffer, strlen(senBuffer), 0);
-        memset(recBuffer, 0, 1000);
-        recv(sockfd, recBuffer, 1000, 0);
-        if(isDebug)
-        	printf("Auth Login Receive:%s\n",recBuffer);
-        
+			{
+				sprintf(error,"open socket wrong");
+				return false;
+			}
+			if (connect(sockfd,(struct sockaddr *)&their_addr, sizeof(struct sockaddr)) < 0)
+			{
+				sprintf(error,"connect wrong");
+				return false;
+			}
+			memset(recBuffer, 0, 1000);
+		}
+		if(isDebug)
+			printf("get:%s",recBuffer);
+		
 		memset(senBuffer, 0, 1000);
-        sprintf(senBuffer, "%s",sendEmail);
-        memset(login, 0, 128);
-        EncodeBase64(login, senBuffer, strlen(senBuffer));
-        sprintf(senBuffer, "%s\r\n", login);
-        send(sockfd, senBuffer, strlen(senBuffer), 0);
-    	if(isDebug)
-    		printf("Base64 UserName:%s\n",senBuffer);
-        memset(recBuffer, 0, 1000);
-        recv(sockfd, recBuffer, 1000, 0);
-        if(isDebug)
-        	printf("User Login Receive:%s\n",recBuffer);
+		sprintf(senBuffer, "EHLO HYL-PC\r\n");
+		send(sockfd, senBuffer, strlen(senBuffer), 0);
+		memset(recBuffer, 0, 1000);
+		recv(sockfd, recBuffer, 1000, 0);
+		if(isDebug)
+			printf("EHLO REceive:%s\n",recBuffer);
+		
+		memset(senBuffer, 0, 1000);
+		sprintf(senBuffer, "AUTH LOGIN\r\n");
+		send(sockfd, senBuffer, strlen(senBuffer), 0);
+		memset(recBuffer, 0, 1000);
+		recv(sockfd, recBuffer, 1000, 0);
+		if(isDebug)
+			printf("Auth Login Receive:%s\n",recBuffer);
+		
+		memset(senBuffer, 0, 1000);
+		sprintf(senBuffer, "%s",sendEmail);
+		memset(login, 0, 128);
+		EncodeBase64(login, senBuffer, strlen(senBuffer));
+		sprintf(senBuffer, "%s\r\n", login);
+		send(sockfd, senBuffer, strlen(senBuffer), 0);
+		if(isDebug)
+			printf("Base64 UserName:%s\n",senBuffer);
+		memset(recBuffer, 0, 1000);
+		recv(sockfd, recBuffer, 1000, 0);
+		if(isDebug)
+			printf("User Login Receive:%s\n",recBuffer);
 
 		sprintf(senBuffer, "%s",passwd);//password
-        memset(pass, 0, 128);
-        EncodeBase64(pass, senBuffer, strlen(senBuffer));
-        sprintf(senBuffer, "%s\r\n", pass);
-        send(sockfd, senBuffer, strlen(senBuffer), 0);
-        if(isDebug)
-        	printf("Base64 Password:%s\n",senBuffer);
+		memset(pass, 0, 128);
+		EncodeBase64(pass, senBuffer, strlen(senBuffer));
+		sprintf(senBuffer, "%s\r\n", pass);
+		send(sockfd, senBuffer, strlen(senBuffer), 0);
+		if(isDebug)
+			printf("Base64 Password:%s\n",senBuffer);
 
-        memset(recBuffer, 0, 1000);
-        recv(sockfd, recBuffer, 1000, 0);
-        if(isDebug)
-        	printf("Send Password Receive:%s\n",recBuffer);
+		memset(recBuffer, 0, 1000);
+		recv(sockfd, recBuffer, 1000, 0);
+		if(isDebug)
+			printf("Send Password Receive:%s\n",recBuffer);
 
-        // self email
-        memset(recBuffer, 0, 1000);
-        sprintf(senBuffer, "MAIL FROM: <%s>\r\n",sendEmail);  
-        send(sockfd, senBuffer, strlen(senBuffer), 0);
-        memset(recBuffer, 0, 1000);
-        recv(sockfd, recBuffer, 1000, 0);
-        if(isDebug)
-        	printf("set Mail From Receive:%s\n",recBuffer);
+		// self email
+		memset(recBuffer, 0, 1000);
+		sprintf(senBuffer, "MAIL FROM: <%s>\r\n",sendEmail);  
+		send(sockfd, senBuffer, strlen(senBuffer), 0);
+		memset(recBuffer, 0, 1000);
+		recv(sockfd, recBuffer, 1000, 0);
+		if(isDebug)
+			printf("set Mail From Receive:%s\n",recBuffer);
 
-        // recv email
-        sprintf(recBuffer, "RCPT TO:<%s>\r\n", recEmail);
-        send(sockfd, recBuffer, strlen(recBuffer), 0);
-        memset(recBuffer, 0, 1000);
-        recv(sockfd, recBuffer, 1000, 0);
-        if(isDebug)
-        	printf("Tell Sendto Receive:%s\n",recBuffer);
-        int bug=0;
-        sscanf(recBuffer,"%d",&bug);
-        if(bug==550)
-        {
+		// recv email
+		sprintf(recBuffer, "RCPT TO:<%s>\r\n", recEmail);
+		send(sockfd, recBuffer, strlen(recBuffer), 0);
+		memset(recBuffer, 0, 1000);
+		recv(sockfd, recBuffer, 1000, 0);
+		if(isDebug)
+			printf("Tell Sendto Receive:%s\n",recBuffer);
+		int bug=0;
+		sscanf(recBuffer,"%d",&bug);
+		if(bug==550)
+		{
 			sprintf(error,"recemail wrong");
-            return false;
+			return false;
 		}
-        // send body
-        sprintf(senBuffer, "DATA\r\n");
-        send(sockfd, senBuffer, strlen(senBuffer), 0);
-        memset(recBuffer, 0, 1000);
-        recv(sockfd, recBuffer, 1000, 0);
-        if(isDebug)
-        	printf("Send Mail Prepare Receive:%s\n",recBuffer);
+		// send body
+		sprintf(senBuffer, "DATA\r\n");
+		send(sockfd, senBuffer, strlen(senBuffer), 0);
+		memset(recBuffer, 0, 1000);
+		recv(sockfd, recBuffer, 1000, 0);
+		if(isDebug)
+			printf("Send Mail Prepare Receive:%s\n",recBuffer);
 
-        // send data
-        sprintf(senBuffer, "%s\r\n.\r\n", body);
-        send(sockfd, senBuffer, strlen(senBuffer), 0);
-        memset(recBuffer, 0, 1000);
-        recv(sockfd, recBuffer, 1000, 0);
-        if(isDebug)
-        	printf("Send Mail Receive:%s\n",recBuffer);
+		// send data
+		sprintf(senBuffer, "%s\r\n.\r\n", body);
+		send(sockfd, senBuffer, strlen(senBuffer), 0);
+		memset(recBuffer, 0, 1000);
+		recv(sockfd, recBuffer, 1000, 0);
+		if(isDebug)
+			printf("Send Mail Receive:%s\n",recBuffer);
 
-        // QUIT
-        sprintf(senBuffer,"QUIT\r\n");
-        send(sockfd, senBuffer, strlen(senBuffer), 0);
-        memset(recBuffer, 0, 1000);
-        recv(sockfd, recBuffer, 1000, 0);
-        if(isDebug)
-        	printf("Quit Receive:%s\n",recBuffer);
-        return true;
+		// QUIT
+		sprintf(senBuffer,"QUIT\r\n");
+		send(sockfd, senBuffer, strlen(senBuffer), 0);
+		memset(recBuffer, 0, 1000);
+		recv(sockfd, recBuffer, 1000, 0);
+		if(isDebug)
+			printf("Quit Receive:%s\n",recBuffer);
+		return true;
 	}
 	char ConvertToBase64(char uc)
-    {
-        if (uc < 26)
-            return 'A' + uc;
-        if (uc < 52)
-            return 'a' + (uc - 26);
-        if (uc < 62)
-            return '0' + (uc - 52);
-        if (uc == 62)
-            return '+';
-        return '/';
-    }
-    void EncodeBase64(char *dbuf, char *buf128, int len)
-    {
-        struct Base64Date6 *ddd = NULL;
-        int i = 0;
-        char buf[256] = { 0 };
-        char* tmp = NULL;
-        char cc = '\0';
-        memset(buf, 0, 256);
-        strcpy(buf, buf128);
-        for (i = 1; i <= len / 3; i++)
-        {
-            tmp = buf + (i - 1) * 3;
-            cc = tmp[2];
-            tmp[2] = tmp[0];
-            tmp[0] = cc;
-            ddd = (struct Base64Date6 *)tmp;
-            dbuf[(i - 1) * 4 + 0] = ConvertToBase64((unsigned int)ddd->d1);
-            dbuf[(i - 1) * 4 + 1] = ConvertToBase64((unsigned int)ddd->d2);
-            dbuf[(i - 1) * 4 + 2] = ConvertToBase64((unsigned int)ddd->d3);
-            dbuf[(i - 1) * 4 + 3] = ConvertToBase64((unsigned int)ddd->d4);
-        }
-        if (len % 3 == 1)
-        {
-            tmp = buf + (i - 1) * 3;
-            cc = tmp[2];
-            tmp[2] = tmp[0];
-            tmp[0] = cc;
-            ddd = (struct Base64Date6 *)tmp;
-            dbuf[(i - 1) * 4 + 0] = ConvertToBase64((unsigned int)ddd->d1);
-            dbuf[(i - 1) * 4 + 1] = ConvertToBase64((unsigned int)ddd->d2);
-            dbuf[(i - 1) * 4 + 2] = '=';
-            dbuf[(i - 1) * 4 + 3] = '=';
-        }
-        if (len % 3 == 2)
-        {
-            tmp = buf + (i - 1) * 3;
-            cc = tmp[2];
-            tmp[2] = tmp[0];
-            tmp[0] = cc;
-            ddd = (struct Base64Date6 *)tmp;
-            dbuf[(i - 1) * 4 + 0] = ConvertToBase64((unsigned int)ddd->d1);
-            dbuf[(i - 1) * 4 + 1] = ConvertToBase64((unsigned int)ddd->d2);
-            dbuf[(i - 1) * 4 + 2] = ConvertToBase64((unsigned int)ddd->d3);
-            dbuf[(i - 1) * 4 + 3] = '=';
-        }
-        return;
-    }
-    void CreateSend(const char* youName,const char* toName,const char* from,const char* to,const char* subject,const char* body,char* buf)
-    {
-        sprintf(buf,"From: \"%s\"<%s>\r\n"
-                "To: \"%s\"<%s>\r\n"
-                "Subject:%s\r\n\r\n"
-                "%s\n",youName,from,toName,to,subject,body);
-    }
-    inline const char* LastError()
-    {
+	{
+		if (uc < 26)
+			return 'A' + uc;
+		if (uc < 52)
+			return 'a' + (uc - 26);
+		if (uc < 62)
+			return '0' + (uc - 52);
+		if (uc == 62)
+			return '+';
+		return '/';
+	}
+	void EncodeBase64(char *dbuf, char *buf128, int len)
+	{
+		struct Base64Date6 *ddd = NULL;
+		int i = 0;
+		char buf[256] = { 0 };
+		char* tmp = NULL;
+		char cc = '\0';
+		memset(buf, 0, 256);
+		strcpy(buf, buf128);
+		for (i = 1; i <= len / 3; i++)
+		{
+			tmp = buf + (i - 1) * 3;
+			cc = tmp[2];
+			tmp[2] = tmp[0];
+			tmp[0] = cc;
+			ddd = (struct Base64Date6 *)tmp;
+			dbuf[(i - 1) * 4 + 0] = ConvertToBase64((unsigned int)ddd->d1);
+			dbuf[(i - 1) * 4 + 1] = ConvertToBase64((unsigned int)ddd->d2);
+			dbuf[(i - 1) * 4 + 2] = ConvertToBase64((unsigned int)ddd->d3);
+			dbuf[(i - 1) * 4 + 3] = ConvertToBase64((unsigned int)ddd->d4);
+		}
+		if (len % 3 == 1)
+		{
+			tmp = buf + (i - 1) * 3;
+			cc = tmp[2];
+			tmp[2] = tmp[0];
+			tmp[0] = cc;
+			ddd = (struct Base64Date6 *)tmp;
+			dbuf[(i - 1) * 4 + 0] = ConvertToBase64((unsigned int)ddd->d1);
+			dbuf[(i - 1) * 4 + 1] = ConvertToBase64((unsigned int)ddd->d2);
+			dbuf[(i - 1) * 4 + 2] = '=';
+			dbuf[(i - 1) * 4 + 3] = '=';
+		}
+		if (len % 3 == 2)
+		{
+			tmp = buf + (i - 1) * 3;
+			cc = tmp[2];
+			tmp[2] = tmp[0];
+			tmp[0] = cc;
+			ddd = (struct Base64Date6 *)tmp;
+			dbuf[(i - 1) * 4 + 0] = ConvertToBase64((unsigned int)ddd->d1);
+			dbuf[(i - 1) * 4 + 1] = ConvertToBase64((unsigned int)ddd->d2);
+			dbuf[(i - 1) * 4 + 2] = ConvertToBase64((unsigned int)ddd->d3);
+			dbuf[(i - 1) * 4 + 3] = '=';
+		}
+		return;
+	}
+	void CreateSend(const char* youName,const char* toName,const char* from,const char* to,const char* subject,const char* body,char* buf)
+	{
+		sprintf(buf,"From: \"%s\"<%s>\r\n"
+				"To: \"%s\"<%s>\r\n"
+				"Subject:%s\r\n\r\n"
+				"%s\n",youName,from,toName,to,subject,body);
+	}
+	inline const char* LastError()
+	{
 		return error;
 	}
 	static const char* getDomainBySelfEmail(const char* email,char* buffer,int bufferLen)
@@ -2019,10 +2019,11 @@ private:
 	int textLen;
 	bool isDebug;
 	bool isLongCon;
+	bool isFork;
 	void (*clientIn)(HttpServer&,int num,void* ip,int port);
 	void (*clientOut)(HttpServer&,int num,void* ip,int port);
 public:
-	HttpServer(unsigned port,bool debug=false,bool longConnect=true):ServerTcpIp(port)
+	HttpServer(unsigned port,bool debug=false):ServerTcpIp(port)
 	{
 		getText=NULL;
 		array=NULL;
@@ -2034,7 +2035,8 @@ public:
 		now=0;
 		max=20;
 		isDebug=debug;
-		isLongCon=longConnect;
+		isLongCon=true;
+		isFork=false;
 		textLen=0;
 		clientIn=NULL;
 		clientOut=NULL;
@@ -2172,8 +2174,12 @@ public:
 		this->getText=get;
 		if(isDebug)
 			printf("server is ok\n");
-		while(1)
-			this->epollHttp(get,recBufLenChar,sen,defaultFile);
+		if(isFork==false)
+			while(1)
+				this->epollHttp(get,recBufLenChar,sen,defaultFile);
+		else
+			while(1)
+				this->forkHttp(get,recBufLenChar,sen,defaultFile);
 		free(sen);
 		free(get);
 	}
@@ -2184,6 +2190,14 @@ public:
 	int httpRecv(int num,void* buffer,int bufferLen)
 	{
 		return this->receiveSocket(num,buffer,bufferLen);
+	}
+	void changeSetting(bool debug,bool isLongCon,bool isForkModel)
+	{
+		this->isDebug=debug;
+		this->isLongCon=isLongCon;
+		this->isFork=isForkModel;
+		if(isFork==true)
+			signal(SIGCHLD,sigCliDeal);
 	}
 	inline void* recText()
 	{
@@ -2298,7 +2312,7 @@ private:
 			{
 				sockaddr_in newaddr={0};
 				int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
-                this->addFd(newClient);
+				this->addFd(newClient);
 				nowEvent.data.fd=newClient;
 				nowEvent.events=EPOLLIN;
 				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
@@ -2317,7 +2331,7 @@ private:
 					func(temp.data.fd,pget,pneed,defaultFile,*this);
 					if(isLongCon==false)
 					{
-                  		this->deleteFd(temp.data.fd);
+				  		this->deleteFd(temp.data.fd);
 						epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
 						close(temp.data.fd);						
 					}
@@ -2330,7 +2344,69 @@ private:
 						strcpy((char*)pget,this->getPeerIp(temp.data.fd,&port));
 						clientOut(*this,temp.data.fd,pget,port);
 					}
-                    this->deleteFd(temp.data.fd);
+					this->deleteFd(temp.data.fd);
+					epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
+					close(temp.data.fd);
+				}
+			}
+		}
+		return ;
+	}
+	void forkHttp(void* pget,int len,void* pneed,const char* defaultFile)
+	{
+		memset(pget,0,sizeof(char)*len);
+		int eventNum=epoll_wait(epfd,pevent,512,-1);
+		for(int i=0;i<eventNum;i++)
+		{
+			epoll_event temp=pevent[i];
+			if(temp.data.fd==sock)
+			{
+				sockaddr_in newaddr={0};
+				int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
+				this->addFd(newClient);
+				nowEvent.data.fd=newClient;
+				nowEvent.events=EPOLLIN;
+				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
+				if(this->clientIn!=NULL)
+				{
+					strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
+					clientIn(*this,newClient,pget,newaddr.sin_port);
+				}
+			}
+			else
+			{
+				int getNum=recv(temp.data.fd,(char*)pget,len,0);
+				if(getNum>0)
+				{
+					this->textLen=getNum;
+					if(fork()==0)
+					{
+						close(sock);
+						func(temp.data.fd,pget,pneed,defaultFile,*this);
+						close(temp.data.fd);
+						free(pget);
+						free(pneed);
+						exit(0);
+					}
+					else
+					{
+						if(isLongCon==false)
+						{
+					  		this->deleteFd(temp.data.fd);
+							epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
+							close(temp.data.fd);
+						}
+					}
+				}
+				else
+				{
+					if(this->clientOut!=NULL)
+					{
+						int port=0;
+						strcpy((char*)pget,this->getPeerIp(temp.data.fd,&port));
+						clientOut(*this,temp.data.fd,pget,port);
+					}
+					this->deleteFd(temp.data.fd);
 					epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
 					close(temp.data.fd);
 				}
@@ -2355,6 +2431,10 @@ private:
 			printf("404 get %s wrong\n",buf);
 		}
 	}
+	static void sigCliDeal(int pid)
+	{
+		while(waitpid(-1, NULL, WNOHANG)>0);
+	}
 };
 /********************************
 	author:chenxuan
@@ -2363,56 +2443,56 @@ private:
 *********************************/
 class MySql{
 private:
-    MYSQL* mysql;
-    MYSQL one;
-    MYSQL_RES* results;
-    MySql(MySql&);
-    MySql& operator==(MySql&);
+	MYSQL* mysql;
+	MYSQL one;
+	MYSQL_RES* results;
+	MySql(MySql&);
+	MySql& operator==(MySql&);
 public:
-    MySql(const char* ipOrHostName,const char* user,const char* passwd,const char* dataBaseName)
-    {
-        this->results=NULL;
-        this->mysql=mysql_init(NULL);
-        if(NULL==mysql_real_connect(this->mysql,ipOrHostName,user,passwd,dataBaseName,0,NULL,0))
-        {
-            this->~MySql();
-            throw;
-        }
-    }
-    ~MySql()
-    {
-        if(this->results!=NULL)
-            mysql_free_result(this->results);
-        mysql_close(mysql);
-    }
-    int MySqlSelectQuery(const char* sql)
-    {
-        if(this->results!=NULL)
-            mysql_free_result(this->results);
-        int temp=mysql_query(this->mysql,sql);
-        if(temp!=0)
-            return 0;
-        this->results=mysql_store_result(mysql);
-        if(results==NULL)
-            return 0;
-        return mysql_num_fields(this->results);
-    }
-    bool MySqlOtherQuery(const char* sql)
-    {
-        int temp=mysql_query(this->mysql,sql);
-        if(temp!=0)
-            return false;
-        return true;
-    }
-    char** MySqlGetResultRow()
-    {
-        if(this->results==NULL)
-            return NULL;
-        return mysql_fetch_row(results);
-    }
-    char* GetSqlLastError(char* errorSay)
-    {
-    	if(mysql_error(this->mysql)!=NULL)
+	MySql(const char* ipOrHostName,const char* user,const char* passwd,const char* dataBaseName)
+	{
+		this->results=NULL;
+		this->mysql=mysql_init(NULL);
+		if(NULL==mysql_real_connect(this->mysql,ipOrHostName,user,passwd,dataBaseName,0,NULL,0))
+		{
+			this->~MySql();
+			throw;
+		}
+	}
+	~MySql()
+	{
+		if(this->results!=NULL)
+			mysql_free_result(this->results);
+		mysql_close(mysql);
+	}
+	int MySqlSelectQuery(const char* sql)
+	{
+		if(this->results!=NULL)
+			mysql_free_result(this->results);
+		int temp=mysql_query(this->mysql,sql);
+		if(temp!=0)
+			return 0;
+		this->results=mysql_store_result(mysql);
+		if(results==NULL)
+			return 0;
+		return mysql_num_fields(this->results);
+	}
+	bool MySqlOtherQuery(const char* sql)
+	{
+		int temp=mysql_query(this->mysql,sql);
+		if(temp!=0)
+			return false;
+		return true;
+	}
+	char** MySqlGetResultRow()
+	{
+		if(this->results==NULL)
+			return NULL;
+		return mysql_fetch_row(results);
+	}
+	char* GetSqlLastError(char* errorSay)
+	{
+		if(mysql_error(this->mysql)!=NULL)
 			strcpy(errorSay,mysql_error(this->mysql));
 		return errorSay;
 	}
@@ -2604,47 +2684,47 @@ private:
 	ThreadPool* pool;
 	pthread_mutex_t mutex;
 protected:
-    int* pfdn;//pointer if file descriptor
-    int fdNumNow;//num of fd now
-    int fdMax;//fd max num
-    bool addFd(int addsoc)//add file des criptor
-    {
-        bool flag=false;
-        for(int i=0;i<fdNumNow;i++)
-        {
-            if(pfdn[i]==0)
-            {
-                pfdn[i]=addsoc;
-                flag=true;//has free room
-                break;
-            }
-        }
-        if(flag==false)//no free room
-        {
-            if(fdNumNow>=fdMax)
-            {
-                pfdn=(int*)realloc(pfdn,sizeof(int)*fdMax+32);//try to realloc
-                if(pfdn==NULL)
-                	return false;
-                fdMax+=10;
-            }
-            pfdn[fdNumNow]=addsoc;
-            fdNumNow++;
-        }
-        return true;
-    }
-    bool deleteFd(int clisoc)//delete
-    {
-        for(int i=0;i<fdNumNow;i++)
-        {
-            if(pfdn[i]==clisoc)
-            {
-                pfdn[i]=0;
-                return true;
-            }
-        }
-        return false;
-    }
+	int* pfdn;//pointer if file descriptor
+	int fdNumNow;//num of fd now
+	int fdMax;//fd max num
+	bool addFd(int addsoc)//add file des criptor
+	{
+		bool flag=false;
+		for(int i=0;i<fdNumNow;i++)
+		{
+			if(pfdn[i]==0)
+			{
+				pfdn[i]=addsoc;
+				flag=true;//has free room
+				break;
+			}
+		}
+		if(flag==false)//no free room
+		{
+			if(fdNumNow>=fdMax)
+			{
+				pfdn=(int*)realloc(pfdn,sizeof(int)*fdMax+32);//try to realloc
+				if(pfdn==NULL)
+					return false;
+				fdMax+=10;
+			}
+			pfdn[fdNumNow]=addsoc;
+			fdNumNow++;
+		}
+		return true;
+	}
+	bool deleteFd(int clisoc)//delete
+	{
+		for(int i=0;i<fdNumNow;i++)
+		{
+			if(pfdn[i]==clisoc)
+			{
+				pfdn[i]=0;
+				return true;
+			}
+		}
+		return false;
+	}
 public:
 	struct ArgvSer{
 		ServerTcpIpThreadPool& server;
@@ -2681,12 +2761,12 @@ public:
 			throw NULL;
 		memset(pevent,0,sizeof(epoll_event)*512);
 		memset(&nowEvent,0,sizeof(epoll_event));
-        pfdn=(int*)malloc(sizeof(int)*64);
-        if(pfdn==NULL)
-            throw NULL;
-        memset(pfdn,0,sizeof(int)*64);
-        fdNumNow=0;
-        fdMax=64;
+		pfdn=(int*)malloc(sizeof(int)*64);
+		if(pfdn==NULL)
+			throw NULL;
+		memset(pfdn,0,sizeof(int)*64);
+		fdNumNow=0;
+		fdMax=64;
 		if(threadNum>0)
 		{	
 			pool=new ThreadPool(threadNum);
@@ -2703,9 +2783,9 @@ public:
 		free(hostip);
 		free(hostname);
 		free(pevent);
-        free(pfdn);
-        free(pool);
-        pthread_mutex_destroy(&mutex);
+		free(pfdn);
+		free(pool);
+		pthread_mutex_destroy(&mutex);
 	}
 	inline void mutexLock()
 	{
@@ -2837,12 +2917,12 @@ public:
 			p[i]=pfdn[i];
 		return true;
 	}
-    void sendEverySocket(void* ps,int len)
-    {
-        for(int i=0;i<fdNumNow;i++)
-            if(pfdn[i]!=0)
-                send(pfdn[i],ps,len,0);
-    }
+	void sendEverySocket(void* ps,int len)
+	{
+		for(int i=0;i<fdNumNow;i++)
+			if(pfdn[i]!=0)
+				send(pfdn[i],ps,len,0);
+	}
 	inline int sendSocket(int socCli,const void* ps,int len)
 	{
 		return send(socCli,(char*)ps,len,0);
@@ -2885,7 +2965,7 @@ public:
 			{
 				sockaddr_in newaddr={0};
 				int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
-                this->addFd(newClient);
+				this->addFd(newClient);
 				nowEvent.data.fd=newClient;
 				nowEvent.events=EPOLLIN;
 				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
@@ -2908,7 +2988,7 @@ public:
 				{
 					*(char*)pget=0;
 					*pthing=0;
-                    this->deleteFd(temp.data.fd);
+					this->deleteFd(temp.data.fd);
 					epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
 					close(temp.data.fd);
 				}
@@ -2931,24 +3011,24 @@ public:
 		return inet_ntoa(cliAddr.sin_addr); 
 	}
 	bool disconnectSocket(int clisock)
-    {
-        close(clisock);
-        return this->deleteFd(clisock);
-    }
-    void threadModel(void* pneed,void* (*pfunc)(void*))
-    {
-    	ServerTcpIpThreadPool::ArgvSer argv={*this,0,pneed};
-    	ThreadPool::Task task={pfunc,&argv};
-    	while(1)
-    	{
+	{
+		close(clisock);
+		return this->deleteFd(clisock);
+	}
+	void threadModel(void* pneed,void* (*pfunc)(void*))
+	{
+		ServerTcpIpThreadPool::ArgvSer argv={*this,0,pneed};
+		ThreadPool::Task task={pfunc,&argv};
+		while(1)
+		{
 			sockaddr_in newaddr={0};
 			int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
 			if(newClient==-1)
 				continue;
 			this->addFd(newClient);
 			argv.soc=newClient;
-    		task.ptask=pfunc;
-    		task.arg=&argv;
+			task.ptask=pfunc;
+			task.arg=&argv;
 			pool->addTask(task);
 		}
 	}
@@ -2962,7 +3042,7 @@ public:
 			{
 				sockaddr_in newaddr={0};
 				int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
-	            this->addFd(newClient);
+				this->addFd(newClient);
 				nowEvent.data.fd=newClient;
 				nowEvent.events=EPOLLIN;
 				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
@@ -2984,7 +3064,7 @@ public:
 				{
 					*(char*)pget=0;
 					*pthing=0;
-	                this->deleteFd(temp.data.fd);
+					this->deleteFd(temp.data.fd);
 					epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
 					close(temp.data.fd);
 				}
@@ -3052,7 +3132,7 @@ public:
 	~ServerPool()
 	{
 		delete pool;
-       	pthread_mutex_destroy(&mutex);
+	   	pthread_mutex_destroy(&mutex);
 	}
 	inline void mutexLock()
 	{
@@ -3070,24 +3150,24 @@ public:
 			return false;
 	}
 	void threadModel(void* pneed,void* (*pfunc)(void*))
-    {
-    	if(this->threadNum==0)
-    	{
+	{
+		if(this->threadNum==0)
+		{
 			this->error="thread wrong init";
 			return;
 		}
-    	ServerPool::ArgvSer argv={*this,0,pneed};
-    	ThreadPool::Task task={pfunc,&argv};
-    	while(1)
-    	{
+		ServerPool::ArgvSer argv={*this,0,pneed};
+		ThreadPool::Task task={pfunc,&argv};
+		while(1)
+		{
 			sockaddr_in newaddr={0};
 			int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
 			if(newClient==-1)
 				continue;
 			this->addFd(newClient);
 			argv.soc=newClient;
-    		task.ptask=pfunc;
-    		task.arg=&argv;
+			task.ptask=pfunc;
+			task.arg=&argv;
 			pool->addTask(task);
 		}
 	}
@@ -3129,7 +3209,7 @@ public:
 				{
 					sockaddr_in newaddr={0};
 					int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
-		            this->addFd(newClient);
+					this->addFd(newClient);
 					nowEvent.data.fd=newClient;
 					nowEvent.events=EPOLLIN;
 					epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
@@ -3147,7 +3227,7 @@ public:
 					{
 						*(char*)pget=0;
 						thing=0;
-		                this->deleteFd(temp.data.fd);
+						this->deleteFd(temp.data.fd);
 						epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
 						close(temp.data.fd);
 					}
@@ -3162,6 +3242,12 @@ public:
 							free(pget);
 							exit(0);
 						}
+						else
+						{
+							this->deleteFd(temp.data.fd);
+							epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
+							close(temp.data.fd);
+						}
 					}
 				}
 			}
@@ -3169,8 +3255,8 @@ public:
 	}
 	void epollThread(void* pget,int len,void* pneed,void* (*pfunc)(void*))
 	{
-    	if(this->threadNum==0)
-    	{
+		if(this->threadNum==0)
+		{
 			this->error="thread wrong init";
 			return;
 		}
@@ -3182,7 +3268,7 @@ public:
 			{
 				sockaddr_in newaddr={0};
 				int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
-	            this->addFd(newClient);
+				this->addFd(newClient);
 				nowEvent.data.fd=newClient;
 				nowEvent.events=EPOLLIN;
 				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
@@ -3204,11 +3290,11 @@ public:
 				{
 					*(char*)pget=0;
 					thing=0;
-	                this->deleteFd(temp.data.fd);
+					this->deleteFd(temp.data.fd);
 					epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
 					close(temp.data.fd);
 				}
-				if(pfunc!=NULL)
+				if(pfunc!=NULL&&thing==2)
 				{
 					ServerPool::ArgvSerEpoll argv={*this,num,thing,getNum,pneed,pget};
 					ThreadPool::Task task={pfunc,&argv};
@@ -3381,17 +3467,17 @@ int funcTwo(int thing,int num,int,void* pget,void* sen,ServerPool& server)//main
 			printf("some thing wrong %s\n",(char*)sen);
 		else if(flag==1)
 			printf("create auto success\n");
-        else if(flag==2)
-        {
-            FILE* fp=fopen("wrong.txt","a+");
-            if(fp==NULL)
-                fp=fopen("wrong.txt","w+");
-            if(fp==NULL)
-                return 0;
-            fprintf(fp,"can not open file %s\n",ask);
-            printf("cannot open file %s\n",ask);
-            fclose(fp);
-        }
+		else if(flag==2)
+		{
+			FILE* fp=fopen("wrong.txt","a+");
+			if(fp==NULL)
+				fp=fopen("wrong.txt","w+");
+			if(fp==NULL)
+				return 0;
+			fprintf(fp,"can not open file %s\n",ask);
+			printf("cannot open file %s\n",ask);
+			fclose(fp);
+		}
 		
 		if(false==server.sendSocket(num,sen,len))
 			printf("send wrong\n");
@@ -3442,17 +3528,17 @@ void funcThree(ServerPool::Thing thing,int num,int,void* pget,void* sen,ServerPo
 			printf("some thing wrong %s\n",(char*)sen);
 		else if(flag==1)
 			printf("create auto success\n");
-        else if(flag==2)
-        {
-            FILE* fp=fopen("wrong.txt","a+");
-            if(fp==NULL)
-                fp=fopen("wrong.txt","w+");
-            if(fp==NULL)
-                return ;
-            fprintf(fp,"can not open file %s\n",ask);
-            printf("cannot open file %s\n",ask);
-            fclose(fp);
-        }
+		else if(flag==2)
+		{
+			FILE* fp=fopen("wrong.txt","a+");
+			if(fp==NULL)
+				fp=fopen("wrong.txt","w+");
+			if(fp==NULL)
+				return ;
+			fprintf(fp,"can not open file %s\n",ask);
+			printf("cannot open file %s\n",ask);
+			fclose(fp);
+		}
 		if(false==server.sendSocket(num,sen,len))
 			printf("send erong\n");
 		else
@@ -3562,6 +3648,14 @@ void* threadDo(void* argv)
 	DealHttp http;
 	char temp[1000]={0};
 	strcpy(temp,(char*)arg.pget);
+	if(arg.thing==1)
+	{
+		printf("in\n");
+	}
+	if(arg.thing==0)
+	{
+		printf("out\n");
+	}
 	if(arg.thing==2)
 	{
 		printf("get %s\n",http.analysisHttpAsk(temp));
@@ -3598,10 +3692,10 @@ int thread()
 {
 	int thing=0,num=0;
 	ServerPool server(5200);
-//	char get[2048]={0};
-//	char* sen=(char*)malloc(sizeof(char)*10000000);
-//	if(sen==NULL)
-//		printf("memory wrong\n");
+	char get[2048]={0};
+	char* sen=(char*)malloc(sizeof(char)*10000000);
+	if(sen==NULL)
+		printf("memory wrong\n");
 	if(false==server.bondhost())
 	{
 		printf("bound wrong\n");
@@ -3613,8 +3707,9 @@ int thread()
 //	server.forkModel(sen,funcFork);
 //	free(sen);
 	server.forkEpoll(1024*1024,2048,funcThree);
-//		server.epollFork(&thing,&num,get,2048,sen,funcTwo);
-//		server.epollThread(&thing,&num,get,2048,sen,threadDo);
+//		server.forkEpoll(&thing,&num,get,2048,sen,funcTwo);
+//	while(1)
+//		server.epollThread(get,2048,sen,threadDo);
 	return 0;
 	
 }
@@ -3627,11 +3722,12 @@ int main(int argc, char** argv)
 {
 //	thread();
 //	serverHttp();
-	HttpServer server(5201,true);
-	server.loadStatic("/assets","/test/assets");
-	server.loadStatic("/style.css","/test/style.css");
-	server.all(HttpServer::ONEWAY,"/root",func);
-	server.routeHandle(HttpServer::ALL,HttpServer::ONEWAY,"/key/",funHa);
-	server.run(1 ,4000,"./test/index.html");
+	HttpServer server(5200,true);
+	server.changeSetting(true,true,false);
+//	server.loadStatic("/assets","/test/assets");
+//	server.loadStatic("/style.css","/test/style.css");
+//	server.all(HttpServer::ONEWAY,"/root",func);
+//	server.routeHandle(HttpServer::ALL,HttpServer::ONEWAY,"/key/",funHa);
+	server.run(1 ,4000,"./index.html");
 	return 0;
 }
