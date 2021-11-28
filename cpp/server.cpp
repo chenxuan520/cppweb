@@ -5,6 +5,10 @@
 *********************************/
 #include"../hpp/server.h"
 #include"../hpp/http.h"
+#include<string.h>
+#include<iostream>
+//linux env
+#include<netdb.h>
 #include<netinet/in.h>
 #include<arpa/inet.h>
 #include<sys/socket.h>
@@ -14,10 +18,8 @@
 #include<sys/types.h>
 #include<signal.h>
 #include<unistd.h>
-#include<string.h>
-#include<netdb.h>
-#include<iostream>
 using namespace std;
+//linux env
 ServerTcpIp::ServerTcpIp(unsigned short port,int epollNum,int wait)
 {//port is bound ,epollNum is if open epoll model,wait is listen socket max wait
 	sock=socket(AF_INET,SOCK_STREAM,0);//AF=addr family internet
