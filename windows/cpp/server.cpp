@@ -694,12 +694,14 @@ ClientTcpIp::~ClientTcpIp()
 	closesocket(sock);
 	WSACleanup();
 }
-void ClientTcpIp::addHostIp(const char* ip)
+void ClientTcpIp::addHostIp(const char* ip,unsigned short port)
 {
 	if(ip==NULL)
 		return;
 	strcpy(this->ip,ip);
 	addrC.sin_addr.S_un.S_addr=inet_addr(ip);
+	if(port!=0)
+		addrC.sin_port=htons(port);
 }
 bool ClientTcpIp::tryConnect()
 {

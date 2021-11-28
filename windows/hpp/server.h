@@ -146,7 +146,7 @@ private:
 public:
 	ClientTcpIp(const char* hostIp,int port=5200);
 	~ClientTcpIp();
-	void addHostIp(const char* ip);
+	void addHostIp(const char* ip,unsigned short port);
 	bool tryConnect();
 	inline int receiveHost(void* prec,int len)
 	{
