@@ -1574,7 +1574,7 @@ public:
 		in_addr addr;
 		char* p=phost->h_addr_list[0];
 		memcpy(&addr.S_un.S_addr,p,phost->h_length);
-		if(strlen(inet_ntoa(addr))<=ipMaxLen)
+		if(strlen(inet_ntoa(addr))>=ipMaxLen)
 			return false;
 		strcpy(ip,inet_ntoa(addr));
 		return true;

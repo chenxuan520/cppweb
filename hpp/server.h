@@ -181,7 +181,7 @@ private:
 public:
 	ClientTcpIp(const char* hostIp,unsigned short port);
 	~ClientTcpIp();
-	void addHostIp(const char* ip);
+	void addHostIp(const char* ip,unsigned short port=0);
 	bool tryConnect();
 	inline int receiveHost(void* prec,int len)
 	{

@@ -961,12 +961,14 @@ ClientTcpIp::~ClientTcpIp()
 	free(hostname);
 	close(sock);
 }
-void ClientTcpIp::addHostIp(const char* ip)
+void ClientTcpIp::addHostIp(const char* ip,unsigned short port)
 {
 	if(ip==NULL)
 		return;
 	strcpy(this->ip,ip);
 	addrC.sin_addr.s_addr=inet_addr(ip);
+	if(port!=0)
+		addrC.sin_port=htons(port);
 }
 bool ClientTcpIp::tryConnect()
 {

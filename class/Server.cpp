@@ -990,12 +990,14 @@ public:
 		free(hostname);
 		close(sock);
 	}
-	void addHostIp(const char* ip)
+	void addHostIp(const char* ip,unsigned short port=0)
 	{
 		if(ip==NULL)
 			return;
 		strcpy(this->ip,ip);
 		addrC.sin_addr.s_addr=inet_addr(ip);
+		if(port!=0)
+			addrC.sin_port=htons(port);
 	}
 	bool tryConnect()
 	{
