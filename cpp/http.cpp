@@ -24,17 +24,17 @@ bool DealHttp::cutLineAsk(char* pask,const char* pcutIn)
 	*ptemp=0;
 	return true;
 }
-const char* DealHttp::analysisHttpAsk(void* pask,const char* pneed,int needLen)
+const char* DealHttp::analysisHttpAsk(void* message,const char* pneed)
 {
-	if(pask==NULL)
+	if(message==NULL)
 	{
 		error="wrong NULL";
 		return NULL;
 	}
-	pfind=strstr((char*)pask,pneed);
+	pfind=strstr((char*)message,pneed);
 	if(pfind==NULL)
 		return NULL;
-	return this->findBackString(pfind,needLen,ask,256);
+	return this->findBackString(pfind,strlen(pneed),ask,256);
 }
 char* DealHttp::findBackString(char* local,int len,char* word,int maxWordLen)
 {
@@ -87,10 +87,13 @@ void* DealHttp::customizeAddTop(void* buffer,int bufferLen,int statusNum,int con
 }
 void* DealHttp::customizeAddHead(void* buffer,int bufferLen,const char* key,const char* value)
 {
+	if(strlen((char*)buffer)+strlen(key)+strlen(value)+4>=bufferLen)
+		return NULL;
 	strcat((char*)buffer,key);
 	strcat((char*)buffer,": ");
 	strcat((char*)buffer,value);
 	strcat((char*)buffer,"\r\n");
+	return buffer;
 }
 int DealHttp::customizeAddBody(void* buffer,int bufferLen,const char* body,unsigned int bodyLen)
 {
@@ -146,8 +149,13 @@ const char* DealHttp::getCookie(void* recText,const char* key,char* value,unsign
 	*temp='\r';
 	return value;
 }
-void DealHttp::createTop(FileKind kind,char* ptop,int* topLen,int fileLen)//1:http 2:down 3:pic
+void DealHttp::createTop(FileKind kind,char* ptop,unsigned int bufLen,int* topLen,int fileLen)//1:http 2:down 3:pic
 {
+	if(bufLen<100)
+	{
+		this->error="buffer too short";
+		return;
+	}
 	switch (kind)
 	{
 		case UNKNOWN:
@@ -215,25 +223,25 @@ void DealHttp::createTop(FileKind kind,char* ptop,int* topLen,int fileLen)//1:ht
 			break;
 	}
 }
-bool DealHttp::createSendMsg(FileKind kind,char* pask,const char* pfile,int* plong)
+bool DealHttp::createSendMsg(FileKind kind,char* buffer,unsigned int bufferLen,const char* pfile,int* plong)
 {
 	int temp=0;
 	int len=0,noUse=0;
 	if(kind==NOFOUND)
 	{
-		this->createTop(kind,pask,&temp,len);
+		this->createTop(kind,buffer,bufferLen,&temp,len);
 		*plong=len+temp+1;
 		return true;
 	}
 	len=this->getFileLen(pfile);
 	if(len==0)
 		return false;
-	this->createTop(kind,pask,&temp,len);
-	this->findFileMsg(pfile,&noUse,pask+temp);
+	this->createTop(kind,buffer,bufferLen,&temp,len);
+	this->findFileMsg(pfile,&noUse,buffer+temp,bufferLen);
 	*plong=len+temp+1;
 	return true;
 }
-char* DealHttp::findFileMsg(const char* pname,int* plen,char* buffer)
+char* DealHttp::findFileMsg(const char* pname,int* plen,char* buffer,unsigned int bufferLen)
 {
 	FILE* fp=fopen(pname,"rb+");
 	int flen=0,i=0;
@@ -241,6 +249,12 @@ char* DealHttp::findFileMsg(const char* pname,int* plen,char* buffer)
 		return NULL;
 	fseek(fp,0,SEEK_END);
 	flen=ftell(fp);
+	if(flen>=bufferLen)
+	{
+		this->error="buffer too short";
+		fclose(fp);
+		return NULL;
+	}
 	fseek(fp,0,SEEK_SET);
 	for(i=0;i<flen;i++)
 		buffer[i]=fgetc(fp);
@@ -260,93 +274,93 @@ int DealHttp::getFileLen(const char* pname)
 	fclose(fp);
 	return len;
 }
-int DealHttp::autoAnalysisGet(const char* pask,char* psend,const char* pfirstFile,int* plen)
+int DealHttp::autoAnalysisGet(const char* message,char* psend,unsigned int bufferLen,const char* pfirstFile,int* plen)
 {
-	if(NULL==this->analysisHttpAsk((void*)pask))
-        return 0;
-    if(strcmp(ask,"HTTP/1.1")==0||strcmp(ask,"HTTP/1.0")==0)
-    {
-        if(false==this->createSendMsg(HTML,psend,pfirstFile,plen))
-        {
-            if(false==this->createSendMsg(NOFOUND,psend,pfirstFile,plen))
-                return 0;
-            else 
-                return 2;
-        }
-        else
-        	return 1;
-    }
-    else if(strstr(ask,".html"))
-    {
-        if(false==this->createSendMsg(HTML,psend,ask,plen))
-            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
-                return 0;
-            else 
-                return 2;
-        else
-        	return 1;
-    }
-    else if(strstr(ask,".exe"))
-    {
-        if(false==this->createSendMsg(EXE,psend,ask,plen))
-            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
-                return 0;
-            else 
-                return 2;
-        else
-        	return 1;	        
-    }
-    else if(strstr(ask,".png")||strstr(ask,".PNG")||strstr(ask,".jpg")||strstr(ask,".jpeg"))
-    {
-        if(false==this->createSendMsg(IMAGE,psend,ask,plen))
-            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
-                return 0;
-            else 
-                return 2;
-        else
-        	return 1;	                
-    }
-    else if(strstr(ask,".css"))
-    {
-        if(false==this->createSendMsg(CSS,psend,ask,plen))
-            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
-                return 0;
-            else 
-                return 2;
-        else
-        	return 1;	                
-    }
-    else if(strstr(ask,".js"))
-    {
-        if(false==this->createSendMsg(JS,psend,ask,plen))
-            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
-                return 0;
-            else 
-                return 2;
-        else
-        	return 1;
-    }
-	else if(strstr(ask,".json"))
-    {
-        if(false==this->createSendMsg(JSON,psend,ask,plen))
-            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
-                return 0;
-            else 
-                return 2;
-        else
-        	return 1;
-    }
-    else 
-    {
-        if(false==this->createSendMsg(UNKNOWN,psend,ask,plen))
-            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
-                return 0;
-            else 
-                return 2;
-        else
-        	return 1;
+	if(NULL==this->analysisHttpAsk((void*)message))
+		return 0;
+	if(strcmp(ask,"HTTP/1.1")==0||strcmp(ask,"HTTP/1.0")==0)
+	{
+		if(false==this->createSendMsg(HTML,psend,bufferLen,pfirstFile,plen))
+		{
+			if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
+				return 0;
+			else 
+				return 2;
+		}
+		else
+			return 1;
 	}
-    return 1;
+	else if(strstr(ask,".html"))
+	{
+		if(false==this->createSendMsg(HTML,psend,bufferLen,ask,plen))
+			if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
+				return 0;
+			else 
+				return 2;
+		else
+			return 1;
+	}
+	else if(strstr(ask,".exe"))
+	{
+		if(false==this->createSendMsg(EXE,psend,bufferLen,ask,plen))
+			if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
+				return 0;
+			else 
+				return 2;
+		else
+			return 1;			
+	}
+	else if(strstr(ask,".png")||strstr(ask,".PNG")||strstr(ask,".jpg")||strstr(ask,".jpeg"))
+	{
+		if(false==this->createSendMsg(IMAGE,psend,bufferLen,ask,plen))
+			if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
+				return 0;
+			else 
+				return 2;
+		else
+			return 1;					
+	}
+	else if(strstr(ask,".css"))
+	{
+		if(false==this->createSendMsg(CSS,psend,bufferLen,ask,plen))
+			if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
+				return 0;
+			else 
+				return 2;
+		else
+			return 1;					
+	}
+	else if(strstr(ask,".js"))
+	{
+		if(false==this->createSendMsg(JS,psend,bufferLen,ask,plen))
+			if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
+				return 0;
+			else 
+				return 2;
+		else
+			return 1;
+	}
+	else if(strstr(ask,".json"))
+	{
+		if(false==this->createSendMsg(JSON,psend,bufferLen,ask,plen))
+			if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
+				return 0;
+			else 
+				return 2;
+		else
+			return 1;
+	}
+	else 
+	{
+		if(false==this->createSendMsg(UNKNOWN,psend,bufferLen,ask,plen))
+			if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
+				return 0;
+			else 
+				return 2;
+		else
+			return 1;
+	}
+	return 1;
 }
 const char* DealHttp::getKeyValue(const void* message,const char* key,char* value,int maxValueLen,bool onlyFromBody)
 {

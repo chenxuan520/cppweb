@@ -461,10 +461,10 @@ void HttpServer::run(unsigned int memory,unsigned int recBufLenChar,const char* 
 		printf("server is ok\n");
 	if(isFork==false)
 		while(1)
-			this->epollHttp(get,recBufLenChar,sen,defaultFile);
+			this->epollHttp(get,recBufLenChar,memory,sen,defaultFile);
 	else
 		while(1)
-			this->forkHttp(get,recBufLenChar,sen,defaultFile);
+			this->forkHttp(get,recBufLenChar,memory,sen,defaultFile);
 	free(sen);
 	free(get);
 }
@@ -496,7 +496,7 @@ void HttpServer::changeSetting(bool debug,bool isLongCon,bool isForkModel)
 	if(isFork==true)
 		signal(SIGCHLD,sigCliDeal);
 }
-int HttpServer::func(int num,void* pget,void* sen,const char* defaultFile,HttpServer& server)
+int HttpServer::func(int num,void* pget,void* sen,unsigned int senLen,const char* defaultFile,HttpServer& server)
 {
 	static DealHttp http;
 	AskType type=GET;
@@ -550,7 +550,12 @@ int HttpServer::func(int num,void* pget,void* sen,const char* defaultFile,HttpSe
 		}
 	}
 	if(pfunc!=NULL)
-		pfunc(http,*this,num,sen,len);
+	{
+		if(pfunc!=loadFile)
+			pfunc(http,*this,num,sen,len);
+		else
+			pfunc(http,*this,senLen,sen,len);
+	}
 	else
 	{
 		if(isDebug)
@@ -558,7 +563,7 @@ int HttpServer::func(int num,void* pget,void* sen,const char* defaultFile,HttpSe
 		if(http.analysisHttpAsk(pget)!=NULL)
 		{
 			strcpy(ask,http.analysisHttpAsk(pget));
-			flag=http.autoAnalysisGet((char*)pget,(char*)sen,defaultFile,&len);
+			flag=http.autoAnalysisGet((char*)pget,(char*)sen,senLen*1024*1024,defaultFile,&len);
 		}
 		if(flag==2)
 		{
@@ -568,7 +573,7 @@ int HttpServer::func(int num,void* pget,void* sen,const char* defaultFile,HttpSe
 		}
 	}
 	if(len==0)
-		http.createSendMsg(DealHttp::NOFOUND,(char*)sen,NULL,&len);
+		http.createSendMsg(DealHttp::NOFOUND,(char*)sen,senLen*1024*1024,NULL,&len);
 	if(false==server.sendSocket(num,sen,len))
 	{
 		if(isDebug)
@@ -581,7 +586,7 @@ int HttpServer::func(int num,void* pget,void* sen,const char* defaultFile,HttpSe
 	}
 	return 0;
 }
-void HttpServer::epollHttp(void* pget,int len,void* pneed,const char* defaultFile)
+void HttpServer::epollHttp(void* pget,int len,unsigned int senLen,void* pneed,const char* defaultFile)
 {//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
 	memset(pget,0,sizeof(char)*len);
 	int eventNum=epoll_wait(epfd,pevent,512,-1);
@@ -608,7 +613,7 @@ void HttpServer::epollHttp(void* pget,int len,void* pneed,const char* defaultFil
 			if(getNum>0)
 			{
 				this->textLen=getNum;
-				func(temp.data.fd,pget,pneed,defaultFile,*this);
+				func(temp.data.fd,pget,pneed,senLen,defaultFile,*this);
 				if(isLongCon==false)
 				{
 			  		this->deleteFd(temp.data.fd);
@@ -632,7 +637,7 @@ void HttpServer::epollHttp(void* pget,int len,void* pneed,const char* defaultFil
 	}
 	return ;
 }
-void HttpServer::forkHttp(void* pget,int len,void* pneed,const char* defaultFile)
+void HttpServer::forkHttp(void* pget,int len,unsigned int senLen,void* pneed,const char* defaultFile)
 {
 	memset(pget,0,sizeof(char)*len);
 	int eventNum=epoll_wait(epfd,pevent,512,-1);
@@ -662,7 +667,7 @@ void HttpServer::forkHttp(void* pget,int len,void* pneed,const char* defaultFile
 				if(fork()==0)
 				{
 					close(sock);
-					func(temp.data.fd,pget,pneed,defaultFile,*this);
+					func(temp.data.fd,pget,pneed,senLen,defaultFile,*this);
 					close(temp.data.fd);
 					free(pget);
 					free(pneed);
@@ -672,7 +677,7 @@ void HttpServer::forkHttp(void* pget,int len,void* pneed,const char* defaultFile
 				{
 					if(isLongCon==false)
 					{
-						this->deleteFd(temp.data.fd);
+				  		this->deleteFd(temp.data.fd);
 						epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
 						close(temp.data.fd);
 					}
@@ -694,14 +699,14 @@ void HttpServer::forkHttp(void* pget,int len,void* pneed,const char* defaultFile
 	}
 	return ;
 }
-void HttpServer::loadFile(DealHttp& http,HttpServer& server,int,void* sen,int& len)
+void HttpServer::loadFile(DealHttp& http,HttpServer& server,int senLen,void* sen,int& len)
 {
 	char ask[200]={0},buf[200]={0},temp[200]={0};
 	http.getAskRoute(server.recText(),"GET",ask,200);
 	HttpServer::RouteFuntion& route=*server.getNowRoute();
 	http.getWildUrl(ask,route.route,temp,200);
 	sprintf(buf,"GET %s%s HTTP/1.1",route.path,temp);
-	if(2==http.autoAnalysisGet(buf,(char*)sen,NULL,&len))
+	if(2==http.autoAnalysisGet(buf,(char*)sen,senLen*1024*1024,NULL,&len))
 	{
 		LogSystem::recordFileError(ask);
 		printf("404 get %s wrong\n",buf);

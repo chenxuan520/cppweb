@@ -133,10 +133,10 @@ private:
 	{
 		return pnowRoute;
 	}
-	int func(int num,void* pget,void* sen,const char* defaultFile,HttpServer& server);
-	void epollHttp(void* pget,int len,void* pneed,const char* defaultFile);
-	void forkHttp(void* pget,int len,void* pneed,const char* defaultFile);
-	static void loadFile(DealHttp& http,HttpServer& server,int,void* sen,int& len);
+	int func(int num,void* pget,void* sen,unsigned int senLen,const char* defaultFile,HttpServer& server);
+	void epollHttp(void* pget,int len,unsigned int senLen,void* pneed,const char* defaultFile);
+	void forkHttp(void* pget,int len,unsigned int senLen,void* pneed,const char* defaultFile);
+	static void loadFile(DealHttp& http,HttpServer& server,int senLen,void* sen,int& len);
 	static void sigCliDeal(int pid);
 };
 class Email{
