@@ -3,8 +3,6 @@
 #include"./http.h"
 #include<string.h>
 #include<iostream>
-//linux env
-#ifndef _WIN32
 #include<netinet/in.h>
 #include<arpa/inet.h>
 #include<sys/socket.h>
@@ -13,14 +11,8 @@
 #include<sys/types.h>
 #include<unistd.h>
 #include<netdb.h>
-//windows env
-#else
-#include<winsock2.h>
-#endif
 
 using namespace std;
-//linux env
-#ifndef _WIN32
 /********************************
 	author:chenxuan
 	date:2021/11/11
@@ -49,15 +41,15 @@ protected:
 	sockaddr_in client;//IPv4 of client;
 	fd_set  fdClients;//file descriptor
 protected:
-    int* pfdn;//pointer if file descriptor
-    int fdNumNow;//num of fd now
-    int fdMax;//fd max num
-    bool addFd(int addsoc);
-    bool deleteFd(int clisoc);
+	int* pfdn;//pointer if file descriptor
+	int fdNumNow;//num of fd now
+	int fdMax;//fd max num
+	bool addFd(int addsoc);
+	bool deleteFd(int clisoc);
 public:
-    ServerTcpIp(unsigned short port=5200,int epollNum=1,int wait=5);
-    ~ServerTcpIp();//clean server
-    bool bondhost();//bond myself first
+	ServerTcpIp(unsigned short port=5200,int epollNum=1,int wait=5);
+	~ServerTcpIp();//clean server
+	bool bondhost();//bond myself first
 	bool setlisten();//set listem to accept second
 	int acceptClient();//wait until success model one
 	bool acceptClients(int* pcliNum);//model two
@@ -102,6 +94,8 @@ private:
 	unsigned int now;
 	int textLen;
 	bool isDebug;
+	bool isLongCon;
+	bool isFork;
 	void (*clientIn)(HttpServer&,int num,void* ip,int port);
 	void (*clientOut)(HttpServer&,int num,void* ip,int port);
 public:
@@ -117,6 +111,7 @@ public:
 	void run(unsigned int memory,unsigned int recBufLenChar,const char* defaultFile);
 	int httpSend(int num,void* buffer,int sendLen);
 	int httpRecv(int num,void* buffer,int bufferLen);
+	void changeSetting(bool debug,bool isLongCon,bool isForkModel);
 	inline void* recText()
 	{
 		return this->getText;
@@ -138,30 +133,32 @@ private:
 	{
 		return pnowRoute;
 	}
-	int func(int num,void* pget,void* sen,const char* defaultFile,HttpServer& server);
-	void epollHttp(void* pget,int len,void* pneed,const char* defaultFile);
-	static void loadFile(DealHttp& http,HttpServer& server,int,void* sen,int& len);
+	int func(int num,void* pget,void* sen,unsigned int senLen,const char* defaultFile,HttpServer& server);
+	void epollHttp(void* pget,int len,unsigned int senLen,void* pneed,const char* defaultFile);
+	void forkHttp(void* pget,int len,unsigned int senLen,void* pneed,const char* defaultFile);
+	static void loadFile(DealHttp& http,HttpServer& server,int senLen,void* sen,int& len);
+	static void sigCliDeal(int pid);
 };
 class Email{
 private:
 	sockaddr_in their_addr;
 	bool isDebug;
 	char error[30];
-    struct Base64Date6
-    {
-        unsigned int d4 : 6;
-        unsigned int d3 : 6;
-        unsigned int d2 : 6;
-        unsigned int d1 : 6;
-    };
+	struct Base64Date6
+	{
+		unsigned int d4 : 6;
+		unsigned int d3 : 6;
+		unsigned int d2 : 6;
+		unsigned int d1 : 6;
+	};
 public:
 	Email(const char* domain,bool debug=false);
 	bool emailSend(const char* sendEmail,const char* passwd,const char* recEmail,const char* body);
 	char ConvertToBase64(char uc);
-    void EncodeBase64(char *dbuf, char *buf128, int len);
-    void CreateSend(const char* youName,const char* toName,const char* from,const char* to,const char* subject,const char* body,char* buf);
-    inline const char* LastError()
-    {
+	void EncodeBase64(char *dbuf, char *buf128, int len);
+	void CreateSend(const char* youName,const char* toName,const char* from,const char* to,const char* subject,const char* body,char* buf);
+	inline const char* LastError()
+	{
 		return error;
 	}
 	static const char* getDomainBySelfEmail(const char* email,char* buffer,int bufferLen);
@@ -184,7 +181,7 @@ private:
 public:
 	ClientTcpIp(const char* hostIp,unsigned short port);
 	~ClientTcpIp();
-	void addHostIp(const char* ip);
+	void addHostIp(const char* ip,unsigned short port=0);
 	bool tryConnect();
 	inline int receiveHost(void* prec,int len)
 	{
@@ -224,8 +221,4 @@ public:
 //		return SSL_read(ssl,buffer,len);
 //	}
 };
-#elif
-//windows class
-
-#endif
 #endif

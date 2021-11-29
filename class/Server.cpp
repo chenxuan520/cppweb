@@ -1093,7 +1093,7 @@ private:
 	const char* error;
 public:
 	enum FileKind{
-		UNKNOWN=0,HTML=1,EXE=2,IMAGE=3,NOFOUND=4,CSS=5,JS=6,ZIP7=7,JSON=8,
+		UNKNOWN=0,HTML=1,EXE=2,IMAGE=3,NOFOUND=4,CSS=5,JS=6,ZIP=7,JSON=8,
 	};
 public:
 	DealHttp()
@@ -1168,11 +1168,17 @@ public:
 			case 301:
 				statusEng="Moved Permanently";
 				break;
+			case 400:
+				statusEng="Bad Request";
+				break;
 			case 403:
 				statusEng="Forbidden";
 				break;
 			case 404:
 				statusEng="Not Found";
+				break;
+			case 501:
+				statusEng="Not Implemented";
 				break;
 		}
 		sprintf((char*)buffer,"HTTP/1.1 %d %s\r\n"
@@ -1304,11 +1310,11 @@ public:
 				"Content-Type:text/javascript\r\n"
 				"Content-Length:%d\r\n\r\n",fileLen);
 				break;
-			case ZIP7:
+			case ZIP:
 				*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
 				"Server LCserver/1.1\r\n"
 				"Connection: keep-alive\r\n"
-				"Content-Type:application/x-7z-compressed\r\n"
+				"Content-Type:application/zip\r\n"
 				"Content-Length:%d\r\n\r\n",fileLen);
 				break;
 			case JSON:
@@ -1400,6 +1406,16 @@ public:
 		else if(strstr(ask,".exe"))
 		{
 			if(false==this->createSendMsg(EXE,psend,bufferLen,ask,plen))
+				if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
+					return 0;
+				else 
+					return 2;
+			else
+				return 1;			
+		}
+		else if(strstr(ask,".zip"))
+		{
+			if(false==this->createSendMsg(ZIP,psend,bufferLen,ask,plen))
 				if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
 					return 0;
 				else 
