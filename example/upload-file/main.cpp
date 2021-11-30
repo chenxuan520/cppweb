@@ -11,7 +11,7 @@ void upload(DealHttp& http,HttpServer& server,int,void* sen,int& len)
 		cout<<"wrong:"<<(char*)server.recText()<<endl;
 	else
 		FileGet::writeToFile(name,(char*)sen,strlen((char*)sen));
-	http.createSendMsg(DealHttp::HTML,(char*)sen,"index.html",&len);
+	http.createSendMsg(DealHttp::HTML,(char*)sen,1024*1024,"index.html",&len);
 }
 int main()  
 {  

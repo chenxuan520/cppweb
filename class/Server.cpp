@@ -1599,23 +1599,28 @@ public:
 	static const char* urlDecode(char* srcString)
 	{
 		char ch=0;
-		int temp=0;
+		int temp=0,srcLen=strlen(srcString);
 		char* buffer=(char*)malloc(sizeof(char)*strlen(srcString));
 		if(buffer==NULL)
 			return NULL;
 		memset(buffer,0,sizeof(char)*strlen(srcString));
 		for (unsigned int i=0; i<strlen(srcString); i++) 
 		{
-			if (int(srcString[i])==37) 
+		    if (int(srcString[i])==37) 
 			{
-				sscanf(srcString+i+1, "%x", &temp);
-				ch=(char)temp;
-				buffer[strlen(buffer)]=ch;
-				buffer[strlen(buffer)+1]=0;
-				i=i+2;
-			} 
+		        sscanf(srcString+i+1, "%x", &temp);
+		        ch=(char)temp;
+		        buffer[strlen(buffer)]=ch;
+		        buffer[strlen(buffer)+1]=0;
+		        i=i+2;
+		    } 
 			else 
-				buffer[strlen(buffer)]=srcString[i];
+		        buffer[strlen(buffer)]=srcString[i];
+		}
+		if(srcLen<strlen(buffer))
+		{
+			free(buffer);
+			return NULL;
 		}
 		strcpy(srcString,buffer);
 		free(buffer);

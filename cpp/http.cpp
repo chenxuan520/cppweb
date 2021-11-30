@@ -473,7 +473,7 @@ int DealHttp::getRecFile(const void* message,char* fileName,int nameLen,char* bu
 const char* DealHttp::urlDecode(char* srcString)
 {
 	char ch=0;
-	int temp=0;
+	int temp=0,srcLen=strlen(srcString);
 	char* buffer=(char*)malloc(sizeof(char)*strlen(srcString));
 	if(buffer==NULL)
 		return NULL;
@@ -490,6 +490,11 @@ const char* DealHttp::urlDecode(char* srcString)
 	    } 
 		else 
 	        buffer[strlen(buffer)]=srcString[i];
+	}
+	if(srcLen<strlen(buffer))
+	{
+		free(buffer);
+		return NULL;
 	}
 	strcpy(srcString,buffer);
 	free(buffer);
