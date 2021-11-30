@@ -713,7 +713,7 @@ public:
 		fdNumNow=0;
 		fdMax=64;
 	}
-	~ServerTcpIp()//clean server
+	virtual ~ServerTcpIp()//clean server
 	{
 		close(sock);
 		close(sockC);
@@ -880,6 +880,8 @@ public:
 		char* p=phost->h_addr_list[0];
 		memcpy(&addr.s_addr,p,phost->h_length);
 		memset(hostip,0,sizeof(char)*200);
+		if(strlen(inet_ntoa(addr))>=200)
+			return NULL;
 		memcpy(hostip,inet_ntoa(addr),strlen(inet_ntoa(addr)));
 		return hostip;
 	}
@@ -956,6 +958,7 @@ private:
 	char* hostip;//host ip
 	char* hostname;//host name
 	char selfIp[100];
+	const char* error;
 	SSL* ssl;
 	SSL_CTX* ctx;
 public:
@@ -964,8 +967,18 @@ public:
 		memset(ip,0,100);
 		memset(selfIp,0,100);
 		hostip=(char*)malloc(sizeof(char)*50);
+		if(hostip==NULL)
+		{
+			error="malloc wrong";
+			return;
+		}
 		memset(hostip,0,sizeof(char)*50);
 		hostname=(char*)malloc(sizeof(char)*50);
+		if(hostname==NULL)
+		{
+			error="malloc wrong";
+			return;
+		}		
 		memset(hostname,0,sizeof(char)*50);
 		if(hostIp!=NULL)
 			strcpy(ip,hostIp);
@@ -974,6 +987,7 @@ public:
 			addrC.sin_addr.s_addr=inet_addr(hostIp);
 		addrC.sin_family=AF_INET;//af_intt IPv4
 		addrC.sin_port=htons(port);
+		error=NULL;
 		ssl=NULL;
 		ctx=NULL;
 	}
@@ -1072,6 +1086,10 @@ public:
 			return false;
 		return true;
 	}
+	inline const char* getLastError()
+	{
+		return this->error;
+	}
 	inline int sendhostSSL(const void* psen,int len)
 	{
 		return SSL_write(ssl,psen,len);
@@ -1154,7 +1172,7 @@ public:
 		word[i]=0;
 		return word;
 	}
-	void* customizeAddTop(void* buffer,int bufferLen,int statusNum,int contentLen,const char* contentType="application/json",const char* connection="keep-alive")
+	void* customizeAddTop(void* buffer,int bufferLen,int statusNum,int contentLen,const char* contentType="application/json",const char* connection="keep-alive",const char* staEng=NULL)
 	{
 		const char* statusEng=NULL;
 		switch(statusNum)
@@ -1179,6 +1197,9 @@ public:
 				break;
 			case 501:
 				statusEng="Not Implemented";
+				break;
+			default:
+				statusEng=staEng;
 				break;
 		}
 		sprintf((char*)buffer,"HTTP/1.1 %d %s\r\n"
@@ -1519,7 +1540,9 @@ public:
 		char* temp=strstr((char*)message,askWay);
 		if(temp==NULL)
 			return NULL;
-		sscanf(temp+strlen(askWay)+1,"%s",buffer);
+		char format[20]={0};
+		sprintf(format,"%%%us",bufferLen);
+		sscanf(temp+strlen(askWay)+1,format,buffer);
 		return buffer;
 	}
 	const char* getRouteValue(const void* routeMsg,const char* key,char* value,unsigned int valueLen)
@@ -1535,7 +1558,9 @@ public:
 		if(temp==NULL)
 			return NULL;
 		temp+=strlen(route);
-		sscanf(temp,"%s",buffer);
+		char format[20]={0};
+		sprintf(format,"%%%us",maxLen);
+		sscanf(temp,format,buffer);
 		return buffer;
 	}
 	int getRecFile(const void* message,char* fileName,int nameLen,char* buffer,int bufferLen)
@@ -1568,32 +1593,39 @@ public:
 		buffer[i+1]=0;
 		return result;
 	}
-	static void dealUrl(const char* url,char* urlTop,char* urlEnd)
+	static void dealUrl(const char* url,char* urlTop,char* urlEnd,unsigned int topLen,unsigned int endLen)
 	{
 		const char* ptemp=NULL;
+		char format[20]={0};
 		int len=0;
 		if((ptemp=strstr(url,"http://"))==NULL)
 		{
 			if(strstr(url,"https://")!=NULL)
 			{
-				sscanf(url+8,"%[^/]",urlTop);
+				sprintf(format,"%%%u[^/]",topLen);
+				sscanf(url+8,format,urlTop);
 				len=strlen(urlTop);
-				sscanf(url+len+8,"%s",urlEnd);
+				sprintf(format,"%%%us",endLen);
+				sscanf(url+len+8,format,urlEnd);
 				return;
 			}
 			else
 			{
-				sscanf(url,"%[^/]",urlTop);
+				sprintf(format,"%%%u[^/]",topLen);
+				sscanf(url,format,urlTop);
 				len=strlen(urlTop);
-				sscanf(url+len,"%s",urlEnd);
+				sprintf(format,"%%%us",endLen);
+				sscanf(url+len,format,urlEnd);
 				return;
 			}
 		}
 		else
 		{
-			sscanf(url+7,"%[^/]",urlTop);
+			sprintf(format,"%%%u[^/]",topLen);
+			sscanf(url+7,format,urlTop);
 			len=strlen(urlTop);
-			sscanf(url+len+7,"%s",urlEnd);
+			sprintf(format,"%%%us",endLen);
+			sscanf(url+len+7,format,urlEnd);
 		}
 	}
 	static const char* urlDecode(char* srcString)
@@ -1687,7 +1719,7 @@ public:
 		backString=(char*)malloc(sizeof(char)*strlen(token));
 		memset(backString,0,sizeof(char)*strlen(token));
 		char endString[20]={0};
-		if(sscanf(temp+1,"%[^.]",endString)<=0)
+		if(sscanf(temp+1,"%20[^.]",endString)<=0)
 		{
 			sprintf(err,"get time wrong");
 			return NULL;
@@ -2038,7 +2070,7 @@ public:
 		ONEWAY,WILD,STATIC,
 	};
 	enum AskType{
-		GET,POST,ALL,
+		GET,POST,PUT,DELETE,ALL,
 	};
 	struct RouteFuntion{
 		AskType ask;
@@ -2267,12 +2299,26 @@ private:
 				printf("Get url:%s\n",ask);
 			type=GET;
 		}
-		if(strstr(ask,"POST")!=NULL)
+		else if(strstr(ask,"POST")!=NULL)
 		{
 			http.getAskRoute(pget,"POST",ask,200);
 			if(isDebug)
 				printf("POST url:%s\n",ask);
 			type=POST;
+		}
+		else if(strstr(ask,"PUT")!=NULL)
+		{
+			http.getAskRoute(pget,"PUT",ask,200);
+			if(isDebug)
+				printf("PUT url:%s\n",ask);
+			type=PUT;
+		}
+		else if(strstr(ask,"DELETE")!=NULL)
+		{
+			http.getAskRoute(pget,"DELETE",ask,200);
+			if(isDebug)
+				printf("DELETE url:%s\n",ask);
+			type=DELETE;
 		}
 		void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&)=NULL;
 		for(unsigned int i=0;i<now;i++)
@@ -3193,11 +3239,11 @@ public:
 	}
 	void threadModel(void* pneed,void* (*pfunc)(void*))
 	{
-		if(this->threadNum==0)
-		{
-			this->error="thread wrong init";
-			return;
-		}
+//		if(this->threadNum==0)
+//		{
+//			this->error="thread wrong init";
+//			return;
+//		}
 		ServerPool::ArgvSer argv={*this,0,pneed};
 		ThreadPool::Task task={pfunc,&argv};
 		while(1)
@@ -3210,7 +3256,8 @@ public:
 			argv.soc=newClient;
 			task.ptask=pfunc;
 			task.arg=&argv;
-			pool->addTask(task);
+			ThreadPool::createDetachPthread(&argv,pfunc);
+//			pool->addTask(task);
 		}
 	}
 	void forkModel(void* pneed,void (*pfunc)(ServerPool&,int,void*))
@@ -3747,12 +3794,12 @@ int thread()
 	if(false==server.setlisten())
 		exit(0);
 //	printf("server ip is:%s\nthe server is ok\n",server.getHostIp());
-	server.forkModel(sen,funcFork);
+//	server.forkModel(sen,funcFork);
 //	free(sen);
 //	server.forkEpoll(1024*1024,2048,funcThree);
 //		server.forkEpoll(&thing,&num,get,2048,sen,funcTwo);
 	printf("server ok\n");
-//		server.threadModel(NULL,threadDo);
+		server.threadModel(NULL,threadDo);
 //	while(1);
 //		server.epollThread(get,2048,sen,threadDo);
 	return 0;
@@ -3765,10 +3812,10 @@ int thread()
 *********************************/
 int main(int argc, char** argv) 
 {
-//	thread();
+	thread();
 //	serverHttp();
 	HttpServer server(5200,true);
-	server.changeSetting(true,true,true);
+	server.changeSetting(true,true,false);
 	server.loadStatic("/assets","/test/assets");
 	server.loadStatic("/style.css","/test/style.css");
 	server.all(HttpServer::ONEWAY,"/root",func);

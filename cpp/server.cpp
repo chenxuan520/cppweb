@@ -220,6 +220,8 @@ char* ServerTcpIp::getHostIp()//get self ip
 	char* p=phost->h_addr_list[0];
 	memcpy(&addr.s_addr,p,phost->h_length);
 	memset(hostip,0,sizeof(char)*200);
+	if(strlen(inet_ntoa(addr))>=200)
+		return NULL;
 	memcpy(hostip,inet_ntoa(addr),strlen(inet_ntoa(addr)));
 	return hostip;
 }
@@ -510,12 +512,26 @@ int HttpServer::func(int num,void* pget,void* sen,unsigned int senLen,const char
 			printf("Get url:%s\n",ask);
 		type=GET;
 	}
-	if(strstr(ask,"POST")!=NULL)
+	else if(strstr(ask,"POST")!=NULL)
 	{
 		http.getAskRoute(pget,"POST",ask,200);
 		if(isDebug)
 			printf("POST url:%s\n",ask);
 		type=POST;
+	}
+	else if(strstr(ask,"PUT")!=NULL)
+	{
+		http.getAskRoute(pget,"PUT",ask,200);
+		if(isDebug)
+			printf("PUT url:%s\n",ask);
+		type=PUT;
+	}
+	else if(strstr(ask,"DELETE")!=NULL)
+	{
+		http.getAskRoute(pget,"DELETE",ask,200);
+		if(isDebug)
+			printf("DELETE url:%s\n",ask);
+		type=DELETE;
 	}
 	void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&)=NULL;
 	for(unsigned int i=0;i<now;i++)
@@ -940,8 +956,18 @@ ClientTcpIp::ClientTcpIp(const char* hostIp,unsigned short port)
 	memset(ip,0,100);
 	memset(selfIp,0,100);
 	hostip=(char*)malloc(sizeof(char)*50);
+	if(hostip==NULL)
+	{
+		error="malloc wrong";
+		return;
+	}
 	memset(hostip,0,sizeof(char)*50);
 	hostname=(char*)malloc(sizeof(char)*50);
+	if(hostname==NULL)
+	{
+		error="malloc wrong";
+		return;
+	}	
 	memset(hostname,0,sizeof(char)*50);
 	if(hostIp!=NULL)
 		strcpy(ip,hostIp);
@@ -950,6 +976,7 @@ ClientTcpIp::ClientTcpIp(const char* hostIp,unsigned short port)
 		addrC.sin_addr.s_addr=inet_addr(hostIp);
 	addrC.sin_family=AF_INET;//af_intt IPv4
 	addrC.sin_port=htons(port);
+	error=NULL;
 //	ssl=NULL;
 //	ctx=NULL;
 }

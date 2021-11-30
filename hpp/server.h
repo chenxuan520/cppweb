@@ -48,7 +48,7 @@ protected:
 	bool deleteFd(int clisoc);
 public:
 	ServerTcpIp(unsigned short port=5200,int epollNum=1,int wait=5);
-	~ServerTcpIp();//clean server
+	virtual ~ServerTcpIp();//clean server
 	bool bondhost();//bond myself first
 	bool setlisten();//set listem to accept second
 	int acceptClient();//wait until success model one
@@ -77,7 +77,7 @@ public:
 		ONEWAY,WILD,STATIC,
 	};
 	enum AskType{
-		GET,POST,ALL,
+		GET,POST,PUT,DELETE,ALL,
 	};
 	struct RouteFuntion{
 		AskType ask;
@@ -176,6 +176,7 @@ private:
 	char* hostip;//host ip
 	char* hostname;//host name
 	char selfIp[100];
+	const char* error;
 //	SSL* ssl;
 //	SSL_CTX* ctx;
 public:
@@ -195,6 +196,10 @@ public:
 	char* getSelfIp();
 	char* getSelfName(char* hostname,unsigned int bufferLen);
 	static bool getDnsIp(const char* name,char* ip,unsigned int ipMaxLen);
+	inline const char* getLastError()
+	{
+		return this->error;
+	}
 //	bool sslInit()
 //	{
 //		const SSL_METHOD* meth=SSLv23_client_method();

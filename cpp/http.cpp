@@ -57,7 +57,7 @@ char* DealHttp::findBackString(char* local,int len,char* word,int maxWordLen)
 	word[i]=0;
 	return word;
 }
-void* DealHttp::customizeAddTop(void* buffer,int bufferLen,int statusNum,int contentLen,const char* contentType,const char* connection)
+void* DealHttp::customizeAddTop(void* buffer,int bufferLen,int statusNum,int contentLen,const char* contentType,const char* connection,const char* staEng)
 {
 	const char* statusEng=NULL;
 	switch(statusNum)
@@ -82,6 +82,9 @@ void* DealHttp::customizeAddTop(void* buffer,int bufferLen,int statusNum,int con
 			break;
 		case 501:
 			statusEng="Not Implemented";
+			break;
+		default:
+			statusEng=staEng;
 			break;
 	}
 	sprintf((char*)buffer,"HTTP/1.1 %d %s\r\n"
@@ -422,7 +425,9 @@ const char* DealHttp::getAskRoute(const void* message,const char* askWay,char* b
 	char* temp=strstr((char*)message,askWay);
 	if(temp==NULL)
 		return NULL;
-	sscanf(temp+strlen(askWay)+1,"%s",buffer);
+	char format[20]={0};
+	sprintf(format,"%%%us",bufferLen);
+	sscanf(temp+strlen(askWay)+1,format,buffer);
 	return buffer;
 }
 const char* DealHttp::getRouteValue(const void* routeMeg,const char* key,char* value,unsigned int valueLen)
@@ -433,12 +438,15 @@ const char* DealHttp::getRouteValue(const void* routeMeg,const char* key,char* v
 	return this->findBackString(temp,strlen(key),value,valueLen);
 }
 const char* DealHttp::getWildUrl(const void* getText,const char* route,char* buffer,int maxLen)
-{
+	{
 	char* temp=strstr((char*)getText,route);
 	if(temp==NULL)
 		return NULL;
 	temp+=strlen(route);
-	sscanf(temp,"%s",buffer);
+	char format[20]={0};
+	sprintf(format,"%%%us",maxLen);
+	sscanf(temp,format,buffer);
+	return buffer;
 }
 int DealHttp::getRecFile(const void* message,char* fileName,int nameLen,char* buffer,int bufferLen)
 {
@@ -500,32 +508,39 @@ const char* DealHttp::urlDecode(char* srcString)
 	free(buffer);
 	return srcString;
 }
-void DealHttp::dealUrl(const char* url,char* urlTop,char* urlEnd)
+void DealHttp::dealUrl(const char* url,char* urlTop,char* urlEnd,unsigned int topLen,unsigned int endLen)
 {
 	const char* ptemp=NULL;
+	char format[20]={0};
 	int len=0;
 	if((ptemp=strstr(url,"http://"))==NULL)
 	{
 		if(strstr(url,"https://")!=NULL)
 		{
-			sscanf(url+8,"%[^/]",urlTop);
+			sprintf(format,"%%%u[^/]",topLen);
+			sscanf(url+8,format,urlTop);
 			len=strlen(urlTop);
-			sscanf(url+len+8,"%s",urlEnd);
+			sprintf(format,"%%%us",endLen);
+			sscanf(url+len+8,format,urlEnd);
 			return;
 		}
 		else
 		{
-			sscanf(url,"%[^/]",urlTop);
+			sprintf(format,"%%%u[^/]",topLen);
+			sscanf(url,format,urlTop);
 			len=strlen(urlTop);
-			sscanf(url+len,"%s",urlEnd);
+			sprintf(format,"%%%us",endLen);
+			sscanf(url+len,format,urlEnd);
 			return;
 		}
 	}
 	else
 	{
-		sscanf(url+7,"%[^/]",urlTop);
+		sprintf(format,"%%%u[^/]",topLen);
+		sscanf(url+7,format,urlTop);
 		len=strlen(urlTop);
-		sscanf(url+len+7,"%s",urlEnd);
+		sprintf(format,"%%%us",endLen);
+		sscanf(url+len+7,format,urlEnd);
 	}
 }
 bool LogSystem::dealAttack(int isUpdate,int socketCli,int maxTime)//check if accket
@@ -1160,7 +1175,7 @@ const char* WebToken::decryptToken(const char* key,const char* token,char* buffe
 	backString=(char*)malloc(sizeof(char)*strlen(token));
 	memset(backString,0,sizeof(char)*strlen(token));
 	char endString[20]={0};
-	if(sscanf(temp+1,"%[^.]",endString)<=0)
+	if(sscanf(temp+1,"%20[^.]",endString)<=0)
 	{
 		sprintf(err,"get time wrong");
 		return NULL;

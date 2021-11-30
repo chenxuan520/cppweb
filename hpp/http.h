@@ -19,7 +19,7 @@ public:
 		return strstr((char*)message,ptofind);
 	}
 	char* findBackString(char* local,int len,char* word,int maxWordLen);
-	void* customizeAddTop(void* buffer,int bufferLen,int statusNum,int contentLen,const char* contentType="application/json",const char* connection="keep-alive");
+	void* customizeAddTop(void* buffer,int bufferLen,int statusNum,int contentLen,const char* contentType="application/json",const char* connection="keep-alive",const char* staEng=NULL);
 	void* customizeAddHead(void* buffer,int bufferLen,const char* key,const char* value);
 	int customizeAddBody(void* buffer,int bufferLen,const char* body,unsigned int bodyLen);
 	bool setCookie(void* buffer,int bufferLen,const char* key,const char* value,int liveTime=-1,const char* path=NULL,const char* domain=NULL);
@@ -35,7 +35,7 @@ public:
 	const char* getRouteValue(const void* routeMeg,const char* key,char* value,unsigned int valueLen);
 	const char* getWildUrl(const void* getText,const char* route,char* buffer,int maxLen);
 	int getRecFile(const void* message,char* fileName,int nameLen,char* buffer,int bufferLen);
-	static void dealUrl(const char* url,char* urlTop,char* urlEnd);
+	static void dealUrl(const char* url,char* urlTop,char* urlEnd,unsigned int topLen,unsigned int endLen);
 	static const char* urlDecode(char* srcString);
 };
 class LogSystem{
