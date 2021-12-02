@@ -307,7 +307,7 @@ bool HttpServer::routeHandle(AskType ask,RouteType type,const char* route,void (
 	if(max-now<=2)
 	{
 		array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
-		if(array=NULL)
+		if(array==NULL)
 			return false;
 		max+=10;
 	}
@@ -325,7 +325,7 @@ bool HttpServer::loadStatic(const char* route,const char* staticPath)
 	if(max-now<=2)
 	{
 		array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
-		if(array=NULL)
+		if(array==NULL)
 			return false;
 		max+=10;
 	}
@@ -344,7 +344,7 @@ bool HttpServer::get(RouteType type,const char* route,void (*pfunc)(DealHttp&,Ht
 	if(max-now<=2)
 	{
 		array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
-		if(array=NULL)
+		if(array==NULL)
 			return false;
 		max+=10;
 	}
@@ -362,7 +362,7 @@ bool HttpServer::post(RouteType type,const char* route,void (*pfunc)(DealHttp&,H
 	if(max-now<=2)
 	{
 		array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
-		if(array=NULL)
+		if(array==NULL)
 			return false;
 		max+=10;
 	}
@@ -380,7 +380,7 @@ bool HttpServer::all(RouteType type,const char* route,void (*pfunc)(DealHttp&,Ht
 	if(max-now<=2)
 	{
 		array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
-		if(array=NULL)
+		if(array==NULL)
 			return false;
 		max+=10;
 	}

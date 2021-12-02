@@ -897,9 +897,11 @@ public:
 			if(pfdn[i]!=0)
 			    send(pfdn[i],(char*)psen,len,0);
 	}
-	bool epollModel(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int ,int ,int ,void* ,void*,ServerTcpIp& ))
+	bool epollModel(void* pget,int len,void* pneed,int (*pfunc)(int,int ,int ,void* ,void*,ServerTcpIp& ))
 	{//0 out,1 in,2 say
 		fd_set temp=fdClients;
+		int thing=2;
+		int num=0;
 		int sign=select(0,&temp,NULL,NULL,NULL);
 		if(sign>0)
 		{
@@ -911,16 +913,16 @@ public:
 					{
 						if(fdClients.fd_count<FD_SETSIZE)
 						{
-							SOCKADDR_IN newaddr={0};
+							SOCKADDR_IN newaddr={0,0,{0,0,0,0},0};
 							SOCKET newClient=accept(sock,(sockaddr*)&newaddr,&sizeAddr);
 							FD_SET(newClient,&fdClients);
 							this->addFd(newClient);
-							*pthing=1;
-							*pnum=newClient;
+							thing=1;
+							num=newClient;
 							strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
 							if(pfunc!=NULL)
 							{
-								if(pfunc(*pthing,*pnum,0,pget,pneed,*this))
+								if(pfunc(thing,num,0,pget,pneed,*this))
 									return false;
 							}
 						}
@@ -930,19 +932,19 @@ public:
 					else
 					{
 						int sRec=recv(fdClients.fd_array[i],(char*)pget,len,0);
-						*pnum=fdClients.fd_array[i];
+						num=fdClients.fd_array[i];
 						if(sRec>0)
-							*pthing=2;
+							thing=2;
 						if(sRec<=0)
 						{
 							closesocket(fdClients.fd_array[i]);
 							FD_CLR(fdClients.fd_array[i],&fdClients);
 							this->deleteFd(fdClients.fd_array[i]);
-							*pthing=0;
+							thing=0;
 						}
 						if(pfunc!=NULL)
 						{
-							if(pfunc(*pthing,*pnum,sRec,pget,pneed,*this))
+							if(pfunc(thing,num,sRec,pget,pneed,*this))
 								return false;
 						}
 					}
@@ -953,9 +955,11 @@ public:
 			return false;
 		return true;
 	}	
-	bool selectModel(int* pthing,int* pnum,void* pget,int len,void* pneed,int (*pfunc)(int ,int ,int ,void* ,void*,ServerTcpIp& ))
+	bool selectModel(void* pget,int len,void* pneed,int (*pfunc)(int,int ,int ,void* ,void*,ServerTcpIp& ))
 	{//0 out,1 in,2 say
 		fd_set temp=fdClients;
+		int thing=2;
+		int num=0;
 		int sign=select(0,&temp,NULL,NULL,NULL);
 		if(sign>0)
 		{
@@ -967,16 +971,16 @@ public:
 					{
 						if(fdClients.fd_count<FD_SETSIZE)
 						{
-							SOCKADDR_IN newaddr={0};
+							SOCKADDR_IN newaddr={0,0,{0,0,0,0},0};
 							SOCKET newClient=accept(sock,(sockaddr*)&newaddr,&sizeAddr);
 							FD_SET(newClient,&fdClients);
 							this->addFd(newClient);
-							*pthing=1;
-							*pnum=newClient;
+							thing=1;
+							num=newClient;
 							strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
 							if(pfunc!=NULL)
 							{
-								if(pfunc(*pthing,*pnum,0,pget,pneed,*this))
+								if(pfunc(thing,num,0,pget,pneed,*this))
 									return false;
 							}
 						}
@@ -986,19 +990,19 @@ public:
 					else
 					{
 						int sRec=recv(fdClients.fd_array[i],(char*)pget,len,0);
-						*pnum=fdClients.fd_array[i];
+						num=fdClients.fd_array[i];
 						if(sRec>0)
-							*pthing=2;
+							thing=2;
 						if(sRec<=0)
 						{
 							closesocket(fdClients.fd_array[i]);
 							FD_CLR(fdClients.fd_array[i],&fdClients);
 							this->deleteFd(fdClients.fd_array[i]);
-							*pthing=0;
+							thing=0;
 						}
 						if(pfunc!=NULL)
 						{
-							if(pfunc(*pthing,*pnum,sRec,pget,pneed,*this))
+							if(pfunc(thing,num,sRec,pget,pneed,*this))
 								return false;
 						}
 					}
@@ -1091,7 +1095,7 @@ public:
 	}
 	char* getPeerIp(SOCKET cliSoc,int* pcliPort)
 	{
-		SOCKADDR_IN cliAddr={0};
+		SOCKADDR_IN cliAddr={0,0,{0,0,0,0},0};
 		int len=sizeof(cliAddr);
 		if(-1==getpeername(cliSoc,(SOCKADDR*)&cliAddr,&len))
 			return NULL;
@@ -1265,7 +1269,7 @@ public:
 					{
 						if(fdClients.fd_count<FD_SETSIZE)
 						{
-							SOCKADDR_IN newaddr={0};
+							SOCKADDR_IN newaddr={0,0,{0,0,0,0},0};
 							SOCKET newClient=accept(sock,(sockaddr*)&newaddr,&sizeAddr);
 							FD_SET(newClient,&fdClients);
 							this->addFd(newClient);
@@ -1321,7 +1325,7 @@ public:
 					{
 						if(fdClients.fd_count<FD_SETSIZE)
 						{
-							SOCKADDR_IN newaddr={0};
+							SOCKADDR_IN newaddr={0,0,{0,0,0,0},0};
 							SOCKET newClient=accept(sock,(sockaddr*)&newaddr,&sizeAddr);
 							FD_SET(newClient,&fdClients);
 							this->addFd(newClient);
@@ -1369,7 +1373,7 @@ public:
 		ThreadPool::Task task={pfunc,&argv};
     	while(1)
     	{
-			sockaddr_in newaddr={0};
+			sockaddr_in newaddr={0,0,{0,0,0,0},0};
 			int newClient=accept(sock,(sockaddr*)&newaddr,&sizeAddr);
 			if(newClient==-1)
 				continue;
@@ -1461,7 +1465,7 @@ public:
 	}
 	char* getPeerIp(SOCKET cliSoc,int* pcliPort)
 	{
-		SOCKADDR_IN cliAddr={0};
+		SOCKADDR_IN cliAddr={0,0,{0,0,0,0},0};
 		int len=sizeof(cliAddr);
 		if(-1==getpeername(cliSoc,(SOCKADDR*)&cliAddr,&len))
 			return NULL;
@@ -1680,9 +1684,11 @@ public:
 		word[i]=0;
 		return word;
 	}
-	void* customizeAddTop(void* buffer,int bufferLen,int statusNum,int contentLen,const char* contentType="application/json",const char* connection="keep-alive",const char* staEng=NULL)
+	void* customizeAddTop(void* buffer,unsigned int bufferLen,int statusNum,unsigned int contentLen,const char* contentType="application/json",const char* connection="keep-alive",const char* staEng=NULL)
 	{
 		const char* statusEng=NULL;
+		if(bufferLen<100)
+			return NULL;
 		switch(statusNum)
 		{
 			case 200:
@@ -1717,7 +1723,7 @@ public:
 			"Content-Length: %d\r\n",statusNum,statusEng,connection,contentType,contentLen);
 		return buffer;
 	}
-	void* customizeAddHead(void* buffer,int bufferLen,const char* key,const char* value)
+	void* customizeAddHead(void* buffer,unsigned int bufferLen,const char* key,const char* value)
 	{
 		if(strlen((char*)buffer)+strlen(key)+strlen(value)+4>=bufferLen)
 			return NULL;
@@ -1727,7 +1733,7 @@ public:
 		strcat((char*)buffer,"\r\n");
 		return buffer;
 	}
-	int customizeAddBody(void* buffer,int bufferLen,const char* body,unsigned int bodyLen)
+	int customizeAddBody(void* buffer,unsigned int bufferLen,const char* body,unsigned int bodyLen)
 	{
 		int topLen=0;
 		strcat((char*)buffer,"\r\n");
@@ -1741,12 +1747,14 @@ public:
 		temp[i+1]=0;
 		return topLen+bodyLen;
 	}
-	bool setCookie(void* buffer,int bufferLen,const char* key,const char* value,int liveTime=-1,const char* path=NULL,const char* domain=NULL)
+	bool setCookie(void* buffer,unsigned int bufferLen,const char* key,const char* value,int liveTime=-1,const char* path=NULL,const char* domain=NULL)
 	{
 		char temp[1000]={0};
 		if(strlen(key)+strlen(value)>1000)
 			return false;
 		sprintf(temp,"Set-Cookie: %s=%s;max-age= %d;",key,value,liveTime);
+		if(strlen((char*)buffer)+strlen(temp)>=bufferLen)
+			return false;
 		strcat((char*)buffer,temp);
 		if(path!=NULL)
 		{
@@ -1781,7 +1789,7 @@ public:
 		*temp='\r';
 		return value;
 	}
-	void createTop(FileKind kind,char* ptop,unsigned int bufLen,int* topLen,int fileLen)//1:http 2:down 3:pic
+	void createTop(FileKind kind,char* ptop,unsigned int bufLen,int* topLen,unsigned int fileLen)//1:http 2:down 3:pic
 	{
 		if(bufLen<100)
 		{
@@ -1876,7 +1884,7 @@ public:
 	char* findFileMsg(const char* pname,int* plen,char* buffer,unsigned int bufferLen)
 	{
 		FILE* fp=fopen(pname,"rb+");
-		int flen=0,i=0;
+		unsigned int flen=0,i=0;
 		if(fp==NULL)
 			return NULL;
 		fseek(fp,0,SEEK_END);
@@ -2004,7 +2012,7 @@ public:
 		}
 		return 1;
 	}
-	const char* getKeyValue(const void* message,const char* key,char* value,int maxValueLen,bool onlyFromBody=false)
+	const char* getKeyValue(const void* message,const char* key,char* value,unsigned int maxValueLen,bool onlyFromBody=false)
 	{
 		char* temp=NULL;
 		if(onlyFromBody==false)
@@ -2020,7 +2028,7 @@ public:
 			return NULL;
 		return this->findBackString(temp,strlen(key),value,maxValueLen);
 	}
-	const char* getKeyLine(const void* message,const char* key,char* line,int maxLineLen,bool onlyFromBody=false)
+	const char* getKeyLine(const void* message,const char* key,char* line,unsigned int maxLineLen,bool onlyFromBody=false)
 	{
 		int i=0;
 		char* ptemp=NULL;
@@ -2060,7 +2068,7 @@ public:
 			return NULL;
 		return this->findBackString(temp,strlen(key),value,valueLen);
 	}
-	const char* getWildUrl(const void* getText,const char* route,char* buffer,int maxLen)
+	const char* getWildUrl(const void* getText,const char* route,char* buffer,unsigned int maxLen)
 	{
 		char* temp=strstr((char*)getText,route);
 		if(temp==NULL)
@@ -2071,7 +2079,7 @@ public:
 		sscanf(temp,format,buffer);
 		return buffer;
 	}
-	int getRecFile(const void* message,char* fileName,int nameLen,char* buffer,int bufferLen)
+	int getRecFile(const void* message,char* fileName,int nameLen,char* buffer,unsigned int bufferLen)
 	{
 		char tempLen[20]={0},*end=NULL,*top=NULL;
 		int result=0;
@@ -2330,24 +2338,28 @@ public:
 class HttpServer:private ServerTcpIp{
 public:
 	enum RouteType{
-		ONEWAY,WILD,
+		ONEWAY,WILD,STATIC,
 	};
 	enum AskType{
-		GET,POST,ALL,
+		GET,POST,PUT,DELETETO,ALL,
 	};
 	struct RouteFuntion{
 		AskType ask;
 		RouteType type;
 		char route[100];
+		const char* path;
 		void (*pfunc)(DealHttp&,HttpServer&,int num,void* sen,int&);
 	};
 private:
 	RouteFuntion* array;
+	RouteFuntion* pnowRoute;
 	void* getText;
 	unsigned int max;
 	unsigned int now;
 	int textLen;
 	bool isDebug;
+	bool isLongCon;
+	bool isFork;
 	void (*clientIn)(HttpServer&,int num,void* ip,int port);
 	void (*clientOut)(HttpServer&,int num,void* ip,int port);
 public:
@@ -2363,9 +2375,12 @@ public:
 		now=0;
 		max=20;
 		isDebug=debug;
+		isLongCon=true;
+		isFork=false;
 		textLen=0;
 		clientIn=NULL;
 		clientOut=NULL;
+		pnowRoute=NULL;
 	}
 	~HttpServer()
 	{
@@ -2379,7 +2394,7 @@ public:
 		if(max-now<=2)
 		{
 			array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
-			if(array=NULL)
+			if(array==NULL)
 				return false;
 			max+=10;
 		}
@@ -2397,7 +2412,7 @@ public:
 		if(max-now<=2)
 		{
 			array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
-			if(array=NULL)
+			if(array==NULL)
 				return false;
 			max+=10;
 		}
@@ -2415,7 +2430,7 @@ public:
 		if(max-now<=2)
 		{
 			array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
-			if(array=NULL)
+			if(array==NULL)
 				return false;
 			max+=10;
 		}
@@ -2433,7 +2448,7 @@ public:
 		if(max-now<=2)
 		{
 			array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
-			if(array=NULL)
+			if(array==NULL)
 				return false;
 			max+=10;
 		}
@@ -2443,6 +2458,25 @@ public:
 		array[now].pfunc=pfunc;
 		now++;
 		return true;	
+	}
+	bool loadStatic(const char* route,const char* staticPath)
+	{
+		if(strlen(route)>100)
+			return false;
+		if(max-now<=2)
+		{
+			array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
+			if(array==NULL)
+				return false;
+			max+=10;
+		}
+		array[now].type=STATIC;
+		array[now].ask=GET;
+		strcpy(array[now].route,route);
+		array[now].path=staticPath;
+		array[now].pfunc=loadFile;
+		now++;
+		return true;
 	}
 	bool clientInHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port))
 	{
@@ -2480,10 +2514,20 @@ public:
 		this->getText=get;
 		if(isDebug)
 			printf("server is ok\n");
-		while(1)
-			this->epollHttp(get,recBufLenChar,sen,defaultFile);
+		if(isFork==false)
+			while(1)
+				this->epollHttp(get,recBufLenChar,memory,sen,defaultFile);
+		else
+			while(1)
+				this->forkHttp(get,recBufLenChar,memory,sen,defaultFile);
 		free(sen);
 		free(get);
+	}
+	void changeSetting(bool debug,bool isLongCon,bool isForkModel)
+	{
+		this->isDebug=debug;
+		this->isLongCon=isLongCon;
+		this->isFork=isForkModel;
 	}
 	int httpSend(int num,void* buffer,int sendLen)
 	{
@@ -2506,25 +2550,44 @@ public:
 		return this->disconnectSocket(soc);
 	}
 private:
-	int func(int num,void* pget,void* sen,const char* defaultFile,HttpServer& server)
+	inline RouteFuntion* getNowRoute()
+	{
+		return pnowRoute;
+	}
+	int func(int num,void* pget,void* sen,unsigned int senLen,const char* defaultFile,HttpServer& server)
 	{
 		static DealHttp http;
 		AskType type=GET;
 		int len=0,flag=2;
 		char ask[200]={0};
-		if(strstr((char*)pget,"GET")!=NULL)
+		sscanf((char*)pget,"%100s",ask);
+		if(strstr(ask,"GET")!=NULL)
 		{
 			http.getAskRoute(pget,"GET",ask,200);
 			if(isDebug)
 				printf("Get url:%s\n",ask);
 			type=GET;
 		}
-		if(strstr((char*)pget,"POST")!=NULL)
+		else if(strstr(ask,"POST")!=NULL)
 		{
 			http.getAskRoute(pget,"POST",ask,200);
 			if(isDebug)
 				printf("POST url:%s\n",ask);
 			type=POST;
+		}
+		else if(strstr(ask,"PUT")!=NULL)
+		{
+			http.getAskRoute(pget,"PUT",ask,200);
+			if(isDebug)
+				printf("PUT url:%s\n",ask);
+			type=PUT;
+		}
+		else if(strstr(ask,"DELETE")!=NULL)
+		{
+			http.getAskRoute(pget,"DELETE",ask,200);
+			if(isDebug)
+				printf("DELETE url:%s\n",ask);
+			type=DELETETO;
 		}
 		void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&)=NULL;
 		for(unsigned int i=0;i<now;i++)
@@ -2534,6 +2597,7 @@ private:
 				if(strcmp(ask,array[i].route)==0)
 				{
 					pfunc=array[i].pfunc;
+					pnowRoute=&array[i];
 					break;
 				}
 			}
@@ -2542,12 +2606,28 @@ private:
 				if(strstr(ask,array[i].route)!=NULL)
 				{
 					pfunc=array[i].pfunc;
+					pnowRoute=&array[i];
 					break;						
+				}
+			}
+			else if(array[i].type==STATIC&&type==GET)
+			{
+				if(strstr(ask,array[i].route)!=NULL)
+				{
+					pfunc=array[i].pfunc;
+					sprintf((char*)sen,"%s",array[i].path);
+					pnowRoute=&array[i];
+					break;
 				}
 			}
 		}
 		if(pfunc!=NULL)
-			pfunc(http,*this,num,sen,len);
+		{
+			if(pfunc!=loadFile)
+				pfunc(http,*this,num,sen,len);
+			else
+				pfunc(http,*this,senLen,sen,len);
+		}
 		else
 		{
 			if(isDebug)
@@ -2555,14 +2635,17 @@ private:
 			if(http.analysisHttpAsk(pget)!=NULL)
 			{
 				strcpy(ask,http.analysisHttpAsk(pget));
-				flag=http.autoAnalysisGet((char*)pget,(char*)sen,defaultFile,&len);
+				flag=http.autoAnalysisGet((char*)pget,(char*)sen,senLen*1024*1024,defaultFile,&len);
 			}
-			if(flag==2&&isDebug)
+			if(flag==2)
 			{
 				LogSystem::recordFileError(ask);
-				printf("404 get %s wrong\n",ask);
+				if(isDebug)
+					printf("404 get %s wrong\n",ask);
 			}
 		}
+		if(len==0)
+			http.createSendMsg(DealHttp::NOFOUND,(char*)sen,senLen*1024*1024,NULL,&len);
 		if(false==server.sendSocket(num,sen,len))
 		{
 			if(isDebug)
@@ -2575,7 +2658,7 @@ private:
 		}
 		return 0;
 	}
-	void epollHttp(void* pget,int len,void* pneed,const char* defaultFile)
+	void epollHttp(void* pget,int len,unsigned int senLen,void* pneed,const char* defaultFile)
 	{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
 		fd_set temp=fdClients;
 		int sign=select(0,&temp,NULL,NULL,NULL);
@@ -2604,7 +2687,16 @@ private:
 					{
 						int sRec=recv(fdClients.fd_array[i],(char*)pget,len,0);
 						if(sRec>0)
-							func(fdClients.fd_array[i],pget,pneed,defaultFile,*this);
+						{
+							this->textLen=sRec;
+							func(fdClients.fd_array[i],pget,pneed,senLen,defaultFile,*this);
+							if(isLongCon==false)
+							{
+						  		this->deleteFd(fdClients.fd_array[i]);
+								FD_CLR(fdClients.fd_array[i],&fdClients);
+								closesocket(fdClients.fd_array[i]);						
+							}
+						}
 						if(sRec<=0)
 						{
 							if(this->clientOut!=NULL)
@@ -2625,6 +2717,79 @@ private:
 		else
 			return ;
 		return ;
+	}
+	void forkHttp(void* pget,int len,unsigned int senLen,void* pneed,const char* defaultFile)
+	{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
+		fd_set temp=fdClients;
+		int sign=select(0,&temp,NULL,NULL,NULL);
+		if(sign>0)
+		{
+			for(int i=0;i<(int)fdClients.fd_count;i++)
+			{
+				if(FD_ISSET(fdClients.fd_array[i],&temp))
+				{
+					if(fdClients.fd_array[i]==sock)
+					{
+						if(fdClients.fd_count<FD_SETSIZE)
+						{
+							SOCKADDR_IN newaddr={0};
+							SOCKET newClient=accept(sock,(sockaddr*)&newaddr,&sizeAddr);
+							FD_SET(newClient,&fdClients);
+							this->addFd(newClient);
+							strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
+							if(clientIn!=NULL)
+								clientIn(*this,newClient,pget,newaddr.sin_port);
+						}
+						else
+							continue;
+					}
+					else
+					{
+						int sRec=recv(fdClients.fd_array[i],(char*)pget,len,0);
+						if(sRec>0)
+						{
+							this->textLen=sRec;
+							func(fdClients.fd_array[i],pget,pneed,senLen,defaultFile,*this);
+							if(isLongCon==false)
+							{
+						  		this->deleteFd(fdClients.fd_array[i]);
+								FD_CLR(fdClients.fd_array[i],&fdClients);
+								closesocket(fdClients.fd_array[i]);						
+							}
+						}
+						if(sRec<=0)
+						{
+							if(this->clientOut!=NULL)
+							{
+								int port=0;
+								strcpy((char*)pget,this->getPeerIp(fdClients.fd_array[i],&port));
+								clientOut(*this,fdClients.fd_array[i],pget,port);
+							}
+							closesocket(fdClients.fd_array[i]);
+							FD_CLR(fdClients.fd_array[i],&fdClients);
+							this->deleteFd(fdClients.fd_array[i]);
+							
+						}
+					}
+				}
+			}
+		}
+		else
+			return ;
+		return ;
+	}
+	static void loadFile(DealHttp& http,HttpServer& server,int senLen,void* sen,int& len)
+	{
+		char ask[200]={0},buf[200]={0},temp[200]={0};
+		http.getAskRoute(server.recText(),"GET",ask,200);
+		HttpServer::RouteFuntion& route=*server.getNowRoute();
+		http.getWildUrl(ask,route.route,temp,200);
+		sprintf(buf,"GET %s%s HTTP/1.1",route.path,temp);
+		if(2==http.autoAnalysisGet(buf,(char*)sen,senLen*1024*1024,NULL,&len))
+		{
+			LogSystem::recordFileError(ask);
+			printf("404 get %s wrong\n",buf);
+		}
 	}
 };
 char* findBack(char* ps,int len,char* word)
@@ -2703,8 +2868,8 @@ int funcTwo(int thing,int num,int getLen,void* pget,void* sen,ServerTcpIp& serve
 			FileGet::writeToFile(ask,(char*)sen,strlen((char*)sen));
 		printf("\r\nfile:%s\r\n%d",(char*)sen,len);
 		if(NULL==http.analysisHttpAsk(pget))
-			http.createSendMsg(DealHttp::HTML,(char*)sen,"404.html",&len);
-		if(2==http.autoAnalysisGet((char*)pget,(char*)sen,indexName,&len))
+			http.createSendMsg(DealHttp::HTML,(char*)sen,1000000,"404.html",&len);
+		if(2==http.autoAnalysisGet((char*)pget,(char*)sen,1000000,indexName,&len))
 		{
 //			perror("file");	
 			printf("some thing wrong %s\n",(char*)pget);

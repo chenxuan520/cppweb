@@ -57,9 +57,11 @@ char* DealHttp::findBackString(char* local,int len,char* word,int maxWordLen)
 	word[i]=0;
 	return word;
 }
-void* DealHttp::customizeAddTop(void* buffer,int bufferLen,int statusNum,int contentLen,const char* contentType,const char* connection,const char* staEng)
+void* DealHttp::customizeAddTop(void* buffer,unsigned int bufferLen,int statusNum,unsigned int contentLen,const char* contentType,const char* connection,const char* staEng)
 {
 	const char* statusEng=NULL;
+	if(bufferLen<100)
+		return NULL;
 	switch(statusNum)
 	{
 		case 200:
@@ -94,7 +96,7 @@ void* DealHttp::customizeAddTop(void* buffer,int bufferLen,int statusNum,int con
 		"Content-Length: %d\r\n",statusNum,statusEng,connection,contentType,contentLen);
 	return buffer;
 }
-void* DealHttp::customizeAddHead(void* buffer,int bufferLen,const char* key,const char* value)
+void* DealHttp::customizeAddHead(void* buffer,unsigned int bufferLen,const char* key,const char* value)
 {
 	if(strlen((char*)buffer)+strlen(key)+strlen(value)+4>=bufferLen)
 		return NULL;
@@ -104,7 +106,7 @@ void* DealHttp::customizeAddHead(void* buffer,int bufferLen,const char* key,cons
 	strcat((char*)buffer,"\r\n");
 	return buffer;
 }
-int DealHttp::customizeAddBody(void* buffer,int bufferLen,const char* body,unsigned int bodyLen)
+int DealHttp::customizeAddBody(void* buffer,unsigned int bufferLen,const char* body,unsigned int bodyLen)
 {
 	int topLen=0;
 	strcat((char*)buffer,"\r\n");
@@ -118,12 +120,14 @@ int DealHttp::customizeAddBody(void* buffer,int bufferLen,const char* body,unsig
 	temp[i+1]=0;
 	return topLen+bodyLen;
 }
-bool DealHttp::setCookie(void* buffer,int bufferLen,const char* key,const char* value,int liveTime,const char* path,const char* domain)
+bool DealHttp::setCookie(void* buffer,unsigned int bufferLen,const char* key,const char* value,int liveTime,const char* path,const char* domain)
 {
 	char temp[1000]={0};
 	if(strlen(key)+strlen(value)>1000)
 		return false;
 	sprintf(temp,"Set-Cookie: %s=%s;max-age= %d;",key,value,liveTime);
+	if(strlen((char*)buffer)+strlen(temp)>=bufferLen)
+		return false;
 	strcat((char*)buffer,temp);
 	if(path!=NULL)
 	{
@@ -158,7 +162,7 @@ const char* DealHttp::getCookie(void* recText,const char* key,char* value,unsign
 	*temp='\r';
 	return value;
 }
-void DealHttp::createTop(FileKind kind,char* ptop,unsigned int bufLen,int* topLen,int fileLen)//1:http 2:down 3:pic
+void DealHttp::createTop(FileKind kind,char* ptop,unsigned int bufLen,int* topLen,unsigned int fileLen)//1:http 2:down 3:pic
 {
 	if(bufLen<100)
 	{
@@ -253,7 +257,7 @@ bool DealHttp::createSendMsg(FileKind kind,char* buffer,unsigned int bufferLen,c
 char* DealHttp::findFileMsg(const char* pname,int* plen,char* buffer,unsigned int bufferLen)
 {
 	FILE* fp=fopen(pname,"rb+");
-	int flen=0,i=0;
+	unsigned int flen=0,i=0;
 	if(fp==NULL)
 		return NULL;
 	fseek(fp,0,SEEK_END);
@@ -381,7 +385,7 @@ int DealHttp::autoAnalysisGet(const char* message,char* psend,unsigned int buffe
 	}
 	return 1;
 }
-const char* DealHttp::getKeyValue(const void* message,const char* key,char* value,int maxValueLen,bool onlyFromBody)
+const char* DealHttp::getKeyValue(const void* message,const char* key,char* value,unsigned int maxValueLen,bool onlyFromBody)
 {
 	char* temp=NULL;
 	if(onlyFromBody==false)
@@ -397,7 +401,7 @@ const char* DealHttp::getKeyValue(const void* message,const char* key,char* valu
 		return NULL;
 	return this->findBackString(temp,strlen(key),value,maxValueLen);
 }
-const char* DealHttp::getKeyLine(const void* message,const char* key,char* line,int maxLineLen,bool onlyFromBody)
+const char* DealHttp::getKeyLine(const void* message,const char* key,char* line,unsigned int maxLineLen,bool onlyFromBody)
 {
 	int i=0;
 	char* ptemp=NULL;
@@ -437,7 +441,7 @@ const char* DealHttp::getRouteValue(const void* routeMeg,const char* key,char* v
 		return NULL;
 	return this->findBackString(temp,strlen(key),value,valueLen);
 }
-const char* DealHttp::getWildUrl(const void* getText,const char* route,char* buffer,int maxLen)
+const char* DealHttp::getWildUrl(const void* getText,const char* route,char* buffer,unsigned int maxLen)
 	{
 	char* temp=strstr((char*)getText,route);
 	if(temp==NULL)
@@ -448,7 +452,7 @@ const char* DealHttp::getWildUrl(const void* getText,const char* route,char* buf
 	sscanf(temp,format,buffer);
 	return buffer;
 }
-int DealHttp::getRecFile(const void* message,char* fileName,int nameLen,char* buffer,int bufferLen)
+int DealHttp::getRecFile(const void* message,char* fileName,int nameLen,char* buffer,unsigned int bufferLen)
 {
 	char tempLen[20]={0},*end=NULL,*top=NULL;
 	int result=0;

@@ -1172,9 +1172,11 @@ public:
 		word[i]=0;
 		return word;
 	}
-	void* customizeAddTop(void* buffer,int bufferLen,int statusNum,int contentLen,const char* contentType="application/json",const char* connection="keep-alive",const char* staEng=NULL)
+	void* customizeAddTop(void* buffer,unsigned int bufferLen,int statusNum,unsigned int contentLen,const char* contentType="application/json",const char* connection="keep-alive",const char* staEng=NULL)
 	{
 		const char* statusEng=NULL;
+		if(bufferLen<100)
+			return NULL;
 		switch(statusNum)
 		{
 			case 200:
@@ -1209,7 +1211,7 @@ public:
 			"Content-Length: %d\r\n",statusNum,statusEng,connection,contentType,contentLen);
 		return buffer;
 	}
-	void* customizeAddHead(void* buffer,int bufferLen,const char* key,const char* value)
+	void* customizeAddHead(void* buffer,unsigned int bufferLen,const char* key,const char* value)
 	{
 		if(strlen((char*)buffer)+strlen(key)+strlen(value)+4>=bufferLen)
 			return NULL;
@@ -1219,7 +1221,7 @@ public:
 		strcat((char*)buffer,"\r\n");
 		return buffer;
 	}
-	int customizeAddBody(void* buffer,int bufferLen,const char* body,unsigned int bodyLen)
+	int customizeAddBody(void* buffer,unsigned int bufferLen,const char* body,unsigned int bodyLen)
 	{
 		int topLen=0;
 		strcat((char*)buffer,"\r\n");
@@ -1233,12 +1235,14 @@ public:
 		temp[i+1]=0;
 		return topLen+bodyLen;
 	}
-	bool setCookie(void* buffer,int bufferLen,const char* key,const char* value,int liveTime=-1,const char* path=NULL,const char* domain=NULL)
+	bool setCookie(void* buffer,unsigned int bufferLen,const char* key,const char* value,int liveTime=-1,const char* path=NULL,const char* domain=NULL)
 	{
 		char temp[1000]={0};
 		if(strlen(key)+strlen(value)>1000)
 			return false;
 		sprintf(temp,"Set-Cookie: %s=%s;max-age= %d;",key,value,liveTime);
+		if(strlen((char*)buffer)+strlen(temp)>=bufferLen)
+			return false;
 		strcat((char*)buffer,temp);
 		if(path!=NULL)
 		{
@@ -1273,7 +1277,7 @@ public:
 		*temp='\r';
 		return value;
 	}
-	void createTop(FileKind kind,char* ptop,unsigned int bufLen,int* topLen,int fileLen)//1:http 2:down 3:pic
+	void createTop(FileKind kind,char* ptop,unsigned int bufLen,int* topLen,unsigned int fileLen)//1:http 2:down 3:pic
 	{
 		if(bufLen<100)
 		{
@@ -1368,7 +1372,7 @@ public:
 	char* findFileMsg(const char* pname,int* plen,char* buffer,unsigned int bufferLen)
 	{
 		FILE* fp=fopen(pname,"rb+");
-		int flen=0,i=0;
+		unsigned int flen=0,i=0;
 		if(fp==NULL)
 			return NULL;
 		fseek(fp,0,SEEK_END);
@@ -1496,7 +1500,7 @@ public:
 		}
 		return 1;
 	}
-	const char* getKeyValue(const void* message,const char* key,char* value,int maxValueLen,bool onlyFromBody=false)
+	const char* getKeyValue(const void* message,const char* key,char* value,unsigned int maxValueLen,bool onlyFromBody=false)
 	{
 		char* temp=NULL;
 		if(onlyFromBody==false)
@@ -1512,7 +1516,7 @@ public:
 			return NULL;
 		return this->findBackString(temp,strlen(key),value,maxValueLen);
 	}
-	const char* getKeyLine(const void* message,const char* key,char* line,int maxLineLen,bool onlyFromBody=false)
+	const char* getKeyLine(const void* message,const char* key,char* line,unsigned int maxLineLen,bool onlyFromBody=false)
 	{
 		int i=0;
 		char* ptemp=NULL;
@@ -1552,7 +1556,7 @@ public:
 			return NULL;
 		return this->findBackString(temp,strlen(key),value,valueLen);
 	}
-	const char* getWildUrl(const void* getText,const char* route,char* buffer,int maxLen)
+	const char* getWildUrl(const void* getText,const char* route,char* buffer,unsigned int maxLen)
 	{
 		char* temp=strstr((char*)getText,route);
 		if(temp==NULL)
@@ -1563,7 +1567,7 @@ public:
 		sscanf(temp,format,buffer);
 		return buffer;
 	}
-	int getRecFile(const void* message,char* fileName,int nameLen,char* buffer,int bufferLen)
+	int getRecFile(const void* message,char* fileName,int nameLen,char* buffer,unsigned int bufferLen)
 	{
 		char tempLen[20]={0},*end=NULL,*top=NULL;
 		int result=0;
@@ -2123,7 +2127,7 @@ public:
 		if(max-now<=2)
 		{
 			array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
-			if(array=NULL)
+			if(array==NULL)
 				return false;
 			max+=10;
 		}
@@ -2141,7 +2145,7 @@ public:
 		if(max-now<=2)
 		{
 			array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
-			if(array=NULL)
+			if(array==NULL)
 				return false;
 			max+=10;
 		}
@@ -2160,7 +2164,7 @@ public:
 		if(max-now<=2)
 		{
 			array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
-			if(array=NULL)
+			if(array==NULL)
 				return false;
 			max+=10;
 		}
@@ -2178,7 +2182,7 @@ public:
 		if(max-now<=2)
 		{
 			array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
-			if(array=NULL)
+			if(array==NULL)
 				return false;
 			max+=10;
 		}
@@ -2196,7 +2200,7 @@ public:
 		if(max-now<=2)
 		{
 			array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
-			if(array=NULL)
+			if(array==NULL)
 				return false;
 			max+=10;
 		}
