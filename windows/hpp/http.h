@@ -1,7 +1,5 @@
 #ifndef _HTTP_H_
 #define _HTTP_H_
-#include<time.h>
-#include<stdlib.h>
 #include<string.h>
 class DealHttp{
 private:
