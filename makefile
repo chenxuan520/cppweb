@@ -39,7 +39,7 @@ sql: sql.o
 sql.o: ./cpp/sql.cpp
 	g++ -c ./cpp/sql.cpp -o sql.o
 install:
-	mkdir /usr/local/cppweb
+	mkdir /usr/local/include/cppweb
 	cp ./lib/*.h /usr/local/include/cppweb
 	cp ./lib/*.a /usr/local/lib/
 uninstall:
