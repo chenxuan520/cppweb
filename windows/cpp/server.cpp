@@ -417,10 +417,10 @@ void HttpServer::run(unsigned int memory,unsigned int recBufLenChar,const char* 
 		printf("server is ok\n");
 	if(isFork==false)
 		while(1)
-			this->epollHttp(get,recBufLenChar,sen,defaultFile);
+			this->epollHttp(get,recBufLenChar,memory,sen,defaultFile);
 	else
 		while(1)
-			this->forkHttp(get,recBufLenChar,sen,defaultFile);
+			this->forkHttp(get,recBufLenChar,memory,sen,defaultFile);
 	free(sen);
 	free(get);
 }
@@ -450,7 +450,7 @@ void HttpServer::changeSetting(bool debug,bool isLongCon,bool isForkModel)
 	this->isLongCon=isLongCon;
 	this->isFork=isForkModel;
 }
-int HttpServer::func(int num,void* pget,void* sen,const char* defaultFile,HttpServer& server)
+int HttpServer::func(int num,void* pget,void* sen,unsigned int senLen,const char* defaultFile,HttpServer& server)
 {
 	static DealHttp http;
 	AskType type=GET;
@@ -464,12 +464,26 @@ int HttpServer::func(int num,void* pget,void* sen,const char* defaultFile,HttpSe
 			printf("Get url:%s\n",ask);
 		type=GET;
 	}
-	if(strstr(ask,"POST")!=NULL)
+	else if(strstr(ask,"POST")!=NULL)
 	{
 		http.getAskRoute(pget,"POST",ask,200);
 		if(isDebug)
 			printf("POST url:%s\n",ask);
 		type=POST;
+	}
+	else if(strstr(ask,"PUT")!=NULL)
+	{
+		http.getAskRoute(pget,"PUT",ask,200);
+		if(isDebug)
+			printf("PUT url:%s\n",ask);
+		type=PUT;
+	}
+	else if(strstr(ask,"DELETE")!=NULL)
+	{
+		http.getAskRoute(pget,"DELETE",ask,200);
+		if(isDebug)
+			printf("DELETE url:%s\n",ask);
+		type=DELETETO;
 	}
 	void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&)=NULL;
 	for(unsigned int i=0;i<now;i++)
@@ -504,7 +518,12 @@ int HttpServer::func(int num,void* pget,void* sen,const char* defaultFile,HttpSe
 		}
 	}
 	if(pfunc!=NULL)
-		pfunc(http,*this,num,sen,len);
+	{
+		if(pfunc!=loadFile)
+			pfunc(http,*this,num,sen,len);
+		else
+			pfunc(http,*this,senLen,sen,len);
+	}
 	else
 	{
 		if(isDebug)
@@ -512,7 +531,7 @@ int HttpServer::func(int num,void* pget,void* sen,const char* defaultFile,HttpSe
 		if(http.analysisHttpAsk(pget)!=NULL)
 		{
 			strcpy(ask,http.analysisHttpAsk(pget));
-			flag=http.autoAnalysisGet((char*)pget,(char*)sen,defaultFile,&len);
+			flag=http.autoAnalysisGet((char*)pget,(char*)sen,senLen*1024*1024,defaultFile,&len);
 		}
 		if(flag==2)
 		{
@@ -522,7 +541,7 @@ int HttpServer::func(int num,void* pget,void* sen,const char* defaultFile,HttpSe
 		}
 	}
 	if(len==0)
-		http.createSendMsg(DealHttp::NOFOUND,(char*)sen,NULL,&len);
+		http.createSendMsg(DealHttp::NOFOUND,(char*)sen,senLen*1024*1024,NULL,&len);
 	if(false==server.sendSocket(num,sen,len))
 	{
 		if(isDebug)
@@ -535,7 +554,7 @@ int HttpServer::func(int num,void* pget,void* sen,const char* defaultFile,HttpSe
 	}
 	return 0;
 }
-void HttpServer::epollHttp(void* pget,int len,void* pneed,const char* defaultFile)
+void HttpServer::epollHttp(void* pget,int len,unsigned int senLen,void* pneed,const char* defaultFile)
 {//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
 	fd_set temp=fdClients;
 	int sign=select(0,&temp,NULL,NULL,NULL);
@@ -566,7 +585,7 @@ void HttpServer::epollHttp(void* pget,int len,void* pneed,const char* defaultFil
 					if(sRec>0)
 					{
 						this->textLen=sRec;
-						func(fdClients.fd_array[i],pget,pneed,defaultFile,*this);
+						func(fdClients.fd_array[i],pget,pneed,senLen,defaultFile,*this);
 						if(isLongCon==false)
 						{
 					  		this->deleteFd(fdClients.fd_array[i]);
@@ -595,7 +614,7 @@ void HttpServer::epollHttp(void* pget,int len,void* pneed,const char* defaultFil
 		return ;
 	return ;
 }
-void HttpServer::forkHttp(void* pget,int len,void* pneed,const char* defaultFile)
+void HttpServer::forkHttp(void* pget,int len,unsigned int senLen,void* pneed,const char* defaultFile)
 {//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
 	fd_set temp=fdClients;
 	int sign=select(0,&temp,NULL,NULL,NULL);
@@ -626,7 +645,7 @@ void HttpServer::forkHttp(void* pget,int len,void* pneed,const char* defaultFile
 					if(sRec>0)
 					{
 						this->textLen=sRec;
-						func(fdClients.fd_array[i],pget,pneed,defaultFile,*this);
+						func(fdClients.fd_array[i],pget,pneed,senLen,defaultFile,*this);
 						if(isLongCon==false)
 						{
 					  		this->deleteFd(fdClients.fd_array[i]);
@@ -655,14 +674,14 @@ void HttpServer::forkHttp(void* pget,int len,void* pneed,const char* defaultFile
 		return ;
 	return ;
 }
-void HttpServer::loadFile(DealHttp& http,HttpServer& server,int,void* sen,int& len)
+void HttpServer::loadFile(DealHttp& http,HttpServer& server,int senLen,void* sen,int& len)
 {
 	char ask[200]={0},buf[200]={0},temp[200]={0};
 	http.getAskRoute(server.recText(),"GET",ask,200);
 	HttpServer::RouteFuntion& route=*server.getNowRoute();
 	http.getWildUrl(ask,route.route,temp,200);
 	sprintf(buf,"GET %s%s HTTP/1.1",route.path,temp);
-	if(2==http.autoAnalysisGet(buf,(char*)sen,NULL,&len))
+	if(2==http.autoAnalysisGet(buf,(char*)sen,senLen*1024*1024,NULL,&len))
 	{
 		LogSystem::recordFileError(ask);
 		printf("404 get %s wrong\n",buf);

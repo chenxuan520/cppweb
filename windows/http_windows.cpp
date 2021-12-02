@@ -1616,9 +1616,10 @@ class DealHttp{
 private:
 	char ask[256];
 	char* pfind;
+	const char* error;
 public:
 	enum FileKind{
-		UNKNOWN=0,HTML=1,EXE=2,IMAGE=3,NOFOUND=4,CSS=5,JS=6,ZIP7=7,JSON=8,
+		UNKNOWN=0,HTML=1,EXE=2,IMAGE=3,NOFOUND=4,CSS=5,JS=6,ZIP=7,JSON=8,
 	};
 public:
 	DealHttp()
@@ -1626,26 +1627,37 @@ public:
 		for(int i=0;i<256;i++)
 			ask[i]=0;
 		pfind=NULL;
+		error=NULL;
 	}
-	bool cutLineAsk(char* pask,const char* pcutIn)
+	bool cutLineAsk(char* message,const char* pcutIn)
 	{
-		char* ptemp=strstr(pask,pcutIn);
+		if(message==NULL||pcutIn==NULL)
+		{
+			error="wrong NULL";
+			return false;
+		}
+		char* ptemp=strstr(message,pcutIn);
 		if(ptemp==NULL)
 			return false;
 		while(*(ptemp++)!='\n');
 		*ptemp=0;
 		return true;
 	}
-	const char* analysisHttpAsk(void* pask,const char* pneed="GET",int needLen=3)
+	const char* analysisHttpAsk(void* message,const char* pneed="GET")
 	{
-		pfind=strstr((char*)pask,pneed);
+		if(message==NULL)
+		{
+			error="wrong NULL";
+			return NULL;
+		}
+		pfind=strstr((char*)message,pneed);
 		if(pfind==NULL)
 			return NULL;
-		return this->findBackString(pfind,needLen,ask,256);
+		return this->findBackString(pfind,strlen(pneed),ask,256);
 	}
-	inline char* findFirst(void* pask,const char* ptofind)
+	inline char* findFirst(void* message,const char* ptofind)
 	{
-		return strstr((char*)pask,ptofind);
+		return strstr((char*)message,ptofind);
 	}
 	char* findBackString(char* local,int len,char* word,int maxWordLen)
 	{
@@ -1668,7 +1680,7 @@ public:
 		word[i]=0;
 		return word;
 	}
-	void* customizeAddTop(void* buffer,int bufferLen,int statusNum,int contentLen,const char* contentType="application/json",const char* connection="keep-alive")
+	void* customizeAddTop(void* buffer,int bufferLen,int statusNum,int contentLen,const char* contentType="application/json",const char* connection="keep-alive",const char* staEng=NULL)
 	{
 		const char* statusEng=NULL;
 		switch(statusNum)
@@ -1676,11 +1688,26 @@ public:
 			case 200:
 				statusEng="OK";
 				break;
+			case 204:
+				statusEng="No Content";
+				break;
 			case 301:
 				statusEng="Moved Permanently";
 				break;
+			case 400:
+				statusEng="Bad Request";
+				break;
+			case 403:
+				statusEng="Forbidden";
+				break;
 			case 404:
 				statusEng="Not Found";
+				break;
+			case 501:
+				statusEng="Not Implemented";
+				break;
+			default:
+				statusEng=staEng;
 				break;
 		}
 		sprintf((char*)buffer,"HTTP/1.1 %d %s\r\n"
@@ -1692,10 +1719,13 @@ public:
 	}
 	void* customizeAddHead(void* buffer,int bufferLen,const char* key,const char* value)
 	{
+		if(strlen((char*)buffer)+strlen(key)+strlen(value)+4>=bufferLen)
+			return NULL;
 		strcat((char*)buffer,key);
 		strcat((char*)buffer,": ");
 		strcat((char*)buffer,value);
 		strcat((char*)buffer,"\r\n");
+		return buffer;
 	}
 	int customizeAddBody(void* buffer,int bufferLen,const char* body,unsigned int bodyLen)
 	{
@@ -1733,8 +1763,31 @@ public:
 		strcat((char*)buffer,"\r\n");
 		return true;
 	}
-	void createTop(FileKind kind,char* ptop,int* topLen,int fileLen)//1:http 2:down 3:pic
+	const char* getCookie(void* recText,const char* key,char* value,unsigned int valueLen)
 	{
+		if(recText==NULL||key==NULL||value==NULL||valueLen==0)
+			return NULL;
+		char* temp=strstr((char*)recText,"\r\n\r\n"),*cookie=NULL;
+		if(temp==NULL)
+			return NULL;
+		*temp=0;
+		cookie=strstr((char*)recText,"Cookie");
+		if(cookie==NULL)
+			return NULL;
+		cookie=strstr(cookie,key);
+		if(cookie==NULL)
+			return NULL;
+		this->findBackString(cookie,strlen(key),value,valueLen);
+		*temp='\r';
+		return value;
+	}
+	void createTop(FileKind kind,char* ptop,unsigned int bufLen,int* topLen,int fileLen)//1:http 2:down 3:pic
+	{
+		if(bufLen<100)
+		{
+			this->error="buffer too short";
+			return;
+		}
 		switch (kind)
 		{
 			case UNKNOWN:
@@ -1786,11 +1839,11 @@ public:
 				"Content-Type:text/javascript\r\n"
 				"Content-Length:%d\r\n\r\n",fileLen);
 				break;
-			case ZIP7:
+			case ZIP:
 				*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
 				"Server LCserver/1.1\r\n"
 				"Connection: keep-alive\r\n"
-				"Content-Type:application/x-7z-compressed\r\n"
+				"Content-Type:application/zip\r\n"
 				"Content-Length:%d\r\n\r\n",fileLen);
 				break;
 			case JSON:
@@ -1802,25 +1855,25 @@ public:
 				break;
 		}
 	}
-	bool createSendMsg(FileKind kind,char* buffer,const char* pfile,int* plong)
+	bool createSendMsg(FileKind kind,char* buffer,unsigned int bufferLen,const char* pfile,int* plong)
 	{
 		int temp=0;
 		int len=0,noUse=0;
 		if(kind==NOFOUND)
 		{
-			this->createTop(kind,buffer,&temp,len);
+			this->createTop(kind,buffer,bufferLen,&temp,len);
 			*plong=len+temp+1;
 			return true;
 		}
 		len=this->getFileLen(pfile);
 		if(len==0)
 			return false;
-		this->createTop(kind,buffer,&temp,len);
-		this->findFileMsg(pfile,&noUse,buffer+temp);
+		this->createTop(kind,buffer,bufferLen,&temp,len);
+		this->findFileMsg(pfile,&noUse,buffer+temp,bufferLen);
 		*plong=len+temp+1;
 		return true;
 	}
-	char* findFileMsg(const char* pname,int* plen,char* buffer)
+	char* findFileMsg(const char* pname,int* plen,char* buffer,unsigned int bufferLen)
 	{
 		FILE* fp=fopen(pname,"rb+");
 		int flen=0,i=0;
@@ -1828,6 +1881,12 @@ public:
 			return NULL;
 		fseek(fp,0,SEEK_END);
 		flen=ftell(fp);
+		if(flen>=bufferLen)
+		{
+			this->error="buffer too short";
+			fclose(fp);
+			return NULL;
+		}
 		fseek(fp,0,SEEK_SET);
 		for(i=0;i<flen;i++)
 			buffer[i]=fgetc(fp);
@@ -1847,93 +1906,103 @@ public:
 		fclose(fp);
 		return len;
 	}
-	int autoAnalysisGet(const char* pask,char* psend,const char* pfirstFile,int* plen)
+	int autoAnalysisGet(const char* message,char* psend,unsigned int bufferLen,const char* pfirstFile,int* plen)
 	{
-		if(NULL==this->analysisHttpAsk((void*)pask))
-	        return 0;
-	    if(strcmp(ask,"HTTP/1.1")==0||strcmp(ask,"HTTP/1.0")==0)
-	    {
-	        if(false==this->createSendMsg(HTML,psend,pfirstFile,plen))
-	        {
-	            if(false==this->createSendMsg(NOFOUND,psend,pfirstFile,plen))
-	                return 0;
-	            else 
-	                return 2;
-	        }
-	        else
-	        	return 1;
-	    }
-	    else if(strstr(ask,".html"))
-	    {
-	        if(false==this->createSendMsg(HTML,psend,ask,plen))
-	            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
-	                return 0;
-	            else 
-	                return 2;
-	        else
-	        	return 1;
-	    }
-	    else if(strstr(ask,".exe"))
-	    {
-	        if(false==this->createSendMsg(EXE,psend,ask,plen))
-	            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
-	                return 0;
-	            else 
-	                return 2;
-	        else
-	        	return 1;	        
-	    }
-	    else if(strstr(ask,".png")||strstr(ask,".PNG")||strstr(ask,".jpg")||strstr(ask,".jpeg"))
-	    {
-	        if(false==this->createSendMsg(IMAGE,psend,ask,plen))
-	            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
-	                return 0;
-	            else 
-	                return 2;
-	        else
-	        	return 1;	                
-	    }
-	    else if(strstr(ask,".css"))
-	    {
-	        if(false==this->createSendMsg(CSS,psend,ask,plen))
-	            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
-	                return 0;
-	            else 
-	                return 2;
-	        else
-	        	return 1;	                
-	    }
-	    else if(strstr(ask,".js"))
-	    {
-	        if(false==this->createSendMsg(JS,psend,ask,plen))
-	            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
-	                return 0;
-	            else 
-	                return 2;
-	        else
-	        	return 1;
-	    }
-		else if(strstr(ask,".json"))
-	    {
-	        if(false==this->createSendMsg(JSON,psend,ask,plen))
-	            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
-	                return 0;
-	            else 
-	                return 2;
-	        else
-	        	return 1;
-	    }
-	    else 
-	    {
-	        if(false==this->createSendMsg(UNKNOWN,psend,ask,plen))
-	            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
-	                return 0;
-	            else 
-	                return 2;
-	        else
-	        	return 1;
+		if(NULL==this->analysisHttpAsk((void*)message))
+			return 0;
+		if(strcmp(ask,"HTTP/1.1")==0||strcmp(ask,"HTTP/1.0")==0)
+		{
+			if(false==this->createSendMsg(HTML,psend,bufferLen,pfirstFile,plen))
+			{
+				if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
+					return 0;
+				else 
+					return 2;
+			}
+			else
+				return 1;
 		}
-	    return 1;
+		else if(strstr(ask,".html"))
+		{
+			if(false==this->createSendMsg(HTML,psend,bufferLen,ask,plen))
+				if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
+					return 0;
+				else 
+					return 2;
+			else
+				return 1;
+		}
+		else if(strstr(ask,".exe"))
+		{
+			if(false==this->createSendMsg(EXE,psend,bufferLen,ask,plen))
+				if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
+					return 0;
+				else 
+					return 2;
+			else
+				return 1;			
+		}
+		else if(strstr(ask,".zip"))
+		{
+			if(false==this->createSendMsg(ZIP,psend,bufferLen,ask,plen))
+				if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
+					return 0;
+				else 
+					return 2;
+			else
+				return 1;			
+		}
+		else if(strstr(ask,".png")||strstr(ask,".PNG")||strstr(ask,".jpg")||strstr(ask,".jpeg"))
+		{
+			if(false==this->createSendMsg(IMAGE,psend,bufferLen,ask,plen))
+				if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
+					return 0;
+				else 
+					return 2;
+			else
+				return 1;					
+		}
+		else if(strstr(ask,".css"))
+		{
+			if(false==this->createSendMsg(CSS,psend,bufferLen,ask,plen))
+				if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
+					return 0;
+				else 
+					return 2;
+			else
+				return 1;					
+		}
+		else if(strstr(ask,".js"))
+		{
+			if(false==this->createSendMsg(JS,psend,bufferLen,ask,plen))
+				if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
+					return 0;
+				else 
+					return 2;
+			else
+				return 1;
+		}
+		else if(strstr(ask,".json"))
+		{
+			if(false==this->createSendMsg(JSON,psend,bufferLen,ask,plen))
+				if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
+					return 0;
+				else 
+					return 2;
+			else
+				return 1;
+		}
+		else 
+		{
+			if(false==this->createSendMsg(UNKNOWN,psend,bufferLen,ask,plen))
+				if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
+					return 0;
+				else 
+					return 2;
+			else
+				return 1;
+		}
+		return 1;
 	}
 	const char* getKeyValue(const void* message,const char* key,char* value,int maxValueLen,bool onlyFromBody=false)
 	{
@@ -1979,7 +2048,9 @@ public:
 		char* temp=strstr((char*)message,askWay);
 		if(temp==NULL)
 			return NULL;
-		sscanf(temp+strlen(askWay)+1,"%s",buffer);
+		char format[20]={0};
+		sprintf(format,"%%%us",bufferLen);
+		sscanf(temp+strlen(askWay)+1,format,buffer);
 		return buffer;
 	}
 	const char* getRouteValue(const void* routeMsg,const char* key,char* value,unsigned int valueLen)
@@ -1995,7 +2066,9 @@ public:
 		if(temp==NULL)
 			return NULL;
 		temp+=strlen(route);
-		sscanf(temp,"%s",buffer);
+		char format[20]={0};
+		sprintf(format,"%%%us",maxLen);
+		sscanf(temp,format,buffer);
 		return buffer;
 	}
 	int getRecFile(const void* message,char* fileName,int nameLen,char* buffer,int bufferLen)
@@ -2028,38 +2101,45 @@ public:
 		buffer[i+1]=0;
 		return result;
 	}
-	static void dealUrl(const char* url,char* urlTop,char* urlEnd)
+	static void dealUrl(const char* url,char* urlTop,char* urlEnd,unsigned int topLen,unsigned int endLen)
 	{
 		const char* ptemp=NULL;
+		char format[20]={0};
 		int len=0;
 		if((ptemp=strstr(url,"http://"))==NULL)
 		{
 			if(strstr(url,"https://")!=NULL)
 			{
-				sscanf(url+8,"%[^/]",urlTop);
+				sprintf(format,"%%%u[^/]",topLen);
+				sscanf(url+8,format,urlTop);
 				len=strlen(urlTop);
-				sscanf(url+len+8,"%s",urlEnd);
+				sprintf(format,"%%%us",endLen);
+				sscanf(url+len+8,format,urlEnd);
 				return;
 			}
 			else
 			{
-				sscanf(url,"%[^/]",urlTop);
+				sprintf(format,"%%%u[^/]",topLen);
+				sscanf(url,format,urlTop);
 				len=strlen(urlTop);
-				sscanf(url+len,"%s",urlEnd);
+				sprintf(format,"%%%us",endLen);
+				sscanf(url+len,format,urlEnd);
 				return;
 			}
 		}
 		else
 		{
-			sscanf(url+7,"%[^/]",urlTop);
+			sprintf(format,"%%%u[^/]",topLen);
+			sscanf(url+7,format,urlTop);
 			len=strlen(urlTop);
-			sscanf(url+len+7,"%s",urlEnd);
+			sprintf(format,"%%%us",endLen);
+			sscanf(url+len+7,format,urlEnd);
 		}
 	}
 	static const char* urlDecode(char* srcString)
 	{
 		char ch=0;
-		int temp=0;
+		int temp=0,srcLen=strlen(srcString);
 		char* buffer=(char*)malloc(sizeof(char)*strlen(srcString));
 		if(buffer==NULL)
 			return NULL;
@@ -2076,6 +2156,11 @@ public:
 		    } 
 			else 
 		        buffer[strlen(buffer)]=srcString[i];
+		}
+		if(srcLen<strlen(buffer))
+		{
+			free(buffer);
+			return NULL;
 		}
 		strcpy(srcString,buffer);
 		free(buffer);

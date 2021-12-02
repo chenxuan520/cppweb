@@ -3239,11 +3239,11 @@ public:
 	}
 	void threadModel(void* pneed,void* (*pfunc)(void*))
 	{
-//		if(this->threadNum==0)
-//		{
-//			this->error="thread wrong init";
-//			return;
-//		}
+		if(this->threadNum==0)
+		{
+			this->error="thread wrong init";
+			return;
+		}
 		ServerPool::ArgvSer argv={*this,0,pneed};
 		ThreadPool::Task task={pfunc,&argv};
 		while(1)
@@ -3253,11 +3253,12 @@ public:
 			if(newClient==-1)
 				continue;
 			this->addFd(newClient);
+			this->mutexLock();
 			argv.soc=newClient;
 			task.ptask=pfunc;
 			task.arg=&argv;
-			ThreadPool::createDetachPthread(&argv,pfunc);
-//			pool->addTask(task);
+			ThreadPool::createPthread((void*)&argv,pfunc);
+			pool->addTask(task);
 		}
 	}
 	void forkModel(void* pneed,void (*pfunc)(ServerPool&,int,void*))
@@ -3739,21 +3740,32 @@ void* threadDo(void* argv)
 	char rec[1024]={0};
 	if(sen==NULL)
 	{
-		arg.server.threadDeleteSoc(arg.soc);
+//		arg.server.threadDeleteSoc(arg.soc);
 		printf("malloc wrong");
 		return NULL;
 	}
 	int len=0,flag=0;
-	while((len=arg.server.receiveSocket(arg.soc,rec,1024))<=0);
+	arg.server.mutexUnlock();
+	len=recv(arg.soc,rec,1024,0);
+//	arg.server.receiveSocket(arg.soc,rec,1024);
+	if(len==0)
+	{
+//		arg.server.threadDeleteSoc(arg.soc);
+		close(arg.soc);
+		perror("recv");
+		return NULL;
+	}
 	printf("get %s ask\n",http.analysisHttpAsk(rec));
 	if(NULL==http.analysisHttpAsk(rec))
 		printf("get %s wrong %d\n",rec,len);
 	flag=http.autoAnalysisGet(rec,sen,1000000,"./index.html",&len);
 //	arg.server.mutexLock();
-	while(arg.server.sendSocket(arg.soc,sen,len)<=0);
+//	arg.server.sendSocket(arg.soc,sen,len);
+	send(arg.soc,sen,len,0);
 //	arg.server.mutexUnlock();
 	free(sen);
-	arg.server.threadDeleteSoc(arg.soc);
+	close(arg.soc);
+//	arg.server.threadDeleteSoc(arg.soc);
 	return NULL;
 }
 void funcFork(ServerPool& server,int sock,void*)
@@ -3781,11 +3793,11 @@ void funcFork(ServerPool& server,int sock,void*)
 int thread()
 {
 	int thing=0,num=0;
-	ServerPool server(5200);
+	ServerPool server(5200,5);
 	char get[2048]={0};
-	char* sen=(char*)malloc(sizeof(char)*10000000);
-	if(sen==NULL)
-		printf("memory wrong\n");
+//	char* sen=(char*)malloc(sizeof(char)*10000000);
+//	if(sen==NULL)
+//		printf("memory wrong\n");
 	if(false==server.bondhost())
 	{
 		printf("bound wrong\n");
