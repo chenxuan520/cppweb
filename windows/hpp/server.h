@@ -96,6 +96,7 @@ public:
 	bool clientOutHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port));
 	bool clientInHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port));
 	bool routeHandle(AskType ask,RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&));
+	int getCompleteMessage(const void* message,unsigned int messageLen,void* buffer,unsigned int buffLen,int sockCli);
 	bool loadStatic(const char* route,const char* staticPath);
 	bool get(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&));
 	bool post(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&));
