@@ -24,7 +24,7 @@ int main()
 {  
 	HttpServer server(5200,true);
 	server.routeHandle(HttpServer::POST,HttpServer::WILD,"/upload",upload);
-	server.run(1,5000,"index.html");
+	server.run(1,6000,"index.html");
     return 0; 
 }  
 
