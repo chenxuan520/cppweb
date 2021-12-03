@@ -12,13 +12,13 @@ void addCLi(DealHttp & http, HttpServer & server, int , void * sen, int & len)
 	if(http.getKeyValue(server.recText(),"score",strSco,20,true)==NULL)
 	{
 		printf("get name wrong \n%s\n",(char*)server.recText());
-		http.createSendMsg(DealHttp::NOFOUND,(char*)sen,NULL,&len);
+		http.createSendMsg(DealHttp::NOFOUND,(char*)sen,10000,NULL,&len);
 		return;
 	}
 	if(http.getKeyValue(server.recText(),"name",name,50,true)==NULL)
 	{
 		printf("get name wrong \n%s\n",(char*)server.recText());
-		http.createSendMsg(DealHttp::NOFOUND,(char*)sen,NULL,&len);
+		http.createSendMsg(DealHttp::NOFOUND,(char*)sen,10000,NULL,&len);
 		return;
 	}
 	DealHttp::urlDecode(name);
@@ -26,7 +26,7 @@ void addCLi(DealHttp & http, HttpServer & server, int , void * sen, int & len)
 	if(0>=sscanf(strSco,"%d",&score))
 	{
 		printf("get score wrong \n%s\n",(char*)server.recText());
-		http.createSendMsg(DealHttp::NOFOUND,(char*)sen,NULL,&len);
+		http.createSendMsg(DealHttp::NOFOUND,(char*)sen,10000,NULL,&len);
 		return;
 	}
 	if(tree.size()<5)
@@ -47,7 +47,7 @@ void addCLi(DealHttp & http, HttpServer & server, int , void * sen, int & len)
 	json.addKeyValue("name",name);
 	json.addKeyValInt("sco",score);
 	json.jsonToFile("temp");
-	http.createSendMsg(DealHttp::JSON,(char*)sen,"temp",&len);
+	http.createSendMsg(DealHttp::JSON,(char*)sen,10000,"temp",&len);
 }
 void getList(DealHttp & http, HttpServer & , int , void * sen, int & len)
 {
@@ -86,7 +86,7 @@ void getList(DealHttp & http, HttpServer & , int , void * sen, int & len)
 	json.addOBject(array);
 	json.addKeyValInt("len",tree.size());
 	json.jsonToFile("temp");
-	http.createSendMsg(DealHttp::JSON,(char*)sen,"temp",&len);
+	http.createSendMsg(DealHttp::JSON,(char*)sen,10000,"temp",&len);
 	for(unsigned int i=0;i<9;i++)
 		free(buf[i]);
 }

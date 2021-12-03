@@ -26,3 +26,7 @@ libthreadpool.a:thread.o
 	ar rcs ./lib/libthreadpool.a thread.o
 clean:
 	rm -f *.o 
+cp:
+	copy .\lib\*.a .\install
+	copy .\hpp\http.h  .\install
+	copy .\hpp\server.h .\install

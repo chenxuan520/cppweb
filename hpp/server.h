@@ -48,7 +48,7 @@ protected:
 	bool deleteFd(int clisoc);
 public:
 	ServerTcpIp(unsigned short port=5200,int epollNum=1,int wait=5);
-	~ServerTcpIp();//clean server
+	virtual ~ServerTcpIp();//clean server
 	bool bondhost();//bond myself first
 	bool setlisten();//set listem to accept second
 	int acceptClient();//wait until success model one
@@ -77,7 +77,7 @@ public:
 		ONEWAY,WILD,STATIC,
 	};
 	enum AskType{
-		GET,POST,ALL,
+		GET,POST,PUT,DELETE,ALL,
 	};
 	struct RouteFuntion{
 		AskType ask;
@@ -104,6 +104,7 @@ public:
 	bool clientOutHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port));
 	bool clientInHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port));
 	bool routeHandle(AskType ask,RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&));
+	int getCompleteMessage(const void* message,unsigned int messageLen,void* buffer,unsigned int buffLen,int sockCli);
 	bool loadStatic(const char* route,const char* staticPath);
 	bool get(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&));
 	bool post(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&));
@@ -133,10 +134,10 @@ private:
 	{
 		return pnowRoute;
 	}
-	int func(int num,void* pget,void* sen,const char* defaultFile,HttpServer& server);
-	void epollHttp(void* pget,int len,void* pneed,const char* defaultFile);
-	void forkHttp(void* pget,int len,void* pneed,const char* defaultFile);
-	static void loadFile(DealHttp& http,HttpServer& server,int,void* sen,int& len);
+	int func(int num,void* pget,void* sen,unsigned int senLen,const char* defaultFile,HttpServer& server);
+	void epollHttp(void* pget,int len,unsigned int senLen,void* pneed,const char* defaultFile);
+	void forkHttp(void* pget,int len,unsigned int senLen,void* pneed,const char* defaultFile);
+	static void loadFile(DealHttp& http,HttpServer& server,int senLen,void* sen,int& len);
 	static void sigCliDeal(int pid);
 };
 class Email{
@@ -176,12 +177,13 @@ private:
 	char* hostip;//host ip
 	char* hostname;//host name
 	char selfIp[100];
+	const char* error;
 //	SSL* ssl;
 //	SSL_CTX* ctx;
 public:
 	ClientTcpIp(const char* hostIp,unsigned short port);
 	~ClientTcpIp();
-	void addHostIp(const char* ip);
+	void addHostIp(const char* ip,unsigned short port=0);
 	bool tryConnect();
 	inline int receiveHost(void* prec,int len)
 	{
@@ -195,6 +197,10 @@ public:
 	char* getSelfIp();
 	char* getSelfName(char* hostname,unsigned int bufferLen);
 	static bool getDnsIp(const char* name,char* ip,unsigned int ipMaxLen);
+	inline const char* getLastError()
+	{
+		return this->error;
+	}
 //	bool sslInit()
 //	{
 //		const SSL_METHOD* meth=SSLv23_client_method();

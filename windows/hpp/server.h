@@ -69,7 +69,7 @@ public:
 		ONEWAY,WILD,STATIC,
 	};
 	enum AskType{
-		GET,POST,ALL,
+		GET,POST,PUT,DELETETO,ALL,
 	};
 	struct RouteFuntion{
 		AskType ask;
@@ -96,6 +96,7 @@ public:
 	bool clientOutHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port));
 	bool clientInHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port));
 	bool routeHandle(AskType ask,RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&));
+	int getCompleteMessage(const void* message,unsigned int messageLen,void* buffer,unsigned int buffLen,int sockCli);
 	bool loadStatic(const char* route,const char* staticPath);
 	bool get(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&));
 	bool post(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&));
@@ -125,9 +126,9 @@ private:
 	{
 		return pnowRoute;
 	}
-	int func(int num,void* pget,void* sen,const char* defaultFile,HttpServer& server);
-	void epollHttp(void* pget,int len,void* pneed,const char* defaultFile);
-	void forkHttp(void* pget,int len,void* pneed,const char* defaultFile);
+	int func(int num,void* pget,void* sen,unsigned int senLen,const char* defaultFile,HttpServer& server);
+	void epollHttp(void* pget,int len,unsigned int senLen,void* pneed,const char* defaultFile);
+	void forkHttp(void* pget,int len,unsigned int senLen,void* pneed,const char* defaultFile);
 	static void loadFile(DealHttp& http,HttpServer& server,int,void* sen,int& len);
 	static void sigCliDeal(int pid);
 };
@@ -146,7 +147,7 @@ private:
 public:
 	ClientTcpIp(const char* hostIp,int port=5200);
 	~ClientTcpIp();
-	void addHostIp(const char* ip);
+	void addHostIp(const char* ip,unsigned short port);
 	bool tryConnect();
 	inline int receiveHost(void* prec,int len)
 	{

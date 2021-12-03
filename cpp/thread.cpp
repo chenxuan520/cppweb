@@ -269,7 +269,7 @@ void ServerPool::forkEpoll(unsigned int senBufChar,unsigned int recBufChar,void 
 	memset(pget,0,sizeof(char)*recBufChar);
 	while(1)
 	{
-		int eventNum=epoll_wait(epfd,pevent,512,-1),thing=0,num=0;
+		int eventNum=epoll_wait(epfd,pevent,512,-1),thing=0;
 		for(int i=0;i<eventNum;i++)
 		{
 			epoll_event temp=pevent[i];
@@ -281,14 +281,12 @@ void ServerPool::forkEpoll(unsigned int senBufChar,unsigned int recBufChar,void 
 				nowEvent.data.fd=newClient;
 				nowEvent.events=EPOLLIN;
 				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
-				num=newClient;
 				strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
 			}
 			else
 			{
 				memset(pget,0,sizeof(char)*recBufChar);
 				int getNum=recv(temp.data.fd,(char*)pget,recBufChar,0);
-				num=temp.data.fd;
 				if(getNum>0)
 					thing=2;
 				else
