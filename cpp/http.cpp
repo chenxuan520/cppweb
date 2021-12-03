@@ -403,7 +403,7 @@ const char* DealHttp::getKeyValue(const void* message,const char* key,char* valu
 }
 const char* DealHttp::getKeyLine(const void* message,const char* key,char* line,unsigned int maxLineLen,bool onlyFromBody)
 {
-	int i=0;
+	unsigned int i=0;
 	char* ptemp=NULL;
 	if(false==onlyFromBody)
 		ptemp=strstr((char*)message,key);
@@ -476,6 +476,7 @@ int DealHttp::getRecFile(const void* message,char* fileName,int nameLen,char* bu
 		return 0;
 	top+=4;
 	end-=2;
+	result=end-top;
 	unsigned int i=0;
 	for(i=0;top!=end;i++,top++)
 		buffer[i]=*top;
@@ -485,7 +486,8 @@ int DealHttp::getRecFile(const void* message,char* fileName,int nameLen,char* bu
 const char* DealHttp::urlDecode(char* srcString)
 {
 	char ch=0;
-	int temp=0,srcLen=strlen(srcString);
+	int temp=0;
+	unsigned int srcLen=strlen(srcString);
 	char* buffer=(char*)malloc(sizeof(char)*strlen(srcString));
 	if(buffer==NULL)
 		return NULL;
@@ -593,6 +595,8 @@ bool LogSystem::attackLog(int port,const char* ip,const char* pfileName)//log ac
             return false;
         else
             fprintf(fp,"server attacked log\n");
+	else
+		fprintf(fp,"find attack\n");
     fprintf(fp,"%d year%d month%d day%d hour%d min%d sec:",pt->tm_year+1900,pt->tm_mon+1,pt->tm_mday,pt->tm_hour,pt->tm_min,pt->tm_sec);
     fprintf(fp,"%s:%d port attack server\n",ip,port);
     fclose(fp);
@@ -1237,7 +1241,7 @@ int FileGet::getFileLen(const char* fileName)
 }
 bool FileGet::getFileMsg(const char* fileName,char* buffer,unsigned int bufferLen)
 {
-	int i=0,len=0;
+	unsigned int i=0,len=0;
 	len=this->getFileLen(fileName);
 	FILE* fp=fopen(fileName,"rb");
 	if(fp==NULL)

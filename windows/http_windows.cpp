@@ -2103,6 +2103,7 @@ public:
 			return 0;
 		top+=4;
 		end-=2;
+		result=end-top;
 		unsigned int i=0;
 		for(i=0;top!=end;i++,top++)
 			buffer[i]=*top;
@@ -2478,6 +2479,33 @@ public:
 		now++;
 		return true;
 	}
+	int getCompleteMessage(const void* message,unsigned int messageLen,void* buffer,unsigned int buffLen,int sockCli)
+	{
+		if(message==NULL||buffer==NULL||buffLen<=0||message==0)
+			return -1;
+		unsigned int len=0;
+		char* temp=NULL;
+		if((temp=strstr((char*)message,"Content-Length"))==NULL)
+			return -1;
+		if(sscanf(temp+strlen("Content-Length")+1,"%d",&len)<=0)
+			return -1;
+		if((temp=strstr((char*)message,"\r\n\r\n"))==NULL)
+			return -1;
+		temp+=4;
+		if(strlen(temp)>=len)
+			return 0;
+		if(strlen((char*)message)+len>buffLen)
+			return -2;
+		memcpy(buffer,message,messageLen);
+		unsigned int leftLen=len-strlen(temp),getLen=0,all=0;
+		while(leftLen>5||getLen<=0)
+		{
+			getLen=this->httpRecv(sockCli,(char*)buffer+messageLen+all,buffLen-messageLen-all);
+			all+=getLen;
+			leftLen-=getLen;
+		}
+		return len;
+	}
 	bool clientInHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port))
 	{
 		if(clientIn!=NULL)
@@ -2533,6 +2561,41 @@ public:
 	{
 		return this->sendSocket(num,buffer,sendLen);
 	}
+	int httpRecv(int num,void* buffer,int bufferLen)
+	{
+		return this->receiveSocket(num,buffer,bufferLen);
+	}
+//	int getRecFile(const void* message,int sockCli,char* fileName,int nameLen,char* buffer,unsigned int bufferLen)
+//	{
+//		DealHttp http;
+//		char tempLen[20]={0},*end=NULL,*top=NULL;
+//		int result=0;
+//		if(NULL==http.getKeyLine(message,"boundary",buffer,bufferLen))
+//			return 0;
+//		if(NULL==http.getKeyValue(message,"filename",fileName,nameLen))
+//			return 0;
+//		if(NULL==http.getKeyValue(message,"Content-Length",tempLen,20))
+//			return 0;
+//		if(0>=sscanf(tempLen,"%d",&result))
+//			return 0;
+//		if((top=strstr((char*)message,buffer))==NULL)
+//			return 0;
+//		if((top=strstr(top+strlen(buffer),buffer))==NULL)
+//			return 0;
+//		if((end=strstr(top+strlen(buffer),buffer))==NULL)
+//			return 0;
+//		if((top=strstr(top,"\r\n\r\n"))==NULL)
+//			return 0;
+//		if(end-top>bufferLen)
+//			return 0;
+//		top+=4;
+//		end-=2;
+//		unsigned int i=0;
+//		for(i=0;top!=end;i++,top++)
+//			buffer[i]=*top;
+//		buffer[i+1]=0;
+//		return result;
+//	}
 	inline void* recText()
 	{
 		return this->getText;
@@ -2639,9 +2702,11 @@ private:
 			}
 			if(flag==2)
 			{
-				LogSystem::recordFileError(ask);
 				if(isDebug)
+				{	
+					LogSystem::recordFileError(ask);
 					printf("404 get %s wrong\n",ask);
+				}
 			}
 		}
 		if(len==0)
@@ -2885,26 +2950,34 @@ int funcTwo(int thing,int num,int getLen,void* pget,void* sen,ServerTcpIp& serve
 }
 void func(DealHttp& http,HttpServer& server,int num,void* sen,int& len)
 {
-	char buffer[100]={0},name[30]={0};
-	printf("%s\n",(char*)server.recText());
-	http.getKeyValue(server.recText(),"try",name,30);
+	char buffer[2000]={0},name[30]={0};
+	char* temp=(char*)malloc(sizeof(char)*1024*1024);
+	if(NULL==temp)
+		return;
+	memset(temp,0,sizeof(char)*1024*1024);
+	int flen=0;
+//	printf("%s\n",(char*)server.recText());
+	server.getCompleteMessage(server.recText(),server.recLen(),sen,1024*1024,num);
+	flen=http.getRecFile(sen,name,30,temp,1024*1024);
+	printf("%s\n",(char*)temp);
+//	printf("%s\nname:%s\n",buffer,name);
+	if(flen>0)
+		FileGet::writeToFile(name,temp,flen);
 	Json json;
 	json.init(200);
-	json.addKeyValue("try",name);
-	http.customizeAddTop(sen,1000000,200,strlen(json.resultText()));
-	if(strcmp(name,"lpl")!=0)
-		http.setCookie(sen,1000000,"try","lpl",30);
-	else
-		http.setCookie(sen,1000000,"try","",0);
-	len=http.customizeAddBody(sen,1000000,json.resultText(),strlen(json.resultText()));
+	json.addKeyValue("status","ok");
+	json.jsonToFile("temp");
+	http.createSendMsg(DealHttp::JSON,(char*)sen,100000,"temp",&len);
+	printf("sen:\n%s",(char*)sen);
+	free(temp);
 }
 void serverHttp()
 {
 	unsigned int port=80;
 	chooseModel(&port);
 	HttpServer server(port,true);
-		server.routeHandle(HttpServer::ALL,HttpServer::ONEWAY,"/upload",func);
-	server.run(1,5000,indexName);
+	server.routeHandle(HttpServer::ALL,HttpServer::ONEWAY,"/upload",func);
+	server.run(1,50000,indexName);
 //	ServerTcpIp server(port);
 //	int thing=0,num=0;
 //	char get[2048]={0};

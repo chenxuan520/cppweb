@@ -1518,7 +1518,7 @@ public:
 	}
 	const char* getKeyLine(const void* message,const char* key,char* line,unsigned int maxLineLen,bool onlyFromBody=false)
 	{
-		int i=0;
+		unsigned int i=0;
 		char* ptemp=NULL;
 		if(false==onlyFromBody)
 			ptemp=strstr((char*)message,key);
@@ -1591,6 +1591,7 @@ public:
 			return 0;
 		top+=4;
 		end-=2;
+		result=end-top;
 		unsigned int i=0;
 		for(i=0;top!=end;i++,top++)
 			buffer[i]=*top;
@@ -1635,7 +1636,8 @@ public:
 	static const char* urlDecode(char* srcString)
 	{
 		char ch=0;
-		int temp=0,srcLen=strlen(srcString);
+		int temp=0;
+		unsigned int srcLen=strlen(srcString);
 		char* buffer=(char*)malloc(sizeof(char)*strlen(srcString));
 		if(buffer==NULL)
 			return NULL;
@@ -2045,6 +2047,8 @@ public:
 				return false;
 			else
 				fprintf(fp,"server attacked log\n");
+		else
+			fprintf(fp,"find attack\n");
 		fprintf(fp,"%d year%d month%d day%d hour%d min%d sec:",pt->tm_year+1900,pt->tm_mon+1,pt->tm_mday,pt->tm_hour,pt->tm_min,pt->tm_sec);
 		fprintf(fp,"%s:%d port attack server\n",ip,port);
 		fclose(fp);
@@ -2264,6 +2268,33 @@ public:
 	{
 		return this->receiveSocket(num,buffer,bufferLen);
 	}
+	int getCompleteMessage(const void* message,unsigned int messageLen,void* buffer,unsigned int buffLen,int sockCli)
+	{
+		if(message==NULL||buffer==NULL||buffLen<=0||message==0)
+			return -1;
+		unsigned int len=0;
+		char* temp=NULL;
+		if((temp=strstr((char*)message,"Content-Length"))==NULL)
+			return -1;
+		if(sscanf(temp+strlen("Content-Length")+1,"%d",&len)<=0)
+			return -1;
+		if((temp=strstr((char*)message,"\r\n\r\n"))==NULL)
+			return -1;
+		temp+=4;
+		if(strlen(temp)>=len)
+			return 0;
+		if(strlen((char*)message)+len>buffLen)
+			return -2;
+		memcpy(buffer,message,messageLen);
+		unsigned int leftLen=len-strlen(temp),getLen=0,all=0;
+		while(leftLen>5||getLen<=0)
+		{
+			getLen=this->httpRecv(sockCli,(char*)buffer+messageLen+all,buffLen-messageLen-all);
+			all+=getLen;
+			leftLen-=getLen;
+		}
+		return len;
+	}
 	void changeSetting(bool debug,bool isLongCon,bool isForkModel)
 	{
 		this->isDebug=debug;
@@ -2374,9 +2405,11 @@ private:
 			}
 			if(flag==2)
 			{
-				LogSystem::recordFileError(ask);
 				if(isDebug)
+				{
+					LogSystem::recordFileError(ask);
 					printf("404 get %s wrong\n",ask);
+				}
 			}
 		}
 		if(len==0)
@@ -3295,7 +3328,7 @@ public:
 		memset(pget,0,sizeof(char)*recBufChar);
 		while(1)
 		{
-			int eventNum=epoll_wait(epfd,pevent,512,-1),thing=0,num=0;
+			int eventNum=epoll_wait(epfd,pevent,512,-1),thing=0;
 			for(int i=0;i<eventNum;i++)
 			{
 				epoll_event temp=pevent[i];
@@ -3307,14 +3340,12 @@ public:
 					nowEvent.data.fd=newClient;
 					nowEvent.events=EPOLLIN;
 					epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
-					num=newClient;
 					strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
 				}
 				else
 				{
 					memset(pget,0,sizeof(char)*recBufChar);
 					int getNum=recv(temp.data.fd,(char*)pget,recBufChar,0);
-					num=temp.data.fd;
 					if(getNum>0)
 						thing=2;
 					else
@@ -3439,7 +3470,7 @@ public:
 	}
 	bool getFileMsg(const char* fileName,char* buffer,unsigned int bufferLen)
 	{
-		int i=0,len=0;
+		unsigned int i=0,len=0;
 		len=this->getFileLen(fileName);
 		FILE* fp=fopen(fileName,"rb");
 		if(fp==NULL)
@@ -3821,6 +3852,22 @@ int thread()
 	return 0;
 	
 }
+void upload(DealHttp& http,HttpServer& server,int num,void* sen,int& len)
+{
+    char name[100]={0},buffer[6000];
+    memset(sen,0,sizeof(char)*1024*1024);
+    printf("%s\n",(char*)server.recText());
+    int flen=server.getCompleteMessage(server.recText(),server.recLen(),sen,1024*1024,num);
+    printf("%s\n",(char*)sen);
+    if(flen>6000)
+    {
+            http.createSendMsg(DealHttp::NOFOUND,(char*)sen,6000,NULL,&len);
+            return;
+    }
+    flen=http.getRecFile(sen,name,100,buffer,6000);
+    FileGet::writeToFile(name,buffer,flen);
+    http.createSendMsg(DealHttp::HTML,(char*)sen,1024*1024,"index.html",&len);
+}
 /********************************
 	author:chenxuan
 	date:2021/9/9
@@ -3828,14 +3875,15 @@ int thread()
 *********************************/
 int main(int argc, char** argv) 
 {
-	thread();
+//	thread();
 //	serverHttp();
 	HttpServer server(5200,true);
 	server.changeSetting(true,true,false);
+	server.routeHandle(HttpServer::POST,HttpServer::WILD,"/upload",upload);
 	server.loadStatic("/assets","/test/assets");
 	server.loadStatic("/style.css","/test/style.css");
 	server.all(HttpServer::ONEWAY,"/root",func);
 	server.routeHandle(HttpServer::ALL,HttpServer::ONEWAY,"/key/",funHa);
-	server.run(1,4000,"./test/index.html");
+	server.run(1,4000,"../try.html");
 	return 0;
 }

@@ -364,6 +364,33 @@ bool HttpServer::routeHandle(AskType ask,RouteType type,const char* route,void (
 	now++;
 	return true;
 }
+int HttpServer::getCompleteMessage(const void* message,unsigned int messageLen,void* buffer,unsigned int buffLen,int sockCli)
+{
+	if(message==NULL||buffer==NULL||buffLen<=0||message==0)
+		return -1;
+	unsigned int len=0;
+	char* temp=NULL;
+	if((temp=strstr((char*)message,"Content-Length"))==NULL)
+		return -1;
+	if(sscanf(temp+strlen("Content-Length")+1,"%d",&len)<=0)
+		return -1;
+	if((temp=strstr((char*)message,"\r\n\r\n"))==NULL)
+		return -1;
+	temp+=4;
+	if(strlen(temp)>=len)
+		return 0;
+	if(strlen((char*)message)+len>buffLen)
+		return -2;
+	memcpy(buffer,message,messageLen);
+	unsigned int leftLen=len-strlen(temp),getLen=0,all=0;
+	while(leftLen>5||getLen<=0)
+	{
+		getLen=this->httpRecv(sockCli,(char*)buffer+messageLen+all,buffLen-messageLen-all);
+		all+=getLen;
+		leftLen-=getLen;
+	}
+	return len;
+}
 bool HttpServer::loadStatic(const char* route,const char* staticPath)
 {
 	if(strlen(route)>100)
@@ -583,9 +610,11 @@ int HttpServer::func(int num,void* pget,void* sen,unsigned int senLen,const char
 		}
 		if(flag==2)
 		{
-			LogSystem::recordFileError(ask);
 			if(isDebug)
+			{
+				LogSystem::recordFileError(ask);
 				printf("404 get %s wrong\n",ask);
+			}
 		}
 	}
 	if(len==0)

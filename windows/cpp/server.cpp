@@ -535,9 +535,11 @@ int HttpServer::func(int num,void* pget,void* sen,unsigned int senLen,const char
 		}
 		if(flag==2)
 		{
-			LogSystem::recordFileError(ask);
 			if(isDebug)
+			{
+				LogSystem::recordFileError(ask);
 				printf("404 get %s wrong\n",ask);
+			}
 		}
 	}
 	if(len==0)
