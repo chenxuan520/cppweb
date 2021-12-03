@@ -11,7 +11,7 @@ void pfunc(DealHttp & http, HttpServer & server, int , void * sen, int & len)
 	json.addKeyValue("name",value);
 	json.addKeyValue("welcome","you");
 	json.jsonToFile("temp");
-	http.createSendMsg(DealHttp::JSON,(char*)sen,"temp",&len);
+	http.createSendMsg(DealHttp::JSON,(char*)sen,1024,"temp",&len);
 }
 int main()  
 {  

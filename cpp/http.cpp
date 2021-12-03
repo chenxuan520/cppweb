@@ -1,6 +1,8 @@
 #include"../hpp/http.h"
 #include<iostream>
 #include<string.h>
+#include<stdlib.h>
+#include<time.h>
 #include<stdio.h>
 using namespace std;
 DealHttp::DealHttp()
@@ -24,17 +26,17 @@ bool DealHttp::cutLineAsk(char* pask,const char* pcutIn)
 	*ptemp=0;
 	return true;
 }
-const char* DealHttp::analysisHttpAsk(void* pask,const char* pneed,int needLen)
+const char* DealHttp::analysisHttpAsk(void* message,const char* pneed)
 {
-	if(pask==NULL)
+	if(message==NULL)
 	{
 		error="wrong NULL";
 		return NULL;
 	}
-	pfind=strstr((char*)pask,pneed);
+	pfind=strstr((char*)message,pneed);
 	if(pfind==NULL)
 		return NULL;
-	return this->findBackString(pfind,needLen,ask,256);
+	return this->findBackString(pfind,strlen(pneed),ask,256);
 }
 char* DealHttp::findBackString(char* local,int len,char* word,int maxWordLen)
 {
@@ -57,9 +59,11 @@ char* DealHttp::findBackString(char* local,int len,char* word,int maxWordLen)
 	word[i]=0;
 	return word;
 }
-void* DealHttp::customizeAddTop(void* buffer,int bufferLen,int statusNum,int contentLen,const char* contentType,const char* connection)
+void* DealHttp::customizeAddTop(void* buffer,unsigned int bufferLen,int statusNum,unsigned int contentLen,const char* contentType,const char* connection,const char* staEng)
 {
 	const char* statusEng=NULL;
+	if(bufferLen<100)
+		return NULL;
 	switch(statusNum)
 	{
 		case 200:
@@ -71,11 +75,20 @@ void* DealHttp::customizeAddTop(void* buffer,int bufferLen,int statusNum,int con
 		case 301:
 			statusEng="Moved Permanently";
 			break;
+		case 400:
+			statusEng="Bad Request";
+			break;
 		case 403:
 			statusEng="Forbidden";
 			break;
 		case 404:
 			statusEng="Not Found";
+			break;
+		case 501:
+			statusEng="Not Implemented";
+			break;
+		default:
+			statusEng=staEng;
 			break;
 	}
 	sprintf((char*)buffer,"HTTP/1.1 %d %s\r\n"
@@ -85,14 +98,17 @@ void* DealHttp::customizeAddTop(void* buffer,int bufferLen,int statusNum,int con
 		"Content-Length: %d\r\n",statusNum,statusEng,connection,contentType,contentLen);
 	return buffer;
 }
-void* DealHttp::customizeAddHead(void* buffer,int bufferLen,const char* key,const char* value)
+void* DealHttp::customizeAddHead(void* buffer,unsigned int bufferLen,const char* key,const char* value)
 {
+	if(strlen((char*)buffer)+strlen(key)+strlen(value)+4>=bufferLen)
+		return NULL;
 	strcat((char*)buffer,key);
 	strcat((char*)buffer,": ");
 	strcat((char*)buffer,value);
 	strcat((char*)buffer,"\r\n");
+	return buffer;
 }
-int DealHttp::customizeAddBody(void* buffer,int bufferLen,const char* body,unsigned int bodyLen)
+int DealHttp::customizeAddBody(void* buffer,unsigned int bufferLen,const char* body,unsigned int bodyLen)
 {
 	int topLen=0;
 	strcat((char*)buffer,"\r\n");
@@ -106,12 +122,14 @@ int DealHttp::customizeAddBody(void* buffer,int bufferLen,const char* body,unsig
 	temp[i+1]=0;
 	return topLen+bodyLen;
 }
-bool DealHttp::setCookie(void* buffer,int bufferLen,const char* key,const char* value,int liveTime,const char* path,const char* domain)
+bool DealHttp::setCookie(void* buffer,unsigned int bufferLen,const char* key,const char* value,int liveTime,const char* path,const char* domain)
 {
 	char temp[1000]={0};
 	if(strlen(key)+strlen(value)>1000)
 		return false;
 	sprintf(temp,"Set-Cookie: %s=%s;max-age= %d;",key,value,liveTime);
+	if(strlen((char*)buffer)+strlen(temp)>=bufferLen)
+		return false;
 	strcat((char*)buffer,temp);
 	if(path!=NULL)
 	{
@@ -146,8 +164,13 @@ const char* DealHttp::getCookie(void* recText,const char* key,char* value,unsign
 	*temp='\r';
 	return value;
 }
-void DealHttp::createTop(FileKind kind,char* ptop,int* topLen,int fileLen)//1:http 2:down 3:pic
+void DealHttp::createTop(FileKind kind,char* ptop,unsigned int bufLen,int* topLen,unsigned int fileLen)//1:http 2:down 3:pic
 {
+	if(bufLen<100)
+	{
+		this->error="buffer too short";
+		return;
+	}
 	switch (kind)
 	{
 		case UNKNOWN:
@@ -199,11 +222,11 @@ void DealHttp::createTop(FileKind kind,char* ptop,int* topLen,int fileLen)//1:ht
 			"Content-Type:text/javascript\r\n"
 			"Content-Length:%d\r\n\r\n",fileLen);
 			break;
-		case ZIP7:
+		case ZIP:
 			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
 			"Server LCserver/1.1\r\n"
 			"Connection: keep-alive\r\n"
-			"Content-Type:application/x-7z-compressed\r\n"
+			"Content-Type:application/zip\r\n"
 			"Content-Length:%d\r\n\r\n",fileLen);
 			break;
 		case JSON:
@@ -215,32 +238,38 @@ void DealHttp::createTop(FileKind kind,char* ptop,int* topLen,int fileLen)//1:ht
 			break;
 	}
 }
-bool DealHttp::createSendMsg(FileKind kind,char* pask,const char* pfile,int* plong)
+bool DealHttp::createSendMsg(FileKind kind,char* buffer,unsigned int bufferLen,const char* pfile,int* plong)
 {
 	int temp=0;
 	int len=0,noUse=0;
 	if(kind==NOFOUND)
 	{
-		this->createTop(kind,pask,&temp,len);
+		this->createTop(kind,buffer,bufferLen,&temp,len);
 		*plong=len+temp+1;
 		return true;
 	}
 	len=this->getFileLen(pfile);
 	if(len==0)
 		return false;
-	this->createTop(kind,pask,&temp,len);
-	this->findFileMsg(pfile,&noUse,pask+temp);
+	this->createTop(kind,buffer,bufferLen,&temp,len);
+	this->findFileMsg(pfile,&noUse,buffer+temp,bufferLen);
 	*plong=len+temp+1;
 	return true;
 }
-char* DealHttp::findFileMsg(const char* pname,int* plen,char* buffer)
+char* DealHttp::findFileMsg(const char* pname,int* plen,char* buffer,unsigned int bufferLen)
 {
 	FILE* fp=fopen(pname,"rb+");
-	int flen=0,i=0;
+	unsigned int flen=0,i=0;
 	if(fp==NULL)
 		return NULL;
 	fseek(fp,0,SEEK_END);
 	flen=ftell(fp);
+	if(flen>=bufferLen)
+	{
+		this->error="buffer too short";
+		fclose(fp);
+		return NULL;
+	}
 	fseek(fp,0,SEEK_SET);
 	for(i=0;i<flen;i++)
 		buffer[i]=fgetc(fp);
@@ -260,95 +289,105 @@ int DealHttp::getFileLen(const char* pname)
 	fclose(fp);
 	return len;
 }
-int DealHttp::autoAnalysisGet(const char* pask,char* psend,const char* pfirstFile,int* plen)
+int DealHttp::autoAnalysisGet(const char* message,char* psend,unsigned int bufferLen,const char* pfirstFile,int* plen)
 {
-	if(NULL==this->analysisHttpAsk((void*)pask))
-        return 0;
-    if(strcmp(ask,"HTTP/1.1")==0||strcmp(ask,"HTTP/1.0")==0)
-    {
-        if(false==this->createSendMsg(HTML,psend,pfirstFile,plen))
-        {
-            if(false==this->createSendMsg(NOFOUND,psend,pfirstFile,plen))
-                return 0;
-            else 
-                return 2;
-        }
-        else
-        	return 1;
-    }
-    else if(strstr(ask,".html"))
-    {
-        if(false==this->createSendMsg(HTML,psend,ask,plen))
-            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
-                return 0;
-            else 
-                return 2;
-        else
-        	return 1;
-    }
-    else if(strstr(ask,".exe"))
-    {
-        if(false==this->createSendMsg(EXE,psend,ask,plen))
-            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
-                return 0;
-            else 
-                return 2;
-        else
-        	return 1;	        
-    }
-    else if(strstr(ask,".png")||strstr(ask,".PNG")||strstr(ask,".jpg")||strstr(ask,".jpeg"))
-    {
-        if(false==this->createSendMsg(IMAGE,psend,ask,plen))
-            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
-                return 0;
-            else 
-                return 2;
-        else
-        	return 1;	                
-    }
-    else if(strstr(ask,".css"))
-    {
-        if(false==this->createSendMsg(CSS,psend,ask,plen))
-            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
-                return 0;
-            else 
-                return 2;
-        else
-        	return 1;	                
-    }
-    else if(strstr(ask,".js"))
-    {
-        if(false==this->createSendMsg(JS,psend,ask,plen))
-            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
-                return 0;
-            else 
-                return 2;
-        else
-        	return 1;
-    }
-	else if(strstr(ask,".json"))
-    {
-        if(false==this->createSendMsg(JSON,psend,ask,plen))
-            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
-                return 0;
-            else 
-                return 2;
-        else
-        	return 1;
-    }
-    else 
-    {
-        if(false==this->createSendMsg(UNKNOWN,psend,ask,plen))
-            if(false==this->createSendMsg(NOFOUND,psend,ask,plen))
-                return 0;
-            else 
-                return 2;
-        else
-        	return 1;
+	if(NULL==this->analysisHttpAsk((void*)message))
+		return 0;
+	if(strcmp(ask,"HTTP/1.1")==0||strcmp(ask,"HTTP/1.0")==0)
+	{
+		if(false==this->createSendMsg(HTML,psend,bufferLen,pfirstFile,plen))
+		{
+			if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
+				return 0;
+			else 
+				return 2;
+		}
+		else
+			return 1;
 	}
-    return 1;
+	else if(strstr(ask,".html"))
+	{
+		if(false==this->createSendMsg(HTML,psend,bufferLen,ask,plen))
+			if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
+				return 0;
+			else 
+				return 2;
+		else
+			return 1;
+	}
+	else if(strstr(ask,".exe"))
+	{
+		if(false==this->createSendMsg(EXE,psend,bufferLen,ask,plen))
+			if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
+				return 0;
+			else 
+				return 2;
+		else
+			return 1;			
+	}
+	else if(strstr(ask,".zip"))
+	{
+		if(false==this->createSendMsg(ZIP,psend,bufferLen,ask,plen))
+			if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
+				return 0;
+			else 
+				return 2;
+		else
+			return 1;			
+	}
+	else if(strstr(ask,".png")||strstr(ask,".PNG")||strstr(ask,".jpg")||strstr(ask,".jpeg"))
+	{
+		if(false==this->createSendMsg(IMAGE,psend,bufferLen,ask,plen))
+			if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
+				return 0;
+			else 
+				return 2;
+		else
+			return 1;					
+	}
+	else if(strstr(ask,".css"))
+	{
+		if(false==this->createSendMsg(CSS,psend,bufferLen,ask,plen))
+			if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
+				return 0;
+			else 
+				return 2;
+		else
+			return 1;					
+	}
+	else if(strstr(ask,".js"))
+	{
+		if(false==this->createSendMsg(JS,psend,bufferLen,ask,plen))
+			if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
+				return 0;
+			else 
+				return 2;
+		else
+			return 1;
+	}
+	else if(strstr(ask,".json"))
+	{
+		if(false==this->createSendMsg(JSON,psend,bufferLen,ask,plen))
+			if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
+				return 0;
+			else 
+				return 2;
+		else
+			return 1;
+	}
+	else 
+	{
+		if(false==this->createSendMsg(UNKNOWN,psend,bufferLen,ask,plen))
+			if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
+				return 0;
+			else 
+				return 2;
+		else
+			return 1;
+	}
+	return 1;
 }
-const char* DealHttp::getKeyValue(const void* message,const char* key,char* value,int maxValueLen,bool onlyFromBody)
+const char* DealHttp::getKeyValue(const void* message,const char* key,char* value,unsigned int maxValueLen,bool onlyFromBody)
 {
 	char* temp=NULL;
 	if(onlyFromBody==false)
@@ -364,9 +403,9 @@ const char* DealHttp::getKeyValue(const void* message,const char* key,char* valu
 		return NULL;
 	return this->findBackString(temp,strlen(key),value,maxValueLen);
 }
-const char* DealHttp::getKeyLine(const void* message,const char* key,char* line,int maxLineLen,bool onlyFromBody)
+const char* DealHttp::getKeyLine(const void* message,const char* key,char* line,unsigned int maxLineLen,bool onlyFromBody)
 {
-	int i=0;
+	unsigned int i=0;
 	char* ptemp=NULL;
 	if(false==onlyFromBody)
 		ptemp=strstr((char*)message,key);
@@ -392,7 +431,9 @@ const char* DealHttp::getAskRoute(const void* message,const char* askWay,char* b
 	char* temp=strstr((char*)message,askWay);
 	if(temp==NULL)
 		return NULL;
-	sscanf(temp+strlen(askWay)+1,"%s",buffer);
+	char format[20]={0};
+	sprintf(format,"%%%us",bufferLen);
+	sscanf(temp+strlen(askWay)+1,format,buffer);
 	return buffer;
 }
 const char* DealHttp::getRouteValue(const void* routeMeg,const char* key,char* value,unsigned int valueLen)
@@ -402,15 +443,18 @@ const char* DealHttp::getRouteValue(const void* routeMeg,const char* key,char* v
 		return NULL;
 	return this->findBackString(temp,strlen(key),value,valueLen);
 }
-const char* DealHttp::getWildUrl(const void* getText,const char* route,char* buffer,int maxLen)
-{
+const char* DealHttp::getWildUrl(const void* getText,const char* route,char* buffer,unsigned int maxLen)
+	{
 	char* temp=strstr((char*)getText,route);
 	if(temp==NULL)
 		return NULL;
 	temp+=strlen(route);
-	sscanf(temp,"%s",buffer);
+	char format[20]={0};
+	sprintf(format,"%%%us",maxLen);
+	sscanf(temp,format,buffer);
+	return buffer;
 }
-int DealHttp::getRecFile(const void* message,char* fileName,int nameLen,char* buffer,int bufferLen)
+int DealHttp::getRecFile(const void* message,char* fileName,int nameLen,char* buffer,unsigned int bufferLen)
 {
 	char tempLen[20]={0},*end=NULL,*top=NULL;
 	int result=0;
@@ -434,6 +478,7 @@ int DealHttp::getRecFile(const void* message,char* fileName,int nameLen,char* bu
 		return 0;
 	top+=4;
 	end-=2;
+	result=end-top;
 	unsigned int i=0;
 	for(i=0;top!=end;i++,top++)
 		buffer[i]=*top;
@@ -444,6 +489,7 @@ const char* DealHttp::urlDecode(char* srcString)
 {
 	char ch=0;
 	int temp=0;
+	unsigned int srcLen=strlen(srcString);
 	char* buffer=(char*)malloc(sizeof(char)*strlen(srcString));
 	if(buffer==NULL)
 		return NULL;
@@ -461,36 +507,48 @@ const char* DealHttp::urlDecode(char* srcString)
 		else 
 	        buffer[strlen(buffer)]=srcString[i];
 	}
+	if(srcLen<strlen(buffer))
+	{
+		free(buffer);
+		return NULL;
+	}
 	strcpy(srcString,buffer);
 	free(buffer);
 	return srcString;
 }
-void DealHttp::dealUrl(const char* url,char* urlTop,char* urlEnd)
+void DealHttp::dealUrl(const char* url,char* urlTop,char* urlEnd,unsigned int topLen,unsigned int endLen)
 {
 	const char* ptemp=NULL;
+	char format[20]={0};
 	int len=0;
 	if((ptemp=strstr(url,"http://"))==NULL)
 	{
 		if(strstr(url,"https://")!=NULL)
 		{
-			sscanf(url+8,"%[^/]",urlTop);
+			sprintf(format,"%%%u[^/]",topLen);
+			sscanf(url+8,format,urlTop);
 			len=strlen(urlTop);
-			sscanf(url+len+8,"%s",urlEnd);
+			sprintf(format,"%%%us",endLen);
+			sscanf(url+len+8,format,urlEnd);
 			return;
 		}
 		else
 		{
-			sscanf(url,"%[^/]",urlTop);
+			sprintf(format,"%%%u[^/]",topLen);
+			sscanf(url,format,urlTop);
 			len=strlen(urlTop);
-			sscanf(url+len,"%s",urlEnd);
+			sprintf(format,"%%%us",endLen);
+			sscanf(url+len,format,urlEnd);
 			return;
 		}
 	}
 	else
 	{
-		sscanf(url+7,"%[^/]",urlTop);
+		sprintf(format,"%%%u[^/]",topLen);
+		sscanf(url+7,format,urlTop);
 		len=strlen(urlTop);
-		sscanf(url+len+7,"%s",urlEnd);
+		sprintf(format,"%%%us",endLen);
+		sscanf(url+len+7,format,urlEnd);
 	}
 }
 bool LogSystem::dealAttack(int isUpdate,int socketCli,int maxTime)//check if accket
@@ -539,6 +597,8 @@ bool LogSystem::attackLog(int port,const char* ip,const char* pfileName)//log ac
             return false;
         else
             fprintf(fp,"server attacked log\n");
+	else
+		fprintf(fp,"find attack\n");
     fprintf(fp,"%d year%d month%d day%d hour%d min%d sec:",pt->tm_year+1900,pt->tm_mon+1,pt->tm_mday,pt->tm_hour,pt->tm_min,pt->tm_sec);
     fprintf(fp,"%s:%d port attack server\n",ip,port);
     fclose(fp);
@@ -1125,7 +1185,7 @@ const char* WebToken::decryptToken(const char* key,const char* token,char* buffe
 	backString=(char*)malloc(sizeof(char)*strlen(token));
 	memset(backString,0,sizeof(char)*strlen(token));
 	char endString[20]={0};
-	if(sscanf(temp+1,"%[^.]",endString)<=0)
+	if(sscanf(temp+1,"%20[^.]",endString)<=0)
 	{
 		sprintf(err,"get time wrong");
 		return NULL;
@@ -1183,7 +1243,7 @@ int FileGet::getFileLen(const char* fileName)
 }
 bool FileGet::getFileMsg(const char* fileName,char* buffer,unsigned int bufferLen)
 {
-	int i=0,len=0;
+	unsigned int i=0,len=0;
 	len=this->getFileLen(fileName);
 	FILE* fp=fopen(fileName,"rb");
 	if(fp==NULL)

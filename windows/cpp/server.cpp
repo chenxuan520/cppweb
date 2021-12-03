@@ -307,7 +307,7 @@ bool HttpServer::routeHandle(AskType ask,RouteType type,const char* route,void (
 	if(max-now<=2)
 	{
 		array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
-		if(array=NULL)
+		if(array==NULL)
 			return false;
 		max+=10;
 	}
@@ -325,7 +325,7 @@ bool HttpServer::loadStatic(const char* route,const char* staticPath)
 	if(max-now<=2)
 	{
 		array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
-		if(array=NULL)
+		if(array==NULL)
 			return false;
 		max+=10;
 	}
@@ -344,7 +344,7 @@ bool HttpServer::get(RouteType type,const char* route,void (*pfunc)(DealHttp&,Ht
 	if(max-now<=2)
 	{
 		array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
-		if(array=NULL)
+		if(array==NULL)
 			return false;
 		max+=10;
 	}
@@ -362,7 +362,7 @@ bool HttpServer::post(RouteType type,const char* route,void (*pfunc)(DealHttp&,H
 	if(max-now<=2)
 	{
 		array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
-		if(array=NULL)
+		if(array==NULL)
 			return false;
 		max+=10;
 	}
@@ -380,7 +380,7 @@ bool HttpServer::all(RouteType type,const char* route,void (*pfunc)(DealHttp&,Ht
 	if(max-now<=2)
 	{
 		array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
-		if(array=NULL)
+		if(array==NULL)
 			return false;
 		max+=10;
 	}
@@ -390,6 +390,33 @@ bool HttpServer::all(RouteType type,const char* route,void (*pfunc)(DealHttp&,Ht
 	array[now].pfunc=pfunc;
 	now++;
 	return true;	
+}
+int HttpServer::getCompleteMessage(const void* message,unsigned int messageLen,void* buffer,unsigned int buffLen,int sockCli)
+{
+	if(message==NULL||buffer==NULL||buffLen<=0||message==0)
+		return -1;
+	unsigned int len=0;
+	char* temp=NULL;
+	if((temp=strstr((char*)message,"Content-Length"))==NULL)
+		return -1;
+	if(sscanf(temp+strlen("Content-Length")+1,"%d",&len)<=0)
+		return -1;
+	if((temp=strstr((char*)message,"\r\n\r\n"))==NULL)
+		return -1;
+	temp+=4;
+	if(strlen(temp)>=len)
+		return 0;
+	if(strlen((char*)message)+len>buffLen)
+		return -2;
+	memcpy(buffer,message,messageLen);
+	unsigned int leftLen=len-strlen(temp),getLen=0,all=0;
+	while(leftLen>5||getLen<=0)
+	{
+		getLen=this->httpRecv(sockCli,(char*)buffer+messageLen+all,buffLen-messageLen-all);
+		all+=getLen;
+		leftLen-=getLen;
+	}
+	return len;
 }
 void HttpServer::run(unsigned int memory,unsigned int recBufLenChar,const char* defaultFile)
 {
@@ -417,10 +444,10 @@ void HttpServer::run(unsigned int memory,unsigned int recBufLenChar,const char* 
 		printf("server is ok\n");
 	if(isFork==false)
 		while(1)
-			this->epollHttp(get,recBufLenChar,sen,defaultFile);
+			this->epollHttp(get,recBufLenChar,memory,sen,defaultFile);
 	else
 		while(1)
-			this->forkHttp(get,recBufLenChar,sen,defaultFile);
+			this->forkHttp(get,recBufLenChar,memory,sen,defaultFile);
 	free(sen);
 	free(get);
 }
@@ -450,7 +477,7 @@ void HttpServer::changeSetting(bool debug,bool isLongCon,bool isForkModel)
 	this->isLongCon=isLongCon;
 	this->isFork=isForkModel;
 }
-int HttpServer::func(int num,void* pget,void* sen,const char* defaultFile,HttpServer& server)
+int HttpServer::func(int num,void* pget,void* sen,unsigned int senLen,const char* defaultFile,HttpServer& server)
 {
 	static DealHttp http;
 	AskType type=GET;
@@ -464,12 +491,26 @@ int HttpServer::func(int num,void* pget,void* sen,const char* defaultFile,HttpSe
 			printf("Get url:%s\n",ask);
 		type=GET;
 	}
-	if(strstr(ask,"POST")!=NULL)
+	else if(strstr(ask,"POST")!=NULL)
 	{
 		http.getAskRoute(pget,"POST",ask,200);
 		if(isDebug)
 			printf("POST url:%s\n",ask);
 		type=POST;
+	}
+	else if(strstr(ask,"PUT")!=NULL)
+	{
+		http.getAskRoute(pget,"PUT",ask,200);
+		if(isDebug)
+			printf("PUT url:%s\n",ask);
+		type=PUT;
+	}
+	else if(strstr(ask,"DELETE")!=NULL)
+	{
+		http.getAskRoute(pget,"DELETE",ask,200);
+		if(isDebug)
+			printf("DELETE url:%s\n",ask);
+		type=DELETETO;
 	}
 	void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&)=NULL;
 	for(unsigned int i=0;i<now;i++)
@@ -504,7 +545,12 @@ int HttpServer::func(int num,void* pget,void* sen,const char* defaultFile,HttpSe
 		}
 	}
 	if(pfunc!=NULL)
-		pfunc(http,*this,num,sen,len);
+	{
+		if(pfunc!=loadFile)
+			pfunc(http,*this,num,sen,len);
+		else
+			pfunc(http,*this,senLen,sen,len);
+	}
 	else
 	{
 		if(isDebug)
@@ -512,17 +558,19 @@ int HttpServer::func(int num,void* pget,void* sen,const char* defaultFile,HttpSe
 		if(http.analysisHttpAsk(pget)!=NULL)
 		{
 			strcpy(ask,http.analysisHttpAsk(pget));
-			flag=http.autoAnalysisGet((char*)pget,(char*)sen,defaultFile,&len);
+			flag=http.autoAnalysisGet((char*)pget,(char*)sen,senLen*1024*1024,defaultFile,&len);
 		}
 		if(flag==2)
 		{
-			LogSystem::recordFileError(ask);
 			if(isDebug)
+			{
+				LogSystem::recordFileError(ask);
 				printf("404 get %s wrong\n",ask);
+			}
 		}
 	}
 	if(len==0)
-		http.createSendMsg(DealHttp::NOFOUND,(char*)sen,NULL,&len);
+		http.createSendMsg(DealHttp::NOFOUND,(char*)sen,senLen*1024*1024,NULL,&len);
 	if(false==server.sendSocket(num,sen,len))
 	{
 		if(isDebug)
@@ -535,7 +583,7 @@ int HttpServer::func(int num,void* pget,void* sen,const char* defaultFile,HttpSe
 	}
 	return 0;
 }
-void HttpServer::epollHttp(void* pget,int len,void* pneed,const char* defaultFile)
+void HttpServer::epollHttp(void* pget,int len,unsigned int senLen,void* pneed,const char* defaultFile)
 {//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
 	fd_set temp=fdClients;
 	int sign=select(0,&temp,NULL,NULL,NULL);
@@ -566,7 +614,7 @@ void HttpServer::epollHttp(void* pget,int len,void* pneed,const char* defaultFil
 					if(sRec>0)
 					{
 						this->textLen=sRec;
-						func(fdClients.fd_array[i],pget,pneed,defaultFile,*this);
+						func(fdClients.fd_array[i],pget,pneed,senLen,defaultFile,*this);
 						if(isLongCon==false)
 						{
 					  		this->deleteFd(fdClients.fd_array[i]);
@@ -595,7 +643,7 @@ void HttpServer::epollHttp(void* pget,int len,void* pneed,const char* defaultFil
 		return ;
 	return ;
 }
-void HttpServer::forkHttp(void* pget,int len,void* pneed,const char* defaultFile)
+void HttpServer::forkHttp(void* pget,int len,unsigned int senLen,void* pneed,const char* defaultFile)
 {//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
 	fd_set temp=fdClients;
 	int sign=select(0,&temp,NULL,NULL,NULL);
@@ -626,7 +674,7 @@ void HttpServer::forkHttp(void* pget,int len,void* pneed,const char* defaultFile
 					if(sRec>0)
 					{
 						this->textLen=sRec;
-						func(fdClients.fd_array[i],pget,pneed,defaultFile,*this);
+						func(fdClients.fd_array[i],pget,pneed,senLen,defaultFile,*this);
 						if(isLongCon==false)
 						{
 					  		this->deleteFd(fdClients.fd_array[i]);
@@ -655,14 +703,14 @@ void HttpServer::forkHttp(void* pget,int len,void* pneed,const char* defaultFile
 		return ;
 	return ;
 }
-void HttpServer::loadFile(DealHttp& http,HttpServer& server,int,void* sen,int& len)
+void HttpServer::loadFile(DealHttp& http,HttpServer& server,int senLen,void* sen,int& len)
 {
 	char ask[200]={0},buf[200]={0},temp[200]={0};
 	http.getAskRoute(server.recText(),"GET",ask,200);
 	HttpServer::RouteFuntion& route=*server.getNowRoute();
 	http.getWildUrl(ask,route.route,temp,200);
 	sprintf(buf,"GET %s%s HTTP/1.1",route.path,temp);
-	if(2==http.autoAnalysisGet(buf,(char*)sen,NULL,&len))
+	if(2==http.autoAnalysisGet(buf,(char*)sen,senLen*1024*1024,NULL,&len))
 	{
 		LogSystem::recordFileError(ask);
 		printf("404 get %s wrong\n",buf);
@@ -694,12 +742,14 @@ ClientTcpIp::~ClientTcpIp()
 	closesocket(sock);
 	WSACleanup();
 }
-void ClientTcpIp::addHostIp(const char* ip)
+void ClientTcpIp::addHostIp(const char* ip,unsigned short port)
 {
 	if(ip==NULL)
 		return;
 	strcpy(this->ip,ip);
 	addrC.sin_addr.S_un.S_addr=inet_addr(ip);
+	if(port!=0)
+		addrC.sin_port=htons(port);
 }
 bool ClientTcpIp::tryConnect()
 {
@@ -745,7 +795,7 @@ bool ClientTcpIp::getDnsIp(const char* name,char* ip,unsigned int ipMaxLen)
 	in_addr addr;
 	char* p=phost->h_addr_list[0];
 	memcpy(&addr.S_un.S_addr,p,phost->h_length);
-	if(strlen(inet_ntoa(addr))<=ipMaxLen)
+	if(strlen(inet_ntoa(addr))>=ipMaxLen)
 		return false;
 	strcpy(ip,inet_ntoa(addr));
 	return true;

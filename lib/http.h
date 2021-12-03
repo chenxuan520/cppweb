@@ -5,36 +5,37 @@ class DealHttp{
 private:
 	char ask[256];
 	char* pfind;
+	const char* error;
 public:
 	enum FileKind{
-		UNKNOWN=0,HTML=1,EXE=2,IMAGE=3,NOFOUND=4,CSS=5,JS=6,ZIP7=7,JSON=8,
+		UNKNOWN=0,HTML=1,EXE=2,IMAGE=3,NOFOUND=4,CSS=5,JS=6,ZIP=7,JSON=8,
 	};
 public:
 	DealHttp();
-	bool cutLineAsk(char* pask,const char* pcutIn);
-	const char* analysisHttpAsk(void* pask,const char* pneed="GET",int needLen=3);
-	inline char* findFirst(void* pask,const char* ptofind)
+	bool cutLineAsk(char* message,const char* pcutIn);
+	const char* analysisHttpAsk(void* message,const char* pneed="GET");
+	inline char* findFirst(void* message,const char* ptofind)
 	{
-		return strstr((char*)pask,ptofind);
+		return strstr((char*)message,ptofind);
 	}
 	char* findBackString(char* local,int len,char* word,int maxWordLen);
-	void* customizeAddTop(void* buffer,int bufferLen,int statusNum,int contentLen,const char* contentType="application/json",const char* connection="keep-alive");
-	void* customizeAddHead(void* buffer,int bufferLen,const char* key,const char* value);
-	int customizeAddBody(void* buffer,int bufferLen,const char* body,unsigned int bodyLen);
-	bool setCookie(void* buffer,int bufferLen,const char* key,const char* value,int liveTime=-1,const char* path=NULL,const char* domain=NULL);
+	void* customizeAddTop(void* buffer,unsigned int bufferLen,int statusNum,unsigned int contentLen,const char* contentType="application/json",const char* connection="keep-alive",const char* staEng=NULL);
+	void* customizeAddHead(void* buffer,unsigned int bufferLen,const char* key,const char* value);
+	int customizeAddBody(void* buffer,unsigned int bufferLen,const char* body,unsigned int bodyLen);
+	bool setCookie(void* buffer,unsigned int bufferLen,const char* key,const char* value,int liveTime=-1,const char* path=NULL,const char* domain=NULL);
 	const char* getCookie(void* recText,const char* key,char* value,unsigned int valueLen);
-	void createTop(FileKind kind,char* ptop,int* topLen,int fileLen);
-	bool createSendMsg(FileKind kind,char* buffer,const char* pfile,int* plong);
-	char* findFileMsg(const char* pname,int* plen,char* buffer);
+	void createTop(FileKind kind,char* ptop,unsigned int bufLen,int* topLen,unsigned int fileLen);
+	bool createSendMsg(FileKind kind,char* buffer,unsigned int bufferLen,const char* pfile,int* plong);
+	char* findFileMsg(const char* pname,int* plen,char* buffer,unsigned int bufferLen);
 	int getFileLen(const char* pname);
-	int autoAnalysisGet(const char* message,char* psend,const char* pfirstFile,int* plen);
-	const char* getKeyValue(const void* message,const char* key,char* value,int maxValueLen,bool onlyFromBody=false);
-	const char* getKeyLine(const void* message,const char* key,char* line,int maxLineLen,bool onlyFromBody=false);
+	int autoAnalysisGet(const char* message,char* psend,unsigned int bufferLen,const char* pfirstFile,int* plen);
+	const char* getKeyValue(const void* message,const char* key,char* value,unsigned int maxValueLen,bool onlyFromBody=false);
+	const char* getKeyLine(const void* message,const char* key,char* line,unsigned int maxLineLen,bool onlyFromBody=false);
 	const char* getAskRoute(const void* message,const char* askWay,char* buffer,unsigned int bufferLen);
 	const char* getRouteValue(const void* routeMeg,const char* key,char* value,unsigned int valueLen);
-	const char* getWildUrl(const void* getText,const char* route,char* buffer,int maxLen);
-	int getRecFile(const void* message,char* fileName,int nameLen,char* buffer,int bufferLen);
-	static void dealUrl(const char* url,char* urlTop,char* urlEnd);
+	const char* getWildUrl(const void* getText,const char* route,char* buffer,unsigned int maxLen);
+	int getRecFile(const void* message,char* fileName,int nameLen,char* buffer,unsigned int bufferLen);
+	static void dealUrl(const char* url,char* urlTop,char* urlEnd,unsigned int topLen,unsigned int endLen);
 	static const char* urlDecode(char* srcString);
 };
 class LogSystem{

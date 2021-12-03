@@ -22,7 +22,7 @@ int funcTwo(ServerTcpIp::Thing thing,int num,int,void* pget,void* sen,ServerTcpI
 	static DealHttp http;
 	DealAsk dealAsk;
 	int len=0;
-    int flag=0;
+	int flag=0;
 	if(sen==NULL)
 		return -1;
 	memset(sen,0,sizeof(char)*memory*1024*1024);
@@ -50,24 +50,24 @@ int funcTwo(ServerTcpIp::Thing thing,int num,int,void* pget,void* sen,ServerTcpI
 			printf("ask:%s\n",(char*)pget);
 			printf("http:%s\n",http.analysisHttpAsk(pget));
 			strcpy(ask,http.analysisHttpAsk(pget));
-	        if(false==dealAsk.dealGetAsk(server,http,pget,sen,num))
-	        {
-				flag=http.autoAnalysisGet((char*)pget,(char*)sen,indexName,&len);
+			if(false==dealAsk.dealGetAsk(server,http,pget,sen,num))
+			{
+				flag=http.autoAnalysisGet((char*)pget,(char*)sen,sizeof(char)*memory*1024*1024,indexName,&len);
 				if(0==flag)
 					printf("some thing wrong %s\n",(char*)sen);
 				else if(flag==1)
 					printf("create auto success\n");
-		        else if(flag==2)
-		        {
-	                FILE* fp=fopen("wrong.txt","a+");
-	                if(fp==NULL)
-	                    fp=fopen("wrong.txt","w+");
-	                if(fp==NULL)
-	                    return 0;
-	                fprintf(fp,"can not open file %s\n",ask);
-	                printf("cannot open file %s\n",ask);
-	                fclose(fp);
-	            }
+				else if(flag==2)
+				{
+					FILE* fp=fopen("wrong.txt","a+");
+					if(fp==NULL)
+						fp=fopen("wrong.txt","w+");
+					if(fp==NULL)
+						return 0;
+					fprintf(fp,"can not open file %s\n",ask);
+					printf("cannot open file %s\n",ask);
+					fclose(fp);
+				}
 			}
 		}
 		else 
@@ -94,9 +94,9 @@ void chooseModel(unsigned int* port,bool* pflag)
 	printf("please input if run in background(default no)y/n:");
 	fflush(stdin);
 	scanf("%s",temp);
-    printf("please input memory(M):");
-    fflush(stdin);
-    scanf("%d",&memory);
+	printf("please input memory(M):");
+	fflush(stdin);
+	scanf("%d",&memory);
 	if(strchr(temp,'y')!=NULL)
 		*pflag=true;
 	else 
@@ -121,32 +121,32 @@ void chooseModel(unsigned int* port,bool* pflag)
 void ifChoose(bool* pb,unsigned int* pport,bool* is_back)
 {
 	char temp[10]={0};
-    FILE* fp=fopen("my.ini","r+");
-    if(fp==NULL)
-    {
-        *pb=false;
-        return;
-    }
-    if(fscanf(fp,"%u",pport)!=1)
-    {
-        *pb=false;
-        printf("port=%u\n",*pport);
-        return;
-    }
-    if(fscanf(fp,"%s",indexName)!=1)
-    {
-        *pb=false;
-        printf("name:%s\n",indexName);
-        return;
-    }
-    if(fscanf(fp,"%d",&memory)!=1)
-    {
-        *pb=false;
-        printf("memory=%d\n",memory);
-        return;
-    }
-    if(fscanf(fp,"%s",temp)!=1)
-    {
+	FILE* fp=fopen("my.ini","r+");
+	if(fp==NULL)
+	{
+		*pb=false;
+		return;
+	}
+	if(fscanf(fp,"%u",pport)!=1)
+	{
+		*pb=false;
+		printf("port=%u\n",*pport);
+		return;
+	}
+	if(fscanf(fp,"%s",indexName)!=1)
+	{
+		*pb=false;
+		printf("name:%s\n",indexName);
+		return;
+	}
+	if(fscanf(fp,"%d",&memory)!=1)
+	{
+		*pb=false;
+		printf("memory=%d\n",memory);
+		return;
+	}
+	if(fscanf(fp,"%s",temp)!=1)
+	{
 		*pb=false;
 		printf("is back wrong\n");
 		return;
@@ -155,9 +155,9 @@ void ifChoose(bool* pb,unsigned int* pport,bool* is_back)
 		*is_back=true;
 	else
 		*is_back=false;
-    *pb=true;
-    fclose(fp);
-    return;
+	*pb=true;
+	fclose(fp);
+	return;
 }
 /********************************
 	author:chenxuan
@@ -169,19 +169,19 @@ bool ifArgc(int argc,char** argv,bool* pis_back,unsigned int* pport)
 	if(argc!=5)
 		return false;
 	if(sscanf(argv[1],"%d",pport)!=1)
-    {
-        printf("init wrong\n");
-        return false;
-    }
-    sscanf(argv[2],"%s",indexName);
-    if(sscanf(argv[3],"%d",&memory)!=1)
-    {
-        printf("memory wrong\n");
-        return false;
-    }
-    if(strchr(argv[4],'y')!=NULL)
-        *pis_back=true;
-    return true;
+	{
+		printf("init wrong\n");
+		return false;
+	}
+	sscanf(argv[2],"%s",indexName);
+	if(sscanf(argv[3],"%d",&memory)!=1)
+	{
+		printf("memory wrong\n");
+		return false;
+	}
+	if(strchr(argv[4],'y')!=NULL)
+		*pis_back=true;
+	return true;
 }
 /********************************
 	author:chenxuan
@@ -192,9 +192,9 @@ void serverHttp(int argc,char** argv)
 {
 	unsigned int port=80;
 	bool is_back=false,is_choose=false;
-    ifChoose(&is_choose,&port,&is_back);
-    if(ifArgc(argc,argv,&is_back,&port)==false&&is_choose==false)
-	    chooseModel(&port,&is_back);
+	ifChoose(&is_choose,&port,&is_back);
+	if(ifArgc(argc,argv,&is_back,&port)==false&&is_choose==false)
+		chooseModel(&port,&is_back);
 	if(is_back)
 	{
 		int pid=0;
