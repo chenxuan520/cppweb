@@ -784,7 +784,7 @@ public:
 					{
 						if(fd_count<1024)
 						{
-							sockaddr_in newaddr={0};
+							sockaddr_in newaddr={0,0,{0},{0}};
 							int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
 							FD_SET(newClient,&fdClients);
 							this->addFd(newClient);
@@ -876,7 +876,7 @@ public:
 	}
 	char* getPeerIp(int cliSoc,int* pcliPort)//get ip and port by socket
 	{
-		sockaddr_in cliAddr={0};
+		sockaddr_in cliAddr={0,0,{0},{0}};
 		int len=sizeof(cliAddr);
 		if(-1==getpeername(cliSoc,(sockaddr*)&cliAddr,(socklen_t*)&len))
 			return NULL;
@@ -892,7 +892,7 @@ public:
 			epoll_event temp=pevent[i];
 			if(temp.data.fd==sock)
 			{
-				sockaddr_in newaddr={0};
+				sockaddr_in newaddr={0,0,{0},{0}};
 				int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
 				this->addFd(newClient);
 				nowEvent.data.fd=newClient;
@@ -2148,12 +2148,14 @@ public:
 		if(clientIn!=NULL)
 			return false;
 		clientIn=pfunc;
+		return true;
 	}
 	bool clientOutHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port))
 	{
 		if(clientOut!=NULL)
 			return false;
 		clientOut=pfunc;
+		return true;
 	}
 	void run(unsigned int memory,unsigned int recBufLenChar,const char* defaultFile)
 	{
@@ -2363,7 +2365,7 @@ private:
 			epoll_event temp=pevent[i];
 			if(temp.data.fd==sock)
 			{
-				sockaddr_in newaddr={0};
+				sockaddr_in newaddr={0,0,{0},{0}};
 				int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
 				this->addFd(newClient);
 				nowEvent.data.fd=newClient;
@@ -2414,7 +2416,7 @@ private:
 			epoll_event temp=pevent[i];
 			if(temp.data.fd==sock)
 			{
-				sockaddr_in newaddr={0};
+				sockaddr_in newaddr={0,0,{0},{0}};
 				int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
 				this->addFd(newClient);
 				nowEvent.data.fd=newClient;
@@ -2484,7 +2486,7 @@ private:
 			printf("404 get %s wrong\n",buf);
 		}
 	}
-	static void sigCliDeal(int pid)
+	static void sigCliDeal(int )
 	{
 		while(waitpid(-1, NULL, WNOHANG)>0);
 	}
@@ -2536,7 +2538,7 @@ private:
 		}
 		return NULL;
 	}
-	static void* manager(void* arg)//manager for user
+	static void* manager(void* )//manager for user
 	{
 		return NULL;
 	}
@@ -2652,7 +2654,7 @@ private:
 	pthread_mutex_t mutex;
 	unsigned int threadNum;
 private:
-	static void sigCliDeal(int pid)
+	static void sigCliDeal(int )
 	{
 		while(waitpid(-1, NULL, WNOHANG)>0);
 	}
@@ -2716,7 +2718,7 @@ public:
 		ThreadPool::Task task={pfunc,&argv};
 		while(1)
 		{
-			sockaddr_in newaddr={0};
+			sockaddr_in newaddr={0,0,{0},{0}};
 			int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
 			if(newClient==-1)
 				continue;
@@ -2734,7 +2736,7 @@ public:
 		signal(SIGCHLD,sigCliDeal);
 		while(1)
 		{
-			sockaddr_in newaddr={0};
+			sockaddr_in newaddr={0,0,{0},{0}};
 			int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
 			if(newClient==-1)
 				continue;
@@ -2765,7 +2767,7 @@ public:
 				epoll_event temp=pevent[i];
 				if(temp.data.fd==sock)
 				{
-					sockaddr_in newaddr={0};
+					sockaddr_in newaddr={0,0,{0},{0}};
 					int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
 					this->addFd(newClient);
 					nowEvent.data.fd=newClient;
@@ -2822,7 +2824,7 @@ public:
 			epoll_event temp=pevent[i];
 			if(temp.data.fd==sock)
 			{
-				sockaddr_in newaddr={0};
+				sockaddr_in newaddr={0,0,{0},{0}};
 				int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
 				this->addFd(newClient);
 				nowEvent.data.fd=newClient;
