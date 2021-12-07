@@ -18,6 +18,7 @@
 #include<pthread.h>
 #include<queue>
 using namespace std;
+namespace cppweb{
 class Json{
 private:
 	char* buffer;
@@ -2955,4 +2956,5 @@ public:
 		return true;
 	}
 };
+}
 #endif

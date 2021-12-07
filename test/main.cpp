@@ -1,7 +1,7 @@
 #include <iostream>  
 #include <string.h>
-#include "./lib/server.h"
-#include "./lib/http.h"
+#include "../lib/server.h"
+#include "../lib/http.h"
 using namespace std;
 void root(DealHttp & http, HttpServer & server, int, void * send, int & len)
 {
@@ -13,11 +13,10 @@ void root(DealHttp & http, HttpServer & server, int, void * send, int & len)
 	token.createToken("chenxuan",email,temp,100,60);
 	sprintf(thing,"http://127.0.0.1:5201/sure/%s",temp);
 	Json json;
-	json.jsonInit(100);
+	json.init(100);
 	json.addKeyValue("password",pwd);
 	json.addKeyValue("email",email);
 	json.addKeyValue("http",thing);
-	json.endJson();
 	json.jsonToFile("temp.json");
 	http.createSendMsg(DealHttp::JSON,(char*)send,"temp.json",&len);
 }

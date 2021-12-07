@@ -9,6 +9,7 @@
 #include"../hpp/route.h"
 #include<stdio.h>
 #include<string.h>
+using namespace cppweb;
 char indexName[100]="index.html";
 int memory=0;
 /********************************

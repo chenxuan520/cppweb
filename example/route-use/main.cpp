@@ -1,6 +1,7 @@
 #include <iostream>
 #include "../../lib/server.h"
 #include "../../lib/http.h"
+using namespace std;
 void pfunc(DealHttp & http, HttpServer & server, int , void * sen, int & len)
 {
 	char url[100]={0},value[30]={0};

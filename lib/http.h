@@ -1,6 +1,7 @@
 #ifndef _HTTP_H_
 #define _HTTP_H_
 #include<string.h>
+namespace cppweb{
 class DealHttp{
 private:
 	char ask[256];
@@ -145,4 +146,6 @@ public:
 	bool fileStrstr(const char* fileName,const char* strFind);
 	static bool writeToFile(const char* fileName,const char* buffer,unsigned int writeLen);
 };
+
+}
 #endif

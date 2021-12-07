@@ -2,7 +2,6 @@
 #define _SERVER_H_
 #include"./http.h"
 #include<string.h>
-#include<iostream>
 #include<netinet/in.h>
 #include<arpa/inet.h>
 #include<sys/socket.h>
@@ -11,13 +10,12 @@
 #include<sys/types.h>
 #include<unistd.h>
 #include<netdb.h>
-
-using namespace std;
 /********************************
 	author:chenxuan
 	date:2021/11/11
 	funtion:the server class
 *********************************/
+namespace cppweb{
 class ServerTcpIp{
 public:
 	enum Thing{
@@ -227,4 +225,6 @@ public:
 //		return SSL_read(ssl,buffer,len);
 //	}
 };
+
+}
 #endif

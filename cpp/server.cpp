@@ -20,6 +20,7 @@
 #include<unistd.h>
 using namespace std;
 //linux env
+namespace cppweb{
 ServerTcpIp::ServerTcpIp(unsigned short port,int epollNum,int wait)
 {//port is bound ,epollNum is if open epoll model,wait is listen socket max wait
 	sock=socket(AF_INET,SOCK_STREAM,0);//AF=addr family internet
@@ -748,7 +749,7 @@ void HttpServer::forkHttp(void* pget,int len,unsigned int senLen,void* pneed,con
 }
 void HttpServer::loadFile(DealHttp& http,HttpServer& server,int senLen,void* sen,int& len)
 {
-	char ask[200]={0},buf[200]={0},temp[200]={0};
+	char ask[200]={0},buf[250]={0},temp[200]={0};
 	http.getAskRoute(server.recText(),"GET",ask,200);
 	HttpServer::RouteFuntion& route=*server.getNowRoute();
 	http.getWildUrl(ask,route.route,temp,200);
@@ -1080,4 +1081,5 @@ bool ClientTcpIp::getDnsIp(const char* name,char* ip,unsigned int ipMaxLen)
 		return false;
 	strcpy(ip,inet_ntoa(addr));
 	return true;
+}
 }

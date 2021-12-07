@@ -1,6 +1,7 @@
 #include <iostream>  
 #include "../../lib/server.h"
 #include "../../lib/http.h"
+using namespace cppweb;
 void cookie(DealHttp & http, HttpServer & server, int , void * sen, int & len)
 {
 	char buffer[100]={0};

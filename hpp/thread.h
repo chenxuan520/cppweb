@@ -3,12 +3,13 @@
 #include<queue>
 #include<pthread.h>
 #include"server.h"
-using namespace std;
 /********************************
 	author:chenxuan
 	date:2021/8/10
 	funtion:class thread pool
 *********************************/
+namespace cppweb{
+
 class ThreadPool{
 public://a struct for you to add task
 	struct Task{
@@ -16,7 +17,7 @@ public://a struct for you to add task
 		void* arg;
 	};
 private:
-	queue<Task> thingWork;//a queue for struct task
+	std::queue<Task> thingWork;//a queue for struct task
 	pthread_cond_t condition;//a condition mutex
 	pthread_mutex_t lockPoll;//a lock to lock queue
 	pthread_mutex_t lockTask;//a lock for user to ctrl
@@ -99,4 +100,5 @@ public:
 		return this->deleteFd(clisoc);
 	}
 };
+}
 #endif

@@ -3,6 +3,7 @@
 #include "../../lib/server.h"
 #include "../../lib/http.h"
 using namespace std;
+using namespace cppweb;
 void root(DealHttp& http,HttpServer& ,int,void* sen,int& len)
 {
 	Json json;

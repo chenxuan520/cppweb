@@ -1,10 +1,11 @@
 #include"../hpp/thread.h"
 #include<queue>
 #include<pthread.h>
+#include <stdlib.h>
 #include<signal.h>
 #include<sys/wait.h>
 #include"../hpp/server.h"
-using namespace std;
+namespace cppweb{
 void* ThreadPool::worker(void* arg)//the worker for user 
 {
 	ThreadPool* poll=(ThreadPool*)arg;
@@ -154,7 +155,7 @@ ServerPool::~ServerPool()
 	delete pool;
    	pthread_mutex_destroy(&mutex);
 }
-void ServerPool::sigCliDeal(int pid)
+void ServerPool::sigCliDeal(int )
 {
 	while(waitpid(-1, NULL, WNOHANG)>0);
 }
@@ -176,7 +177,7 @@ void ServerPool::threadModel(void* pneed,void* (*pfunc)(void*))
 	ThreadPool::Task task={pfunc,&argv};
 	while(1)
 	{
-		sockaddr_in newaddr={0};
+		sockaddr_in newaddr={0,0,{0},{0}};
 		int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
 		if(newClient==-1)
 			continue;
@@ -318,4 +319,5 @@ void ServerPool::forkEpoll(unsigned int senBufChar,unsigned int recBufChar,void 
 			}
 		}
 	}
+}
 }

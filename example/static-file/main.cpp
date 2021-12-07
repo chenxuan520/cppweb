@@ -1,7 +1,7 @@
 #include <iostream>  
 #include "../../lib/server.h"
 #include "../../lib/http.h"
-
+using namespace cppweb;
 int main()  
 {  
 	HttpServer server(5200);
