@@ -9,6 +9,8 @@
 #include"../hpp/dealask.h"
 #include<stdio.h>
 #include<string.h>
+#include <stdlib.h>
+using namespace cppweb;
 char indexName[100]="index.html";
 int memory=0;
 /********************************

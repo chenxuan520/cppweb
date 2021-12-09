@@ -5,6 +5,7 @@
 #include<time.h>
 #include<stdio.h>
 using namespace std;
+namespace cppweb{
 DealHttp::DealHttp()
 {
 	for(int i=0;i<256;i++)
@@ -1163,7 +1164,7 @@ const char* WebToken::createToken(const char* key,const char* encryption,char* g
 		if(backString[i]==94)
 			backString[i]=92;
 	}
-	char tempString[30]={0},endString[30]={0};
+	char tempString[50]={0},endString[30]={0};
 	sprintf(endString,"%d",end);
 	for(unsigned int i=0;i<strlen(endString);i++)
 		endString[i]+=50;
@@ -1298,4 +1299,5 @@ bool FileGet::writeToFile(const char* fileName,const char* buffer,unsigned int w
 		fputc(buffer[i],fp);
 	fclose(fp);
 	return true;
+}
 }

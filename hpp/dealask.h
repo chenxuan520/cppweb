@@ -2,6 +2,7 @@
 #define _DEALASK_H_
 #include"./http.h"
 #include"./server.h"
+using namespace cppweb;
 //#include"./sql.h"
 class DealAsk{
 public:

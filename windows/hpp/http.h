@@ -10,6 +10,10 @@ public:
 	enum FileKind{
 		UNKNOWN=0,HTML=1,EXE=2,IMAGE=3,NOFOUND=4,CSS=5,JS=6,ZIP=7,JSON=8,
 	};
+	enum Status{
+		STATUSOK=200,STATUSNOCON=204,STATUSMOVED=301,STATUSBADREQUEST=400,STATUSFRORBID=403,
+		STATUSNOFOUND=404,STATUSNOIMPLEMENT=501,
+	};
 public:
 	DealHttp();
 	bool cutLineAsk(char* message,const char* pcutIn);

@@ -4,6 +4,7 @@
 #include "../../lib/server.h"
 #include "../../lib/http.h"
 using namespace std;
+using namespace cppweb;
 multimap<int,string> tree;
 void addCLi(DealHttp & http, HttpServer & server, int , void * sen, int & len)
 {

@@ -1,8 +1,8 @@
 #include <iostream>  
 #include <string.h>
-#include "./lib/server.h"
-#include "./lib/http.h"
+#include "../hpp/cppweb.h"
 using namespace std;
+using namespace cppweb;
 void root(DealHttp & http, HttpServer & server, int, void * send, int & len)
 {
 	char buffer[100]={0},pwd[100]={0},email[100]={0};
@@ -13,13 +13,12 @@ void root(DealHttp & http, HttpServer & server, int, void * send, int & len)
 	token.createToken("chenxuan",email,temp,100,60);
 	sprintf(thing,"http://127.0.0.1:5201/sure/%s",temp);
 	Json json;
-	json.jsonInit(100);
+	json.init(200);
 	json.addKeyValue("password",pwd);
 	json.addKeyValue("email",email);
 	json.addKeyValue("http",thing);
-	json.endJson();
 	json.jsonToFile("temp.json");
-	http.createSendMsg(DealHttp::JSON,(char*)send,"temp.json",&len);
+	http.createSendMsg(DealHttp::JSON,(char*)send,1024*1024,"temp.json",&len);
 }
 void sure(DealHttp & http, HttpServer & server, int, void * send, int & len)
 {
@@ -28,18 +27,19 @@ void sure(DealHttp & http, HttpServer & server, int, void * send, int & len)
 	WebToken token;
 	token.decryptToken("chenxuan",buffer,email,100);
 	Json json;
-	json.jsonInit(200);
+	json.init(200);
 	json.addKeyValue("email",email);
-	json.endJson();
 	json.jsonToFile("temp.json");
-	http.createSendMsg(DealHttp::JSON,(char*)send,"temp.json",&len);
+	http.createSendMsg(DealHttp::JSON,(char*)send,1024*1024,"temp.json",&len);
 }
 int main()  
 {  
-	HttpServer server(5201,true);
+	HttpServer server(5200,true);
+	server.changeSetting(true,true,true);
 	server.routeHandle(HttpServer::POST,HttpServer::WILD,"/login",root);
 	server.routeHandle(HttpServer::GET,HttpServer::WILD,"/sure/",sure);
-	server.run(1,"./index.html");
+	server.run(1,5000,"./index.html");
+	printf("%s",server.lastError());
     return 0; 
 }  
 
