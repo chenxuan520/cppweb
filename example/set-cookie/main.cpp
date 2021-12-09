@@ -1,6 +1,7 @@
 #include <iostream>  
 #include "../../lib/server.h"
 #include "../../lib/http.h"
+using namespace cppweb;
 void cookie(DealHttp & http, HttpServer & server, int , void * sen, int & len)
 {
 	char buffer[100]={0};
@@ -8,7 +9,7 @@ void cookie(DealHttp & http, HttpServer & server, int , void * sen, int & len)
 	json.init(200);
 	http.getKeyValue(server.recText(),"key",buffer,100);
 	json.addKeyValue("key",buffer);
-	http.customizeAddTop(sen,1000000,200,strlen(json.resultText()));
+	http.customizeAddTop(sen,1000000,DealHttp::STATUSOK,strlen(json.resultText()));
 	if(NULL==http.getCookie(server.recText(),"key",buffer,100))
 	{
 		http.setCookie(sen,1000000,"key","wew",10);

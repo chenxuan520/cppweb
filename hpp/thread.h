@@ -3,12 +3,13 @@
 #include<queue>
 #include<pthread.h>
 #include"server.h"
-using namespace std;
 /********************************
 	author:chenxuan
 	date:2021/8/10
 	funtion:class thread pool
 *********************************/
+namespace cppweb{
+
 class ThreadPool{
 public://a struct for you to add task
 	struct Task{
@@ -16,7 +17,7 @@ public://a struct for you to add task
 		void* arg;
 	};
 private:
-	queue<Task> thingWork;//a queue for struct task
+	std::queue<Task> thingWork;//a queue for struct task
 	pthread_cond_t condition;//a condition mutex
 	pthread_mutex_t lockPoll;//a lock to lock queue
 	pthread_mutex_t lockTask;//a lock for user to ctrl
@@ -61,22 +62,9 @@ private:
 	ThreadPool* pool;
 	pthread_mutex_t mutex;
 	unsigned int threadNum;
+	bool isEpoll;
 private:
 	static void sigCliDeal(int pid);
-public:
-	struct ArgvSer{
-		ServerPool& server;
-		int soc;
-		void* pneed;
-	};
-	struct ArgvSerEpoll{
-		ServerPool& server;
-		int soc;
-		int thing;
-		int len;
-		void* pneed;
-		void* pget;	
-	};
 public:
 	ServerPool(unsigned short port,unsigned int threadNum=0);
 	~ServerPool();
@@ -91,12 +79,13 @@ public:
 	bool mutexTryLock();
 	void forkModel(void* pneed,void (*pfunc)(ServerPool&,int,void*));
 	void forkEpoll(unsigned int senBufChar,unsigned int recBufChar,void (*pfunc)(ServerPool::Thing,int,int,void*,void*,ServerPool&));
-	void threadModel(void* pneed,void* (*pfunc)(void*));
-	void epollThread(int* pthing,int* pnum,void* pget,int len,void* pneed,void* (*pfunc)(void*));
+	void threadModel(void* (*pfunc)(void*));
+	void epollThread(void* (*pfunc)(void*));
 	inline bool threadDeleteSoc(int clisoc)
 	{
 		close(clisoc);
 		return this->deleteFd(clisoc);
 	}
 };
+}
 #endif

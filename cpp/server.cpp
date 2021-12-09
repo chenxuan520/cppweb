@@ -20,6 +20,7 @@
 #include<unistd.h>
 using namespace std;
 //linux env
+namespace cppweb{
 ServerTcpIp::ServerTcpIp(unsigned short port,int epollNum,int wait)
 {//port is bound ,epollNum is if open epoll model,wait is listen socket max wait
 	sock=socket(AF_INET,SOCK_STREAM,0);//AF=addr family internet
@@ -135,7 +136,7 @@ bool ServerTcpIp::selectModel(void* pget,int len,void* pneed,int (*pfunc)(Thing 
 				{
 					if(fd_count<1024)
 					{
-						sockaddr_in newaddr={0};
+						sockaddr_in newaddr={0,0,{0},{0}};
 						int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
 						FD_SET(newClient,&fdClients);
 						this->addFd(newClient);
@@ -227,7 +228,7 @@ char* ServerTcpIp::getHostIp()//get self ip
 }
 char* ServerTcpIp::getPeerIp(int cliSoc,int* pcliPort)//get ip and port by socket
 {
-	sockaddr_in cliAddr={0};
+	sockaddr_in cliAddr={0,0,{0},{0}};
 	int len=sizeof(cliAddr);
 	if(-1==getpeername(cliSoc,(sockaddr*)&cliAddr,(socklen_t*)&len))
 		return NULL;
@@ -243,7 +244,7 @@ bool ServerTcpIp::epollModel(void* pget,int len,void* pneed,int (*pfunc)(Thing,i
 		epoll_event temp=pevent[i];
 		if(temp.data.fd==sock)
 		{
-			sockaddr_in newaddr={0};
+			sockaddr_in newaddr={0,0,{0},{0}};
 			int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
 			this->addFd(newClient);
 			nowEvent.data.fd=newClient;
@@ -353,7 +354,7 @@ bool HttpServer::routeHandle(AskType ask,RouteType type,const char* route,void (
 	if(max-now<=2)
 	{
 		array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
-		if(array=NULL)
+		if(array==NULL)
 			return false;
 		max+=10;
 	}
@@ -398,7 +399,7 @@ bool HttpServer::loadStatic(const char* route,const char* staticPath)
 	if(max-now<=2)
 	{
 		array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
-		if(array=NULL)
+		if(array==NULL)
 			return false;
 		max+=10;
 	}
@@ -417,7 +418,7 @@ bool HttpServer::get(RouteType type,const char* route,void (*pfunc)(DealHttp&,Ht
 	if(max-now<=2)
 	{
 		array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
-		if(array=NULL)
+		if(array==NULL)
 			return false;
 		max+=10;
 	}
@@ -435,7 +436,7 @@ bool HttpServer::post(RouteType type,const char* route,void (*pfunc)(DealHttp&,H
 	if(max-now<=2)
 	{
 		array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
-		if(array=NULL)
+		if(array==NULL)
 			return false;
 		max+=10;
 	}
@@ -453,7 +454,7 @@ bool HttpServer::all(RouteType type,const char* route,void (*pfunc)(DealHttp&,Ht
 	if(max-now<=2)
 	{
 		array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
-		if(array=NULL)
+		if(array==NULL)
 			return false;
 		max+=10;
 	}
@@ -502,12 +503,14 @@ bool HttpServer::clientInHandle(void (*pfunc)(HttpServer&,int num,void* ip,int p
 	if(clientIn!=NULL)
 		return false;
 	clientIn=pfunc;
+	return true;
 }
 bool HttpServer::clientOutHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port))
 {
 	if(clientOut!=NULL)
 		return false;
 	clientOut=pfunc;
+	return true;
 }
 int HttpServer::httpSend(int num,void* buffer,int sendLen)
 {
@@ -640,7 +643,7 @@ void HttpServer::epollHttp(void* pget,int len,unsigned int senLen,void* pneed,co
 		epoll_event temp=pevent[i];
 		if(temp.data.fd==sock)
 		{
-			sockaddr_in newaddr={0};
+			sockaddr_in newaddr={0,0,{0},{0}};
 			int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
 			this->addFd(newClient);
 			nowEvent.data.fd=newClient;
@@ -691,7 +694,7 @@ void HttpServer::forkHttp(void* pget,int len,unsigned int senLen,void* pneed,con
 		epoll_event temp=pevent[i];
 		if(temp.data.fd==sock)
 		{
-			sockaddr_in newaddr={0};
+			sockaddr_in newaddr={0,0,{0},{0}};
 			int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
 			this->addFd(newClient);
 			nowEvent.data.fd=newClient;
@@ -746,7 +749,7 @@ void HttpServer::forkHttp(void* pget,int len,unsigned int senLen,void* pneed,con
 }
 void HttpServer::loadFile(DealHttp& http,HttpServer& server,int senLen,void* sen,int& len)
 {
-	char ask[200]={0},buf[200]={0},temp[200]={0};
+	char ask[200]={0},buf[250]={0},temp[200]={0};
 	http.getAskRoute(server.recText(),"GET",ask,200);
 	HttpServer::RouteFuntion& route=*server.getNowRoute();
 	http.getWildUrl(ask,route.route,temp,200);
@@ -757,7 +760,7 @@ void HttpServer::loadFile(DealHttp& http,HttpServer& server,int senLen,void* sen
 		printf("404 get %s wrong\n",buf);
 	}
 }
-void HttpServer::sigCliDeal(int pid)
+void HttpServer::sigCliDeal(int)
 {
 	while(waitpid(-1, NULL, WNOHANG)>0);
 }
@@ -1078,4 +1081,5 @@ bool ClientTcpIp::getDnsIp(const char* name,char* ip,unsigned int ipMaxLen)
 		return false;
 	strcpy(ip,inet_ntoa(addr));
 	return true;
+}
 }

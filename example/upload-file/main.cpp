@@ -3,6 +3,7 @@
 #include "../../lib/server.h"
 #include "../../lib/http.h"
 using namespace std;
+using namespace cppweb;
 void upload(DealHttp& http,HttpServer& server,int num,void* sen,int& len)
 {
     char name[100]={0},buffer[6000];

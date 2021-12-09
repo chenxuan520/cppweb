@@ -1,10 +1,11 @@
 #include"../hpp/thread.h"
 #include<queue>
 #include<pthread.h>
+#include <stdlib.h>
 #include<signal.h>
 #include<sys/wait.h>
 #include"../hpp/server.h"
-using namespace std;
+namespace cppweb{
 void* ThreadPool::worker(void* arg)//the worker for user 
 {
 	ThreadPool* poll=(ThreadPool*)arg;
@@ -148,13 +149,14 @@ ServerPool::ServerPool(unsigned short port,unsigned int threadNum):ServerTcpIp(p
 		}
 	}
 	pthread_mutex_init(&mutex,NULL);
+	isEpoll=false;
 }
 ServerPool::~ServerPool()
 {
 	delete pool;
    	pthread_mutex_destroy(&mutex);
 }
-void ServerPool::sigCliDeal(int pid)
+void ServerPool::sigCliDeal(int )
 {
 	while(waitpid(-1, NULL, WNOHANG)>0);
 }
@@ -165,75 +167,53 @@ bool ServerPool::mutexTryLock()
 	else
 		return false;
 }
-void ServerPool::threadModel(void* pneed,void* (*pfunc)(void*))
+void ServerPool::threadModel(void* (*pfunc)(void*))
 {
 	if(this->threadNum==0)
 	{
 		this->error="thread wrong init";
 		return;
 	}
-	ServerPool::ArgvSer argv={*this,0,pneed};
-	ThreadPool::Task task={pfunc,&argv};
 	while(1)
 	{
-		sockaddr_in newaddr={0};
+		sockaddr_in newaddr={0,0,{0},{0}};
 		int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
 		if(newClient==-1)
 			continue;
 		this->addFd(newClient);
-		argv.soc=newClient;
-		task.ptask=pfunc;
-		task.arg=&argv;
+		ThreadPool::Task task={pfunc,(void*)(uintptr_t)newClient};
 		pool->addTask(task);
 	}
 }
-void ServerPool::epollThread(int* pthing,int* pnum,void* pget,int len,void* pneed,void* (*pfunc)(void*))
+void ServerPool::epollThread(void* (*pfunc)(void*))
 {
 	if(this->threadNum==0)
 	{
 		this->error="thread wrong init";
 		return;
 	}
+	isEpoll=true;
 	int eventNum=epoll_wait(epfd,pevent,512,-1),thing=0,num=0;
 	for(int i=0;i<eventNum;i++)
 	{
 		epoll_event temp=pevent[i];
 		if(temp.data.fd==sock)
 		{
-			sockaddr_in newaddr={0};
+			sockaddr_in newaddr={0,0,{0},{0}};
 			int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
 			this->addFd(newClient);
 			nowEvent.data.fd=newClient;
-			nowEvent.events=EPOLLIN;
+			nowEvent.events=EPOLLIN|EPOLLET;
 			epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
 			thing=1;
 			num=newClient;
-			strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
-			ServerPool::ArgvSerEpoll argv={*this,num,thing,0,pneed,pget};
-			ThreadPool::Task task={pfunc,&argv};
-			if(pfunc!=NULL)
-				pool->addTask(task);
 		}
 		else
 		{
-			int getNum=recv(temp.data.fd,(char*)pget,len,0);
-			num=temp.data.fd;
-			if(getNum>0)
-				thing=2;
-			else
-			{
-				*(char*)pget=0;
-				thing=0;
-				this->deleteFd(temp.data.fd);
-				epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
-				close(temp.data.fd);
-			}
 			if(pfunc!=NULL)
 			{
-				ServerPool::ArgvSerEpoll argv={*this,num,thing,getNum,pneed,pget};
-				ThreadPool::Task task={pfunc,&argv};
-				if(pfunc!=NULL)
-					pool->addTask(task);
+				ThreadPool::Task task={pfunc,(void*)(uintptr_t)temp.data.fd};
+				pool->addTask(task);
 			}
 		}
 	}
@@ -318,4 +298,5 @@ void ServerPool::forkEpoll(unsigned int senBufChar,unsigned int recBufChar,void 
 			}
 		}
 	}
+}
 }
