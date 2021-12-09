@@ -1647,7 +1647,7 @@ public:
 			if(backString[i]==94)
 				backString[i]=92;
 		}
-		char tempString[30]={0},endString[30]={0};
+		char tempString[60]={0},endString[30]={0};
 		sprintf(endString,"%d",end);
 		for(unsigned int i=0;i<strlen(endString);i++)
 			endString[i]+=50;
@@ -2421,7 +2421,7 @@ private:
 				int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
 				this->addFd(newClient);
 				nowEvent.data.fd=newClient;
-				nowEvent.events=EPOLLIN;
+				nowEvent.events=EPOLLIN|EPOLLET;
 				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
 				if(this->clientIn!=NULL)
 				{
@@ -2476,7 +2476,7 @@ private:
 	}
 	static void loadFile(DealHttp& http,HttpServer& server,int senLen,void* sen,int& len)
 	{
-		char ask[200]={0},buf[200]={0},temp[200]={0};
+		char ask[200]={0},buf[300]={0},temp[200]={0};
 		http.getAskRoute(server.recText(),"GET",ask,200);
 		HttpServer::RouteFuntion& route=*server.getNowRoute();
 		http.getWildUrl(ask,route.route,temp,200);
@@ -2654,25 +2654,12 @@ private:
 	ThreadPool* pool;
 	pthread_mutex_t mutex;
 	unsigned int threadNum;
+	bool isEpoll;
 private:
 	static void sigCliDeal(int )
 	{
 		while(waitpid(-1, NULL, WNOHANG)>0);
 	}
-public:
-	struct ArgvSer{
-		ServerPool& server;
-		int soc;
-		void* pneed;
-	};
-	struct ArgvSerEpoll{
-		ServerPool& server;
-		int soc;
-		int thing;
-		int len;
-		void* pneed;
-		void* pget;	
-	};
 public:
 	ServerPool(unsigned short port,unsigned int threadNum=0):ServerTcpIp(port)
 	{
@@ -2687,6 +2674,7 @@ public:
 			}
 		}
 		pthread_mutex_init(&mutex,NULL);
+		isEpoll=false;
 	}
 	~ServerPool()
 	{
@@ -2708,15 +2696,13 @@ public:
 		else
 			return false;
 	}
-	void threadModel(void* pneed,void* (*pfunc)(void*))
+	void threadModel(void* (*pfunc)(void*))
 	{
 		if(this->threadNum==0)
 		{
 			this->error="thread wrong init";
 			return;
 		}
-		ServerPool::ArgvSer argv={*this,0,pneed};
-		ThreadPool::Task task={pfunc,&argv};
 		while(1)
 		{
 			sockaddr_in newaddr={0,0,{0},{0}};
@@ -2724,11 +2710,7 @@ public:
 			if(newClient==-1)
 				continue;
 			this->addFd(newClient);
-			this->mutexLock();
-			argv.soc=newClient;
-			task.ptask=pfunc;
-			task.arg=&argv;
-			ThreadPool::createPthread((void*)&argv,pfunc);
+			ThreadPool::Task task={pfunc,(void*)(uintptr_t)newClient};
 			pool->addTask(task);
 		}
 	}
@@ -2812,13 +2794,14 @@ public:
 			}
 		}
 	}
-	void epollThread(void* pget,int len,void* pneed,void* (*pfunc)(void*))
+	void epollThread(void* (*pfunc)(void*))
 	{
 		if(this->threadNum==0)
 		{
 			this->error="thread wrong init";
 			return;
 		}
+		isEpoll=true;
 		int eventNum=epoll_wait(epfd,pevent,512,-1),thing=0,num=0;
 		for(int i=0;i<eventNum;i++)
 		{
@@ -2829,36 +2812,17 @@ public:
 				int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
 				this->addFd(newClient);
 				nowEvent.data.fd=newClient;
-				nowEvent.events=EPOLLIN;
+				nowEvent.events=EPOLLIN|EPOLLET;
 				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
 				thing=1;
 				num=newClient;
-				strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
-				ServerPool::ArgvSerEpoll argv={*this,num,thing,0,pneed,pget};
-				ThreadPool::Task task={pfunc,&argv};
-				if(pfunc!=NULL)
-					pool->addTask(task);
 			}
 			else
 			{
-				int getNum=recv(temp.data.fd,(char*)pget,len,0);
-				num=temp.data.fd;
-				if(getNum>0)
-					thing=2;
-				else
+				if(pfunc!=NULL)
 				{
-					*(char*)pget=0;
-					thing=0;
-					this->deleteFd(temp.data.fd);
-					epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
-					close(temp.data.fd);
-				}
-				if(pfunc!=NULL&&thing==2)
-				{
-					ServerPool::ArgvSerEpoll argv={*this,num,thing,getNum,pneed,pget};
-					ThreadPool::Task task={pfunc,&argv};
-					if(pfunc!=NULL)
-						pool->addTask(task);
+					ThreadPool::Task task={pfunc,(void*)(uintptr_t)temp.data.fd};
+					pool->addTask(task);
 				}
 			}
 		}
@@ -2867,6 +2831,8 @@ public:
 	inline bool threadDeleteSoc(int clisoc)
 	{
 		close(clisoc);
+		if(isEpoll)
+			epoll_ctl(epfd,clisoc,EPOLL_CTL_DEL,NULL);
 		return this->deleteFd(clisoc);
 	}
 };
