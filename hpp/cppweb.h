@@ -17,7 +17,6 @@
 #include<netdb.h>
 #include<pthread.h>
 #include<queue>
-using namespace std;
 namespace cppweb{
 class Json{
 private:
@@ -2499,7 +2498,7 @@ public://a struct for you to add task
 		void* arg;
 	};
 private:
-	queue<Task> thingWork;//a queue for struct task
+	std::queue<Task> thingWork;//a queue for struct task
 	pthread_cond_t condition;//a condition mutex
 	pthread_mutex_t lockPoll;//a lock to lock queue
 	pthread_mutex_t lockTask;//a lock for user to ctrl

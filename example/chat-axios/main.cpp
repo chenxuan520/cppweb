@@ -4,7 +4,7 @@
 #include "../../lib/http.h"
 using namespace std;
 using namespace cppweb;
-void root(DealHttp& http,HttpServer& ,int,void* sen,int& len)
+void root(DealHttp& http,HttpServer& ,int soc,void* sen,int& len)
 {
 	Json json;
 	json.init(200);
@@ -18,7 +18,8 @@ int main()
 {  
 	HttpServer server(5200,true);
 	server.routeHandle(HttpServer::ALL,HttpServer::WILD,"/root",root);
-	server.run(1,6000,"index.html");
+	server.run(1,6000,"b.html");
+	printf("%s",server.lastError());
     return 0; 
 }  
 
