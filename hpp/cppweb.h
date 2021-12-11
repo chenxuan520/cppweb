@@ -98,6 +98,18 @@ public:
 		this->nowLen+=2;
 		return true;
 	}
+	int httpJsonCreate(void* buffer,unsigned int buffLen)
+	{
+		if(buffLen<this->nowLen+100)
+			return -1;
+		sprintf((char*)buffer,"HTTP/1.1 200 OK\r\n"
+			"Server LCserver/1.1\r\n"
+			"Connection: keep-alive\r\n"
+			"Content-Type: application/json\r\n"
+			"Content-Length: %ld\r\n\r\n"
+			"%s",strlen(this->buffer),this->buffer);
+		return strlen((char*)buffer);
+	}
 	void addOBject(const Object& obj)
 	{
 		switch(obj.type)
@@ -368,6 +380,7 @@ public:
 		char temp[100]={0};
 		int len=sprintf(temp,"\"%s\":%d}",key,value);
 		strcat(pbuffer,temp);
+		len=strlen(pbuffer);
 		return len;
 	}
 	int createObjFloat(char* pbuffer,unsigned int bufferLen,const char* key,float value,int output=1)
@@ -389,6 +402,7 @@ public:
 		char temp[100]={0};
 		int len=sprintf(temp,"\"%s\":%.*f}",key,output,value);
 		strcat(pbuffer,temp);
+		len=strlen(pbuffer);
 		return len;
 	}
 	int createObjValue(char* pbuffer,unsigned int bufferLen,const char* key,const char* value)
@@ -415,6 +429,7 @@ public:
 			strcat(pbuffer,"{");
 		int len=sprintf(temp,"\"%s\":\"%s\"}",key,value);
 		strcat(pbuffer,temp);
+		len=strlen(pbuffer);
 		return len;
 	}
 	bool createObjArray(char* pbuffer,unsigned int bufferLen,TypeJson type,const char* key,void** array,unsigned int arrLen,unsigned int floatNum=1)
@@ -497,7 +512,8 @@ public:
 		int len=sprintf(temp,"\"%s\":%s}",key,value);
 		strcat(pbuffer,temp);
 		nowLen+=len;
-		return nowLen;
+		len=strlen(pbuffer);
+		return len;
 	}
 	inline const char* resultText()
 	{

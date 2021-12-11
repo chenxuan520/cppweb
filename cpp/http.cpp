@@ -640,6 +640,18 @@ bool Json::init(unsigned int bufferLen)
 	this->nowLen+=2;
 	return true;
 }
+int Json::httpJsonCreate(void* buffer,unsigned int buffLen)
+{
+	if(buffLen<this->nowLen+100)
+		return -1;
+	sprintf((char*)buffer,"HTTP/1.1 200 OK\r\n"
+		"Server LCserver/1.1\r\n"
+		"Connection: keep-alive\r\n"
+		"Content-Type: application/json\r\n"
+		"Content-Length: %ld\r\n\r\n"
+		"%s",strlen(this->buffer),this->buffer);
+	return strlen((char*)buffer);
+}
 bool Json::addKeyValue(const char* key,const char* value)
 {
 	char temp[200]={0};
@@ -1000,6 +1012,7 @@ int Json::createObjInt(char* pbuffer,unsigned int bufferLen,const char* key,int 
 	char temp[100]={0};
 	int len=sprintf(temp,"\"%s\":%d}",key,value);
 	strcat(pbuffer,temp);
+	len=strlen((char*)pbuffer);
 	return len;
 }
 int Json::createObjFloat(char* pbuffer,unsigned int bufferLen,const char* key,float value,int output)
@@ -1021,6 +1034,7 @@ int Json::createObjFloat(char* pbuffer,unsigned int bufferLen,const char* key,fl
 	char temp[100]={0};
 	int len=sprintf(temp,"\"%s\":%.*f}",key,output,value);
 	strcat(pbuffer,temp);
+	len=strlen((char*)pbuffer);
 	return len;
 }
 int Json::createObjValue(char* pbuffer,unsigned int bufferLen,const char* key,const char* value)
@@ -1047,6 +1061,7 @@ int Json::createObjValue(char* pbuffer,unsigned int bufferLen,const char* key,co
 		strcat(pbuffer,"{");
 	int len=sprintf(temp,"\"%s\":\"%s\"}",key,value);
 	strcat(pbuffer,temp);
+	len=strlen((char*)pbuffer);
 	return len;
 }
 bool Json::createObjArray(char* pbuffer,unsigned int bufferLen,TypeJson type,const char* key,void** array,unsigned int arrLen,unsigned int floatNum)
@@ -1129,7 +1144,8 @@ int Json::createObjObj(char* pbuffer,unsigned int bufferLen,const char* key,cons
 	int len=sprintf(temp,"\"%s\":%s}",key,value);
 	strcat(pbuffer,temp);
 	nowLen+=len;
-	return nowLen;
+	len=strlen((char*)pbuffer);
+	return len;
 }
 WebToken::WebToken()
 {
