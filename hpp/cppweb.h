@@ -874,7 +874,7 @@ public:
 		memcpy(hostip,inet_ntoa(addr),strlen(inet_ntoa(addr)));
 		return hostip;
 	}
-	char* getPeerIp(int cliSoc,int* pcliPort)//get ip and port by socket
+	static const char* getPeerIp(int cliSoc,int* pcliPort)//get ip and port by socket
 	{
 		sockaddr_in cliAddr={0,0,{0},{0}};
 		int len=sizeof(cliAddr);

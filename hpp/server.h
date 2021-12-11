@@ -61,7 +61,7 @@ public:
 	bool findSocket(int cliSoc);//find if socket is connect
 	char* getHostName();//get self name
 	char* getHostIp();//get self ip
-	char* getPeerIp(int cliSoc,int* pcliPort);//get ip and port by socket
+	static const char* getPeerIp(int cliSoc,int* pcliPort);//get ip and port by socket
 	bool epollModel(void* pget,int len,void* pneed,int (*pfunc)(Thing,int ,int ,void* ,void*,ServerTcpIp& ));
 	bool disconnectSocket(int clisock);//disconnect from socket
 	inline const char* getLastError()//get last error
