@@ -2022,7 +2022,7 @@ public:
 		ONEWAY,WILD,STATIC,
 	};
 	enum AskType{
-		GET,POST,PUT,DELETE,ALL,
+		GET,POST,PUT,DELETE,OPTIONS,ALL,
 	};
 	struct RouteFuntion{
 		AskType ask;
@@ -2300,6 +2300,13 @@ private:
 			if(isDebug)
 				printf("DELETE url:%s\n",ask);
 			type=DELETE;
+		}
+		else if(strstr(ask,"OPTIONS")!=NULL)
+		{
+			http.getAskRoute(pget,"OPTIONS",ask,200);
+			if(isDebug)
+				printf("OPTIONS url:%s]n",ask);
+			type=OPTIONS;
 		}
 		void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&)=NULL;
 		for(unsigned int i=0;i<now;i++)
