@@ -2105,6 +2105,24 @@ public:
 		now++;
 		return true;
 	}
+	bool deletePath(const char* path)
+	{
+		if(strlen(path)>100)
+			return false;
+		if(max-now<=2)
+		{
+			array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
+			if(array==NULL)
+				return false;
+			max+=10;
+		}
+		array[now].type=STATIC;
+		array[now].ask=GET;
+		strcpy(array[now].route,path);
+		array[now].pfunc=deleteFile;
+		now++;
+		return true;
+	}
 	bool get(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&))
 	{
 		if(strlen(route)>100)
@@ -2305,7 +2323,7 @@ private:
 		{
 			http.getAskRoute(pget,"OPTIONS",ask,200);
 			if(isDebug)
-				printf("OPTIONS url:%s]n",ask);
+				printf("OPTIONS url:%s\n",ask);
 			type=OPTIONS;
 		}
 		void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&)=NULL;
@@ -2508,6 +2526,11 @@ private:
 			LogSystem::recordFileError(ask);
 			printf("404 get %s wrong\n",buf);
 		}
+	}
+	static void deleteFile(DealHttp& http,HttpServer&,int senLen,void* sen,int& len)
+	{
+		http.customizeAddTop(sen,senLen,DealHttp::STATUSFRORBID,0);
+		len=strlen((char*)sen);
 	}
 	static void sigCliDeal(int )
 	{
