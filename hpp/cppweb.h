@@ -1069,7 +1069,7 @@ public:
 		UNKNOWN=0,HTML=1,EXE=2,IMAGE=3,NOFOUND=4,CSS=5,JS=6,ZIP=7,JSON=8,
 	};
 	enum Status{
-		STATUSOK=200,STATUSNOCON=204,STATUSMOVED=301,STATUSBADREQUEST=400,STATUSFRORBID=403,
+		STATUSOK=200,STATUSNOCON=204,STATUSMOVED=301,STATUSBADREQUEST=400,STATUSFORBIDDEN=403,
 		STATUSNOFOUND=404,STATUSNOIMPLEMENT=501,
 	};
 public:
@@ -2360,7 +2360,7 @@ private:
 		}
 		if(pfunc!=NULL)
 		{
-			if(pfunc!=loadFile)
+			if(pfunc!=loadFile&&pfunc!=deleteFile)
 				pfunc(http,*this,num,sen,len);
 			else
 				pfunc(http,*this,senLen,sen,len);
@@ -2529,7 +2529,8 @@ private:
 	}
 	static void deleteFile(DealHttp& http,HttpServer&,int senLen,void* sen,int& len)
 	{
-		http.customizeAddTop(sen,senLen,DealHttp::STATUSFRORBID,0);
+		http.customizeAddTop(sen,senLen*1024*1024,DealHttp::STATUSFORBIDDEN,strlen("403 forbidden"),"text/plain");
+		http.customizeAddBody(sen,senLen*1024*1024,"403 forbidden",strlen("403 forbidden"));
 		len=strlen((char*)sen);
 	}
 	static void sigCliDeal(int )
