@@ -17,6 +17,8 @@
 #include<netdb.h>
 #include<pthread.h>
 #include<queue>
+#include<unordered_map>
+#include<string>
 namespace cppweb{
 class Json{
 private:
@@ -114,28 +116,28 @@ public:
 	{
 		switch(obj.type)
 		{
-			case INT:
-				this->addKeyValInt(obj.key,obj.valInt);
-				break;
-			case FLOAT:
-				this->addKeyValFloat(obj.key,obj.valFlo,obj.floOut);
-				break;
-			case STRING:
-				this->addKeyValue(obj.key,obj.valStr);
-				break;
-			case ARRAY:
-				this->addArray(obj.arrTyp,obj.key,obj.array,obj.arrLen,obj.floOut);
-				break;
-			case OBJ:
-			case STRUCT:
-				strcat(this->buffer,"\"");
-				if(obj.key!=NULL)
-					strcat(this->buffer,obj.key);
-				strcat(this->buffer,"\":{");
-				for(unsigned int i=0;i<obj.arrLen;i++)
-					this->addOBject(obj.pobj[0]);
-				strcat(this->buffer,"}");
-				break;
+		case INT:
+			this->addKeyValInt(obj.key,obj.valInt);
+			break;
+		case FLOAT:
+			this->addKeyValFloat(obj.key,obj.valFlo,obj.floOut);
+			break;
+		case STRING:
+			this->addKeyValue(obj.key,obj.valStr);
+			break;
+		case ARRAY:
+			this->addArray(obj.arrTyp,obj.key,obj.array,obj.arrLen,obj.floOut);
+			break;
+		case OBJ:
+		case STRUCT:
+			strcat(this->buffer,"\"");
+			if(obj.key!=NULL)
+				strcat(this->buffer,obj.key);
+			strcat(this->buffer,"\":{");
+			for(unsigned int i=0;i<obj.arrLen;i++)
+				this->addOBject(obj.pobj[0]);
+			strcat(this->buffer,"}");
+			break;
 		}
 	}
 	bool addKeyValue(const char* key,const char* value)
@@ -228,83 +230,83 @@ public:
 		Object* pobj=(Object*)array;
 		switch(type)
 		{
-			case OBJ:
-				for(unsigned int i=0;i<arrLen;i++)
+		case OBJ:
+			for(unsigned int i=0;i<arrLen;i++)
+			{
+				strcat(buffer,"{");
+				switch(pobj[i].type)
 				{
-					strcat(buffer,"{");
-					switch(pobj[i].type)
-					{
-						case OBJ:
-							this->addOBject(pobj[i]);
-							break;
-						case INT:
-							this->addKeyValInt(pobj[i].key,pobj[i].valInt);
-							break;
-						case STRING:
-							this->addKeyValue(pobj[i].key,pobj[i].valStr);
-							break;
-						case FLOAT:
-							this->addKeyValFloat(pobj[i].key,pobj[i].valFlo,pobj[i].floOut);
-							break;
-						case ARRAY:
-							this->addArray(pobj[i].arrTyp,pobj[i].key,pobj[i].array,pobj[i].arrLen,pobj[i].floOut);
-							break;
-						case STRUCT:
-							strcat(buffer,pobj[i].valStr);
-							break;
-					}
-					strcat(buffer,",");
+				case OBJ:
+					this->addOBject(pobj[i]);
+					break;
+				case INT:
+					this->addKeyValInt(pobj[i].key,pobj[i].valInt);
+					break;
+				case STRING:
+					this->addKeyValue(pobj[i].key,pobj[i].valStr);
+					break;
+				case FLOAT:
+					this->addKeyValFloat(pobj[i].key,pobj[i].valFlo,pobj[i].floOut);
+					break;
+				case ARRAY:
+					this->addArray(pobj[i].arrTyp,pobj[i].key,pobj[i].array,pobj[i].arrLen,pobj[i].floOut);
+					break;
+				case STRUCT:
+					strcat(buffer,pobj[i].valStr);
+					break;
 				}
-				buffer[strlen(buffer)-1]=']';
-				strcat(buffer,"}");
-				nowLen+=len;
-				break;
-			case STRING:
-				for(unsigned int i=0;i<arrLen;i++)
+				strcat(buffer,",");
+			}
+			buffer[strlen(buffer)-1]=']';
+			strcat(buffer,"}");
+			nowLen+=len;
+			break;
+		case STRING:
+			for(unsigned int i=0;i<arrLen;i++)
+			{
+				len=sprintf(temp,"\"%s\",",(char*)array[i]);
+				strcat(buffer,temp);
+			}
+			buffer[strlen(buffer)-1]=']';
+			strcat(buffer,"}");
+			nowLen+=len;
+			break;				
+		case INT:
+			for(unsigned int i=0;i<arrLen;i++)
+			{
+				len=sprintf(temp,"%d,",arr[i]);
+				strcat(buffer,temp);
+			}
+			buffer[strlen(buffer)-1]=']';
+			strcat(buffer,"}");
+			nowLen+=len;
+			break;
+		case FLOAT:
+			for(unsigned int i=0;i<arrLen;i++)
+			{
+				len=sprintf(temp,"%.*f,",floatNum,arrF[i]);
+				strcat(buffer,temp);
+			}
+			buffer[strlen(buffer)-1]=']';
+			strcat(buffer,"}");
+			nowLen+=len;
+			break;
+		case STRUCT:
+			for(unsigned int i=0;i<arrLen;i++)
+			{
+				if((char*)array[i]!=NULL)
 				{
-					len=sprintf(temp,"\"%s\",",(char*)array[i]);
-					strcat(buffer,temp);
+					strcat(buffer,(char*)array[i]);
+					len+=strlen((char*)array[i]);
 				}
-				buffer[strlen(buffer)-1]=']';
-				strcat(buffer,"}");
-				nowLen+=len;
-				break;				
-			case INT:
-				for(unsigned int i=0;i<arrLen;i++)
-				{
-					len=sprintf(temp,"%d,",arr[i]);
-					strcat(buffer,temp);
-				}
-				buffer[strlen(buffer)-1]=']';
-				strcat(buffer,"}");
-				nowLen+=len;
-				break;
-			case FLOAT:
-				for(unsigned int i=0;i<arrLen;i++)
-				{
-					len=sprintf(temp,"%.*f,",floatNum,arrF[i]);
-					strcat(buffer,temp);
-				}
-				buffer[strlen(buffer)-1]=']';
-				strcat(buffer,"}");
-				nowLen+=len;
-				break;
-			case STRUCT:
-				for(unsigned int i=0;i<arrLen;i++)
-				{
-					if((char*)array[i]!=NULL)
-					{
-						strcat(buffer,(char*)array[i]);
-						len+=strlen((char*)array[i]);
-					}
-					strcat(buffer,",");	
-				}
-				buffer[strlen(buffer)-1]=']';
-				strcat(buffer,"}");
-				nowLen+=len;
-				break;
-			default:
-				return false;
+				strcat(buffer,",");	
+			}
+			buffer[strlen(buffer)-1]=']';
+			strcat(buffer,"}");
+			nowLen+=len;
+			break;
+		default:
+			return false;
 		}
 		return true;
 	}
@@ -337,28 +339,28 @@ public:
 	{
 		switch(obj.type)
 		{
-			case INT:
-				this->createObjInt(pbuffer,bufferLen,obj.key,obj.valInt);
-				break;
-			case FLOAT:
-				this->createObjFloat(pbuffer,bufferLen,obj.key,obj.valFlo,obj.floOut);
-				break;
-			case STRING:
-				this->createObjValue(pbuffer,bufferLen,obj.key,obj.valStr);
-				break;
-			case ARRAY:
-				this->createObjArray(pbuffer,bufferLen,obj.arrTyp,obj.key,obj.array,obj.arrLen,obj.floOut);
-				break;
-			case OBJ:
-			case STRUCT:
-				strcat(this->buffer,"\"");
-				if(obj.key!=NULL)
-					strcat(this->buffer,obj.key);
-				strcat(this->buffer,"\":{");
-				for(unsigned int i=0;i<obj.arrLen;i++)
-					this->addOBject(obj.pobj[0]);
-				strcat(this->buffer,"}");
-				break;
+		case INT:
+			this->createObjInt(pbuffer,bufferLen,obj.key,obj.valInt);
+			break;
+		case FLOAT:
+			this->createObjFloat(pbuffer,bufferLen,obj.key,obj.valFlo,obj.floOut);
+			break;
+		case STRING:
+			this->createObjValue(pbuffer,bufferLen,obj.key,obj.valStr);
+			break;
+		case ARRAY:
+			this->createObjArray(pbuffer,bufferLen,obj.arrTyp,obj.key,obj.array,obj.arrLen,obj.floOut);
+			break;
+		case OBJ:
+		case STRUCT:
+			strcat(this->buffer,"\"");
+			if(obj.key!=NULL)
+				strcat(this->buffer,obj.key);
+			strcat(this->buffer,"\":{");
+			for(unsigned int i=0;i<obj.arrLen;i++)
+				this->addOBject(obj.pobj[0]);
+			strcat(this->buffer,"}");
+			break;
 		}	
 	}
 	int createObjInt(char* pbuffer,unsigned int bufferLen,const char* key,int value)
@@ -455,35 +457,35 @@ public:
 		float* arrF=(float*)array;
 		switch(type)
 		{
-			case STRING:
-				for(unsigned int i=0;i<arrLen;i++)
-				{
-					sprintf(temp,"\"%s\",",(char*)array[i]);
-					strcat(pbuffer,temp);
-				}
-				pbuffer[strlen(pbuffer)-1]=']';
-				strcat(pbuffer,"}");
-				break;
-			case INT:
-				for(unsigned int i=0;i<arrLen;i++)
-				{
-					sprintf(temp,"%d,",arr[i]);
-					strcat(pbuffer,temp);
-				}
-				pbuffer[strlen(pbuffer)-1]=']';
-				strcat(pbuffer,"}");
-				break;
-			case FLOAT:
-				for(unsigned int i=0;i<arrLen;i++)
-				{
-					sprintf(temp,"%.*f,",floatNum,arrF[i]);
-					strcat(pbuffer,temp);
-				}
-				pbuffer[strlen(pbuffer)-1]=']';
-				strcat(pbuffer,"}");
-				break;
-			default:
-				return false;
+		case STRING:
+			for(unsigned int i=0;i<arrLen;i++)
+			{
+				sprintf(temp,"\"%s\",",(char*)array[i]);
+				strcat(pbuffer,temp);
+			}
+			pbuffer[strlen(pbuffer)-1]=']';
+			strcat(pbuffer,"}");
+			break;
+		case INT:
+			for(unsigned int i=0;i<arrLen;i++)
+			{
+				sprintf(temp,"%d,",arr[i]);
+				strcat(pbuffer,temp);
+			}
+			pbuffer[strlen(pbuffer)-1]=']';
+			strcat(pbuffer,"}");
+			break;
+		case FLOAT:
+			for(unsigned int i=0;i<arrLen;i++)
+			{
+				sprintf(temp,"%.*f,",floatNum,arrF[i]);
+				strcat(pbuffer,temp);
+			}
+			pbuffer[strlen(pbuffer)-1]=']';
+			strcat(pbuffer,"}");
+			break;
+		default:
+			return false;
 		}
 		return true;
 	}
@@ -1060,10 +1062,6 @@ public:
 	}
 };
 class DealHttp{
-private:
-	char ask[256];
-	char* pfind;
-	const char* error;
 public:
 	enum FileKind{
 		UNKNOWN=0,HTML=1,EXE=2,IMAGE=3,NOFOUND=4,CSS=5,JS=6,ZIP=7,JSON=8,
@@ -1072,6 +1070,18 @@ public:
 		STATUSOK=200,STATUSNOCON=204,STATUSMOVED=301,STATUSBADREQUEST=400,STATUSFORBIDDEN=403,
 		STATUSNOFOUND=404,STATUSNOIMPLEMENT=501,
 	};
+	struct Datagram{
+		Status statusCode;
+		FileKind typeFile;
+		unsigned fileLen;
+		std::unordered_map<std::string,std::string> head;
+		std::unordered_map<std::string,std::string> cookie;
+		const void* body;
+	};
+private:
+	char ask[256];
+	char* pfind;
+	const char* error;
 public:
 	DealHttp()
 	{
@@ -1138,30 +1148,30 @@ public:
 			return NULL;
 		switch(statusNum)
 		{
-			case 200:
-				statusEng="OK";
-				break;
-			case 204:
-				statusEng="No Content";
-				break;
-			case 301:
-				statusEng="Moved Permanently";
-				break;
-			case 400:
-				statusEng="Bad Request";
-				break;
-			case 403:
-				statusEng="Forbidden";
-				break;
-			case 404:
-				statusEng="Not Found";
-				break;
-			case 501:
-				statusEng="Not Implemented";
-				break;
-			default:
-				statusEng=staEng;
-				break;
+		case 200:
+			statusEng="OK";
+			break;
+		case 204:
+			statusEng="No Content";
+			break;
+		case 301:
+			statusEng="Moved Permanently";
+			break;
+		case 400:
+			statusEng="Bad Request";
+			break;
+		case 403:
+			statusEng="Forbidden";
+			break;
+		case 404:
+			statusEng="Not Found";
+			break;
+		case 501:
+			statusEng="Not Implemented";
+			break;
+		default:
+			statusEng=staEng;
+			break;
 		}
 		sprintf((char*)buffer,"HTTP/1.1 %d %s\r\n"
 			"Server LCserver/1.1\r\n"
@@ -1245,69 +1255,69 @@ public:
 		}
 		switch (kind)
 		{
-			case UNKNOWN:
-				*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
-				"Server LCserver/1.1\r\n"
-				"Connection: keep-alive\r\n"
-				"Content-Length:%d\r\n\r\n",fileLen);
-				break;
-			case HTML:
-				*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
-				"Server LCserver/1.1\r\n"
-				"Connection: keep-alive\r\n"
-				"Content-Type:text/html\r\n"
-				"Content-Length:%d\r\n\r\n",fileLen);
-				break;
-			case EXE:
-				*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
-				"Server LCserver/1.1\r\n"
-				"Connection: keep-alive\r\n"
-				"Content-Type:application/octet-stream\r\n"
-				"Content-Length:%d\r\n\r\n",fileLen);
-				break;
-			case IMAGE:
-				*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
-				"Server LCserver/1.1\r\n"
-				"Connection: keep-alive\r\n"
-				"Content-Type:image\r\n"
-				"Content-Length:%d\r\n\r\n",fileLen);
-				break;
-			case NOFOUND:
-				*topLen=sprintf(ptop,"HTTP/1.1 404 Not Found\r\n"
-				"Server LCserver/1.1\r\n"
-				"Connection: keep-alive\r\n"
-				"Content-Type: text/plain\r\n"
-				"Content-Length:%d\r\n\r\n"
-				"404 no found",(int)strlen("404 no found"));
-				break;
-			case CSS:
-				*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
-				"Server LCserver/1.1\r\n"
-				"Connection: keep-alive\r\n"
-				"Content-Type:text/css\r\n"
-				"Content-Length:%d\r\n\r\n",fileLen);
-				break;
-			case JS:
-				*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
-				"Server LCserver/1.1\r\n"
-				"Connection: keep-alive\r\n"
-				"Content-Type:text/javascript\r\n"
-				"Content-Length:%d\r\n\r\n",fileLen);
-				break;
-			case ZIP:
-				*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
-				"Server LCserver/1.1\r\n"
-				"Connection: keep-alive\r\n"
-				"Content-Type:application/zip\r\n"
-				"Content-Length:%d\r\n\r\n",fileLen);
-				break;
-			case JSON:
-				*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
-				"Server LCserver/1.1\r\n"
-				"Connection: keep-alive\r\n"
-				"Content-Type:application/json\r\n"
-				"Content-Length:%d\r\n\r\n",fileLen);
-				break;
+		   case UNKNOWN:
+			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
+			"Server LCserver/1.1\r\n"
+			"Connection: keep-alive\r\n"
+			"Content-Length:%d\r\n\r\n",fileLen);
+			break;
+		   case HTML:
+			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
+			"Server LCserver/1.1\r\n"
+			"Connection: keep-alive\r\n"
+			"Content-Type:text/html\r\n"
+			"Content-Length:%d\r\n\r\n",fileLen);
+			break;
+		   case EXE:
+			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
+			"Server LCserver/1.1\r\n"
+			"Connection: keep-alive\r\n"
+			"Content-Type:application/octet-stream\r\n"
+			"Content-Length:%d\r\n\r\n",fileLen);
+			break;
+		   case IMAGE:
+			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
+			"Server LCserver/1.1\r\n"
+			"Connection: keep-alive\r\n"
+			"Content-Type:image\r\n"
+			"Content-Length:%d\r\n\r\n",fileLen);
+			break;
+		   case NOFOUND:
+			*topLen=sprintf(ptop,"HTTP/1.1 404 Not Found\r\n"
+			"Server LCserver/1.1\r\n"
+			"Connection: keep-alive\r\n"
+			"Content-Type: text/plain\r\n"
+			"Content-Length:%d\r\n\r\n"
+			"404 no found",(int)strlen("404 no found"));
+			break;
+		   case CSS:
+			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
+			"Server LCserver/1.1\r\n"
+			"Connection: keep-alive\r\n"
+			"Content-Type:text/css\r\n"
+			"Content-Length:%d\r\n\r\n",fileLen);
+			break;
+		   case JS:
+			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
+			"Server LCserver/1.1\r\n"
+			"Connection: keep-alive\r\n"
+			"Content-Type:text/javascript\r\n"
+			"Content-Length:%d\r\n\r\n",fileLen);
+			break;
+		   case ZIP:
+			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
+			"Server LCserver/1.1\r\n"
+			"Connection: keep-alive\r\n"
+			"Content-Type:application/zip\r\n"
+			"Content-Length:%d\r\n\r\n",fileLen);
+			break;
+		   case JSON:
+			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
+			"Server LCserver/1.1\r\n"
+			"Connection: keep-alive\r\n"
+			"Content-Type:application/json\r\n"
+			"Content-Length:%d\r\n\r\n",fileLen);
+			break;
 		}
 	}
 	bool createSendMsg(FileKind kind,char* buffer,unsigned int bufferLen,const char* pfile,int* plong)
@@ -1556,6 +1566,92 @@ public:
 			buffer[i]=*top;
 		buffer[i+1]=0;
 		return result;
+	}
+	int createDatagram(const Datagram& gram,void* buffer,unsigned bufferLen)
+	{
+		if(gram.fileLen>bufferLen||bufferLen==0)
+			return -1;
+		const char* statusEng=NULL;
+		char temp[200]={0};
+		if(bufferLen<100||bufferLen<gram.fileLen+100)
+		{
+			error="len too short";
+			return -1;
+		}
+		switch(gram.statusCode)
+		{
+		case STATUSOK:
+			statusEng="OK";
+			break;
+		case STATUSNOCON:
+			statusEng="No Content";
+			break;
+		case STATUSMOVED:
+			statusEng="Moved Permanently";
+			break;
+		case STATUSBADREQUEST:
+			statusEng="Bad Request";
+			break;
+		case STATUSFORBIDDEN:
+			statusEng="Forbidden";
+			break;
+		case STATUSNOFOUND:
+			statusEng="Not Found";
+			break;
+		case STATUSNOIMPLEMENT:
+			statusEng="Not Implemented";
+			break;
+		default:
+			error="status code UNKNOWN";
+			return -1;
+		}
+		sprintf((char*)buffer,"HTTP/1.1 %d %s\r\n"
+			"Server LCserver/1.1\r\n"
+			"Connection: keep-alive\r\n",
+			gram.statusCode,statusEng);
+		if(gram.fileLen==0)
+		{
+			sprintf((char*)buffer,"\r\n");
+			return strlen((char*)buffer);
+		}
+		switch(gram.typeFile)
+		{
+		case UNKNOWN:
+		case NOFOUND:
+			strcat((char*)buffer,"\r\n");
+			return strlen((char*)buffer);
+		case HTML:
+			sprintf(temp,"Content-Type:%s\r\n","text/html");
+			break;
+		case EXE:
+			sprintf(temp,"Content-Type:%s\r\n","application/octet-stream");
+			break;
+		case IMAGE:
+			sprintf(temp,"Content-Type:%s\r\n","image");
+			break;
+		case CSS:
+			sprintf(temp,"Content-Type:%s\r\n","text/css");
+			break;
+		case JS:
+			sprintf(temp,"Content-Type:%s\r\n","text/javascript");
+			break;
+		case JSON:
+			sprintf(temp,"Content-Type:%s\r\n","application/json");
+			break;
+		case ZIP:
+			sprintf(temp,"Content-Type:%s\r\n","application/zip");
+			break;
+		}
+		strcat((char*)buffer,temp);
+		sprintf(temp,"Content-Length:%d\r\n",gram.fileLen);
+		strcat((char*)buffer,temp);
+		if(gram.head.size()!=0)
+			for(auto iter=gram.head.begin();iter!=gram.head.end();iter++)
+				customizeAddHead(buffer,bufferLen,iter->first.c_str(),iter->second.c_str());
+		if(gram.cookie.size()!=0)
+			for(auto iter=gram.cookie.begin();iter!=gram.cookie.end();iter++)
+				setCookie(buffer,bufferLen,iter->first.c_str(),iter->second.c_str());
+		return customizeAddBody(buffer,bufferLen,(char*)gram.body,gram.fileLen);
 	}
 	static void dealUrl(const char* url,char* urlTop,char* urlEnd,unsigned int topLen,unsigned int endLen)
 	{
