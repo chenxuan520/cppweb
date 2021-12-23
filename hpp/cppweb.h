@@ -613,7 +613,7 @@ public:
 		flag=true;
 		return value;
 	}
-	inline const char* getLastError()
+	inline const char* lastError()
 	{
 		return this->error;
 	}
@@ -1652,6 +1652,10 @@ public:
 			for(auto iter=gram.cookie.begin();iter!=gram.cookie.end();iter++)
 				setCookie(buffer,bufferLen,iter->first.c_str(),iter->second.c_str());
 		return customizeAddBody(buffer,bufferLen,(char*)gram.body,gram.fileLen);
+	}
+	inline const char* lastError()
+	{
+		return error;
 	}
 	static void dealUrl(const char* url,char* urlTop,char* urlEnd,unsigned int topLen,unsigned int endLen)
 	{
