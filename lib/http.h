@@ -97,6 +97,7 @@ public:
 	Json(const char* jsonText);
 	~Json();
 	bool init(unsigned int bufferLen);
+	int httpJsonCreate(void* buffer,unsigned int buffLen);
 	void addOBject(const Object& obj);
 	bool addKeyValue(const char* key,const char* value);
 	bool addKeyValInt(const char* key,int value);

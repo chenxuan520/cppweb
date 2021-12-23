@@ -139,7 +139,7 @@ void serverHttp(int argc,char** argv)
 	}
 	HttpServer server(port,true);
 	addHandle(server);
-	server.run(memory,4000,"./index.html");
+	server.run(memory,4000,indexName);
 }
 int main(int argc, char** argv) 
 {
