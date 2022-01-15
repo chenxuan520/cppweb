@@ -1078,6 +1078,12 @@ public:
 		std::unordered_map<std::string,std::string> cookie;
 		const void* body;
 	};
+	struct Request{
+		std::string method;
+		std::string askPath;
+		std::string version;
+		std::unordered_map<std::string,std::string> head;
+	};
 private:
 	char ask[256];
 	char* pfind;
@@ -2797,7 +2803,22 @@ public:
 };
 class ServerPool:public ServerTcpIp{
 private:
+	struct Argv{
+		bool flag;
+		ServerPool* pserver;
+		void (*func)(ServerPool&,int);
+		int soc;
+		Argv()
+		{
+			flag=false;
+			pserver=NULL;
+			soc=-1;
+			func=NULL;
+		}
+	};
+private:
 	ThreadPool* pool;
+	Argv* argv;
 	pthread_mutex_t mutex;
 	unsigned int threadNum;
 	bool isEpoll;
@@ -2806,6 +2827,14 @@ private:
 	{
 		while(waitpid(-1, NULL, WNOHANG)>0);
 	}
+	static void* worker(void* argc)
+	{
+		Argv argv=*(Argv*)argc;
+		((Argv*)argc)->flag=false;
+		if(argv.func!=NULL)
+			argv.func(*argv.pserver,argv.soc);
+		return NULL;
+	}
 public:
 	ServerPool(unsigned short port,unsigned int threadNum=0):ServerTcpIp(port)
 	{
@@ -2813,7 +2842,8 @@ public:
 		if(threadNum>0)
 		{	
 			pool=new ThreadPool(threadNum);
-			if(pool==NULL)
+			argv=new Argv[threadNum];
+			if(pool==NULL||argv==NULL)
 			{
 				this->error="malloc wrong";
 				return;
@@ -2825,6 +2855,7 @@ public:
 	~ServerPool()
 	{
 		delete pool;
+		delete[] argv;
 	   	pthread_mutex_destroy(&mutex);
 	}
 	inline void mutexLock()
@@ -2842,13 +2873,14 @@ public:
 		else
 			return false;
 	}
-	void threadModel(void* (*pfunc)(void*))
+	void threadModel(void (*pfunc)(ServerPool&,int))
 	{
 		if(this->threadNum==0)
 		{
 			this->error="thread wrong init";
 			return;
 		}
+		unsigned i=0;
 		while(1)
 		{
 			sockaddr_in newaddr={0,0,{0},{0}};
@@ -2856,8 +2888,15 @@ public:
 			if(newClient==-1)
 				continue;
 			this->addFd(newClient);
-			ThreadPool::Task task={pfunc,(void*)(uintptr_t)newClient};
+			while(argv[i%threadNum].flag==true)
+				i++;
+			argv[i%threadNum].flag=true;
+			argv[i%threadNum].pserver=this;
+			argv[i%threadNum].func=pfunc;
+			argv[i%threadNum].soc=newClient;
+			ThreadPool::Task task={worker,&argv[i%threadNum]};
 			pool->addTask(task);
+			i++;
 		}
 	}
 	void forkModel(void* pneed,void (*pfunc)(ServerPool&,int,void*))
