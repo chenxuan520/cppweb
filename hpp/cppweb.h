@@ -1082,7 +1082,6 @@ public:
 		std::string method;
 		std::string askPath;
 		std::string version;
-		std::unordered_map<std::string,std::string> head;
 	};
 private:
 	char ask[256];
@@ -1125,6 +1124,14 @@ public:
 	inline char* findFirst(void* message,const char* ptofind)
 	{
 		return strstr((char*)message,ptofind);
+	}
+	void getRequestMsg(void* message,Request& request)
+	{
+		char method[30]={0},path[256]={0},version[30]={0};
+		sscanf((char*)message,"%30s%256s%30[^\r]",method,path,version);
+		request.askPath=path;
+		request.method=method;
+		request.version=version;
 	}
 	char* findBackString(char* local,int len,char* word,int maxWordLen)
 	{
@@ -2804,13 +2811,11 @@ public:
 class ServerPool:public ServerTcpIp{
 private:
 	struct Argv{
-		bool flag;
 		ServerPool* pserver;
 		void (*func)(ServerPool&,int);
 		int soc;
 		Argv()
 		{
-			flag=false;
 			pserver=NULL;
 			soc=-1;
 			func=NULL;
@@ -2818,7 +2823,6 @@ private:
 	};
 private:
 	ThreadPool* pool;
-	Argv* argv;
 	pthread_mutex_t mutex;
 	unsigned int threadNum;
 	bool isEpoll;
@@ -2830,7 +2834,7 @@ private:
 	static void* worker(void* argc)
 	{
 		Argv argv=*(Argv*)argc;
-		((Argv*)argc)->flag=false;
+		delete (Argv*)argc;
 		if(argv.func!=NULL)
 			argv.func(*argv.pserver,argv.soc);
 		return NULL;
@@ -2842,8 +2846,7 @@ public:
 		if(threadNum>0)
 		{	
 			pool=new ThreadPool(threadNum);
-			argv=new Argv[threadNum];
-			if(pool==NULL||argv==NULL)
+			if(pool==NULL)
 			{
 				this->error="malloc wrong";
 				return;
@@ -2855,7 +2858,6 @@ public:
 	~ServerPool()
 	{
 		delete pool;
-		delete[] argv;
 	   	pthread_mutex_destroy(&mutex);
 	}
 	inline void mutexLock()
@@ -2880,7 +2882,6 @@ public:
 			this->error="thread wrong init";
 			return;
 		}
-		unsigned i=0;
 		while(1)
 		{
 			sockaddr_in newaddr={0,0,{0},{0}};
@@ -2888,15 +2889,12 @@ public:
 			if(newClient==-1)
 				continue;
 			this->addFd(newClient);
-			while(argv[i%threadNum].flag==true)
-				i++;
-			argv[i%threadNum].flag=true;
-			argv[i%threadNum].pserver=this;
-			argv[i%threadNum].func=pfunc;
-			argv[i%threadNum].soc=newClient;
-			ThreadPool::Task task={worker,&argv[i%threadNum]};
+			Argv* temp=new Argv;
+			temp->pserver=this;
+			temp->func=pfunc;
+			temp->soc=newClient;
+			ThreadPool::Task task={worker,temp};
 			pool->addTask(task);
-			i++;
 		}
 	}
 	void forkModel(void* pneed,void (*pfunc)(ServerPool&,int,void*))
@@ -2979,7 +2977,7 @@ public:
 			}
 		}
 	}
-	void epollThread(void* (*pfunc)(void*))
+	void epollThread(void (*pfunc)(ServerPool&,int))
 	{
 		if(this->threadNum==0)
 		{
@@ -3006,7 +3004,11 @@ public:
 			{
 				if(pfunc!=NULL)
 				{
-					ThreadPool::Task task={pfunc,(void*)(uintptr_t)temp.data.fd};
+					Argv* argv=new Argv;
+					argv->func=pfunc;
+					argv->soc=temp.data.fd;
+					argv->pserver=this;
+					ThreadPool::Task task={worker,argv};
 					pool->addTask(task);
 				}
 			}
