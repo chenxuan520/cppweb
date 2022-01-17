@@ -279,6 +279,100 @@ char* DealHttp::findFileMsg(const char* pname,int* plen,char* buffer,unsigned in
 	fclose(fp);
 	return buffer;
 }
+int DealHttp::createDatagram(const Datagram& gram,void* buffer,unsigned bufferLen)
+{
+	if(gram.fileLen>bufferLen||bufferLen==0)
+		return -1;
+	const char* statusEng=NULL;
+	char temp[200]={0};
+	if(bufferLen<100||bufferLen<gram.fileLen+100)
+	{
+		error="len too short";
+		return -1;
+	}
+	switch(gram.statusCode)
+	{
+	case STATUSOK:
+		statusEng="OK";
+		break;
+	case STATUSNOCON:
+		statusEng="No Content";
+		break;
+	case STATUSMOVED:
+		statusEng="Moved Permanently";
+		break;
+	case STATUSBADREQUEST:
+		statusEng="Bad Request";
+		break;
+	case STATUSFORBIDDEN:
+		statusEng="Forbidden";
+		break;
+	case STATUSNOFOUND:
+		statusEng="Not Found";
+		break;
+	case STATUSNOIMPLEMENT:
+		statusEng="Not Implemented";
+		break;
+	default:
+		error="status code UNKNOWN";
+		return -1;
+	}
+	sprintf((char*)buffer,"HTTP/1.1 %d %s\r\n"
+		"Server LCserver/1.1\r\n"
+		"Connection: keep-alive\r\n",
+		gram.statusCode,statusEng);
+	if(gram.fileLen==0)
+	{
+		sprintf((char*)buffer,"\r\n");
+		return strlen((char*)buffer);
+	}
+	switch(gram.typeFile)
+	{
+	case UNKNOWN:
+	case NOFOUND:
+		strcat((char*)buffer,"\r\n");
+		return strlen((char*)buffer);
+	case HTML:
+		sprintf(temp,"Content-Type:%s\r\n","text/html");
+		break;
+	case EXE:
+		sprintf(temp,"Content-Type:%s\r\n","application/octet-stream");
+		break;
+	case IMAGE:
+		sprintf(temp,"Content-Type:%s\r\n","image");
+		break;
+	case CSS:
+		sprintf(temp,"Content-Type:%s\r\n","text/css");
+		break;
+	case JS:
+		sprintf(temp,"Content-Type:%s\r\n","text/javascript");
+		break;
+	case JSON:
+		sprintf(temp,"Content-Type:%s\r\n","application/json");
+		break;
+	case ZIP:
+		sprintf(temp,"Content-Type:%s\r\n","application/zip");
+		break;
+	}
+	strcat((char*)buffer,temp);
+	sprintf(temp,"Content-Length:%d\r\n",gram.fileLen);
+	strcat((char*)buffer,temp);
+	if(gram.head.size()!=0)
+		for(auto iter=gram.head.begin();iter!=gram.head.end();iter++)
+			customizeAddHead(buffer,bufferLen,iter->first.c_str(),iter->second.c_str());
+	if(gram.cookie.size()!=0)
+		for(auto iter=gram.cookie.begin();iter!=gram.cookie.end();iter++)
+			setCookie(buffer,bufferLen,iter->first.c_str(),iter->second.c_str());
+	return customizeAddBody(buffer,bufferLen,(char*)gram.body,gram.fileLen);
+}
+void DealHttp::getRequestMsg(void* message,Request& request)
+{
+	char method[30]={0},path[256]={0},version[30]={0};
+	sscanf((char*)message,"%30s%256s%30[^\r]",method,path,version);
+	request.askPath=path;
+	request.method=method;
+	request.version=version;
+}
 int DealHttp::getFileLen(const char* pname)
 {
 	FILE* fp=fopen(pname,"r+");
@@ -552,30 +646,6 @@ void DealHttp::dealUrl(const char* url,char* urlTop,char* urlEnd,unsigned int to
 		sscanf(url+len+7,format,urlEnd);
 	}
 }
-bool LogSystem::dealAttack(int isUpdate,int socketCli,int maxTime)//check if accket
-{
-    static CliLog cli[41];
-    if(isUpdate==1)
-    {
-        cli[socketCli%41].socketCli=socketCli;
-        cli[socketCli%41].time=1;
-        return true;
-    }
-    else if(isUpdate==2)
-    {
-        cli[socketCli%41].time++;
-        if(cli[socketCli%41].time>maxTime)
-            return false;
-        return true;
-    }
-    else if(isUpdate==0)
-    {
-        cli[socketCli%41].socketCli=0;
-        cli[socketCli%41].time=0;
-        return true;
-    }
-    return true;
-}
 bool LogSystem::recordFileError(const char* fileName)
 {
 	FILE* fp=fopen("wrong.log","r+");
@@ -587,23 +657,6 @@ bool LogSystem::recordFileError(const char* fileName)
 	fprintf(fp,"open file %s wrong\n",fileName);
 	fclose(fp);
 	return true;
-}
-bool LogSystem::attackLog(int port,const char* ip,const char* pfileName)//log accket
-{
-    time_t temp=time(NULL);
-    struct tm* pt=localtime(&temp);
-    FILE* fp=fopen(pfileName,"a+");
-    if(fp==NULL)
-        if((fp=fopen(pfileName,"w+"))==NULL)		
-            return false;
-        else
-            fprintf(fp,"server attacked log\n");
-	else
-		fprintf(fp,"find attack\n");
-    fprintf(fp,"%d year%d month%d day%d hour%d min%d sec:",pt->tm_year+1900,pt->tm_mon+1,pt->tm_mday,pt->tm_hour,pt->tm_min,pt->tm_sec);
-    fprintf(fp,"%s:%d port attack server\n",ip,port);
-    fclose(fp);
-    return true;
 }
 Json::Json()
 {

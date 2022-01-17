@@ -20,7 +20,7 @@
 #include<unordered_map>
 #include<string>
 namespace cppweb{
-class Json{
+class Json{//a easy json class to create json
 private:
 	char* buffer;
 	char word[30];
@@ -81,7 +81,7 @@ public:
 		if(this->buffer!=NULL)
 			free(buffer);
 	}
-	bool init(unsigned int bufferLen)
+	bool init(unsigned int bufferLen)//malloc len size of buff
 	{
 		if(bufferLen<=10)
 		{
@@ -100,7 +100,7 @@ public:
 		this->nowLen+=2;
 		return true;
 	}
-	int httpJsonCreate(void* buffer,unsigned int buffLen)
+	int httpJsonCreate(void* buffer,unsigned int buffLen)//create http top of json
 	{
 		if(buffLen<this->nowLen+100)
 			return -1;
@@ -2070,52 +2070,6 @@ public:
 };
 class LogSystem{
 public:
-	struct CliLog{
-		int socketCli;
-		int time;
-		char ip[20];
-	};
-	static bool dealAttack(int isUpdate,int socketCli,int maxTime)//check if accket
-	{
-		static CliLog cli[41];
-		if(isUpdate==1)
-		{
-			cli[socketCli%41].socketCli=socketCli;
-			cli[socketCli%41].time=1;
-			return true;
-		}
-		else if(isUpdate==2)
-		{
-			cli[socketCli%41].time++;
-			if(cli[socketCli%41].time>maxTime)
-				return false;
-			return true;
-		}
-		else if(isUpdate==0)
-		{
-			cli[socketCli%41].socketCli=0;
-			cli[socketCli%41].time=0;
-			return true;
-		}
-		return true;
-	}
-	static bool attackLog(int port,const char* ip,const char* pfileName)//log accket
-	{
-		time_t temp=time(NULL);
-		struct tm* pt=localtime(&temp);
-		FILE* fp=fopen(pfileName,"a+");
-		if(fp==NULL)
-			if((fp=fopen(pfileName,"w+"))==NULL)		
-				return false;
-			else
-				fprintf(fp,"server attacked log\n");
-		else
-			fprintf(fp,"find attack\n");
-		fprintf(fp,"%d year%d month%d day%d hour%d min%d sec:",pt->tm_year+1900,pt->tm_mon+1,pt->tm_mday,pt->tm_hour,pt->tm_min,pt->tm_sec);
-		fprintf(fp,"%s:%d port attack server\n",ip,port);
-		fclose(fp);
-		return true;
-	}
 	static bool recordFileError(const char* fileName)
 	{
 		FILE* fp=fopen("wrong.log","r+");
@@ -2130,14 +2084,14 @@ public:
 	}
 };
 class HttpServer:private ServerTcpIp{
-public:
-	enum RouteType{
+public://main class for http server2.0.=
+	enum RouteType{//oneway stand for like /hahah,wild if /hahah/*,static is recource static
 		ONEWAY,WILD,STATIC,
 	};
-	enum AskType{
+	enum AskType{//different ask ways in http
 		GET,POST,PUT,DELETE,OPTIONS,ALL,
 	};
-	struct RouteFuntion{
+	struct RouteFuntion{//inside struct,pack for handle
 		AskType ask;
 		RouteType type;
 		char route[100];
@@ -2156,6 +2110,7 @@ private:
 	bool isFork;
 	void (*clientIn)(HttpServer&,int num,void* ip,int port);
 	void (*clientOut)(HttpServer&,int num,void* ip,int port);
+	void (*logFunc)(HttpServer&,const void*,int);
 public:
 	HttpServer(unsigned port,bool debug=false):ServerTcpIp(port)
 	{
@@ -2174,6 +2129,7 @@ public:
 		textLen=0;
 		clientIn=NULL;
 		clientOut=NULL;
+		logFunc=NULL;
 		pnowRoute=NULL;
 	}
 	~HttpServer()
@@ -2302,6 +2258,13 @@ public:
 		if(clientOut!=NULL)
 			return false;
 		clientOut=pfunc;
+		return true;
+	}
+	bool setLog(void (*pfunc)(HttpServer&,const void*,int))
+	{
+		if(logFunc!=NULL)
+			return false;
+		logFunc=pfunc;
 		return true;
 	}
 	void run(unsigned int memory,unsigned int recBufLenChar,const char* defaultFile)
@@ -2538,6 +2501,8 @@ private:
 				{
 					this->textLen=getNum;
 					func(temp.data.fd,pget,pneed,senLen,defaultFile,*this);
+					if(logFunc!=NULL)
+						logFunc(*this,this->recText(),temp.data.fd);
 					if(isLongCon==false)
 					{
 				  		this->deleteFd(temp.data.fd);
@@ -2592,6 +2557,8 @@ private:
 					{
 						close(sock);
 						func(temp.data.fd,pget,pneed,senLen,defaultFile,*this);
+						if(logFunc!=NULL)
+							logFunc(*this,this->recText(),temp.data.fd);
 						close(temp.data.fd);
 						free(pget);
 						free(pneed);

@@ -59,12 +59,25 @@ public:
 *********************************/
 class ServerPool:public ServerTcpIp{
 private:
+	struct Argv{
+		ServerPool* pserver;
+		void (*func)(ServerPool&,int);
+		int soc;
+		Argv()
+		{
+			pserver=NULL;
+			soc=-1;
+			func=NULL;
+		}
+	};
+private:
 	ThreadPool* pool;
 	pthread_mutex_t mutex;
 	unsigned int threadNum;
 	bool isEpoll;
 private:
 	static void sigCliDeal(int pid);
+	static void* worker(void* argc);
 public:
 	ServerPool(unsigned short port,unsigned int threadNum=0);
 	~ServerPool();
@@ -79,8 +92,8 @@ public:
 	bool mutexTryLock();
 	void forkModel(void* pneed,void (*pfunc)(ServerPool&,int,void*));
 	void forkEpoll(unsigned int senBufChar,unsigned int recBufChar,void (*pfunc)(ServerPool::Thing,int,int,void*,void*,ServerPool&));
-	void threadModel(void* (*pfunc)(void*));
-	void epollThread(void* (*pfunc)(void*));
+	void threadModel(void (*pfunc)(ServerPool&,int));
+	void epollThread(void (*pfunc)(ServerPool&,int));
 	inline bool threadDeleteSoc(int clisoc)
 	{
 		close(clisoc);
