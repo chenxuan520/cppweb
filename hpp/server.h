@@ -96,14 +96,17 @@ private:
 	bool isFork;
 	void (*clientIn)(HttpServer&,int num,void* ip,int port);
 	void (*clientOut)(HttpServer&,int num,void* ip,int port);
+	void (*logFunc)(HttpServer&,const void*,int);
 public:
 	HttpServer(unsigned port,bool debug=false);
 	~HttpServer();
 	bool clientOutHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port));
 	bool clientInHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port));
+	bool setLog(void (*pfunc)(HttpServer&,const void*,int));
 	bool routeHandle(AskType ask,RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&));
 	int getCompleteMessage(const void* message,unsigned int messageLen,void* buffer,unsigned int buffLen,int sockCli);
 	bool loadStatic(const char* route,const char* staticPath);
+	bool deletePath(const char* path);
 	bool get(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&));
 	bool post(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&));
 	bool all(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&));
@@ -136,6 +139,7 @@ private:
 	void epollHttp(void* pget,int len,unsigned int senLen,void* pneed,const char* defaultFile);
 	void forkHttp(void* pget,int len,unsigned int senLen,void* pneed,const char* defaultFile);
 	static void loadFile(DealHttp& http,HttpServer& server,int senLen,void* sen,int& len);
+	static void deleteFile(DealHttp& http,HttpServer&,int senLen,void* sen,int& len);
 	static void sigCliDeal(int pid);
 };
 class Email{

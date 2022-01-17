@@ -20,7 +20,7 @@
 #include<unordered_map>
 #include<string>
 namespace cppweb{
-class Json{
+class Json{//a easy json class to create json
 private:
 	char* buffer;
 	char word[30];
@@ -81,7 +81,7 @@ public:
 		if(this->buffer!=NULL)
 			free(buffer);
 	}
-	bool init(unsigned int bufferLen)
+	bool init(unsigned int bufferLen)//malloc len size of buff
 	{
 		if(bufferLen<=10)
 		{
@@ -100,7 +100,7 @@ public:
 		this->nowLen+=2;
 		return true;
 	}
-	int httpJsonCreate(void* buffer,unsigned int buffLen)
+	int httpJsonCreate(void* buffer,unsigned int buffLen)//create http top of json
 	{
 		if(buffLen<this->nowLen+100)
 			return -1;
@@ -1078,6 +1078,11 @@ public:
 		std::unordered_map<std::string,std::string> cookie;
 		const void* body;
 	};
+	struct Request{
+		std::string method;
+		std::string askPath;
+		std::string version;
+	};
 private:
 	char ask[256];
 	char* pfind;
@@ -1119,6 +1124,14 @@ public:
 	inline char* findFirst(void* message,const char* ptofind)
 	{
 		return strstr((char*)message,ptofind);
+	}
+	void getRequestMsg(void* message,Request& request)
+	{
+		char method[30]={0},path[256]={0},version[30]={0};
+		sscanf((char*)message,"%30s%256s%30[^\r]",method,path,version);
+		request.askPath=path;
+		request.method=method;
+		request.version=version;
 	}
 	char* findBackString(char* local,int len,char* word,int maxWordLen)
 	{
@@ -2057,52 +2070,6 @@ public:
 };
 class LogSystem{
 public:
-	struct CliLog{
-		int socketCli;
-		int time;
-		char ip[20];
-	};
-	static bool dealAttack(int isUpdate,int socketCli,int maxTime)//check if accket
-	{
-		static CliLog cli[41];
-		if(isUpdate==1)
-		{
-			cli[socketCli%41].socketCli=socketCli;
-			cli[socketCli%41].time=1;
-			return true;
-		}
-		else if(isUpdate==2)
-		{
-			cli[socketCli%41].time++;
-			if(cli[socketCli%41].time>maxTime)
-				return false;
-			return true;
-		}
-		else if(isUpdate==0)
-		{
-			cli[socketCli%41].socketCli=0;
-			cli[socketCli%41].time=0;
-			return true;
-		}
-		return true;
-	}
-	static bool attackLog(int port,const char* ip,const char* pfileName)//log accket
-	{
-		time_t temp=time(NULL);
-		struct tm* pt=localtime(&temp);
-		FILE* fp=fopen(pfileName,"a+");
-		if(fp==NULL)
-			if((fp=fopen(pfileName,"w+"))==NULL)		
-				return false;
-			else
-				fprintf(fp,"server attacked log\n");
-		else
-			fprintf(fp,"find attack\n");
-		fprintf(fp,"%d year%d month%d day%d hour%d min%d sec:",pt->tm_year+1900,pt->tm_mon+1,pt->tm_mday,pt->tm_hour,pt->tm_min,pt->tm_sec);
-		fprintf(fp,"%s:%d port attack server\n",ip,port);
-		fclose(fp);
-		return true;
-	}
 	static bool recordFileError(const char* fileName)
 	{
 		FILE* fp=fopen("wrong.log","r+");
@@ -2117,14 +2084,14 @@ public:
 	}
 };
 class HttpServer:private ServerTcpIp{
-public:
-	enum RouteType{
+public://main class for http server2.0.=
+	enum RouteType{//oneway stand for like /hahah,wild if /hahah/*,static is recource static
 		ONEWAY,WILD,STATIC,
 	};
-	enum AskType{
+	enum AskType{//different ask ways in http
 		GET,POST,PUT,DELETE,OPTIONS,ALL,
 	};
-	struct RouteFuntion{
+	struct RouteFuntion{//inside struct,pack for handle
 		AskType ask;
 		RouteType type;
 		char route[100];
@@ -2143,6 +2110,7 @@ private:
 	bool isFork;
 	void (*clientIn)(HttpServer&,int num,void* ip,int port);
 	void (*clientOut)(HttpServer&,int num,void* ip,int port);
+	void (*logFunc)(HttpServer&,const void*,int);
 public:
 	HttpServer(unsigned port,bool debug=false):ServerTcpIp(port)
 	{
@@ -2161,6 +2129,7 @@ public:
 		textLen=0;
 		clientIn=NULL;
 		clientOut=NULL;
+		logFunc=NULL;
 		pnowRoute=NULL;
 	}
 	~HttpServer()
@@ -2289,6 +2258,13 @@ public:
 		if(clientOut!=NULL)
 			return false;
 		clientOut=pfunc;
+		return true;
+	}
+	bool setLog(void (*pfunc)(HttpServer&,const void*,int))
+	{
+		if(logFunc!=NULL)
+			return false;
+		logFunc=pfunc;
 		return true;
 	}
 	void run(unsigned int memory,unsigned int recBufLenChar,const char* defaultFile)
@@ -2525,6 +2501,8 @@ private:
 				{
 					this->textLen=getNum;
 					func(temp.data.fd,pget,pneed,senLen,defaultFile,*this);
+					if(logFunc!=NULL)
+						logFunc(*this,this->recText(),temp.data.fd);
 					if(isLongCon==false)
 					{
 				  		this->deleteFd(temp.data.fd);
@@ -2579,6 +2557,8 @@ private:
 					{
 						close(sock);
 						func(temp.data.fd,pget,pneed,senLen,defaultFile,*this);
+						if(logFunc!=NULL)
+							logFunc(*this,this->recText(),temp.data.fd);
 						close(temp.data.fd);
 						free(pget);
 						free(pneed);
@@ -2797,6 +2777,18 @@ public:
 };
 class ServerPool:public ServerTcpIp{
 private:
+	struct Argv{
+		ServerPool* pserver;
+		void (*func)(ServerPool&,int);
+		int soc;
+		Argv()
+		{
+			pserver=NULL;
+			soc=-1;
+			func=NULL;
+		}
+	};
+private:
 	ThreadPool* pool;
 	pthread_mutex_t mutex;
 	unsigned int threadNum;
@@ -2805,6 +2797,14 @@ private:
 	static void sigCliDeal(int )
 	{
 		while(waitpid(-1, NULL, WNOHANG)>0);
+	}
+	static void* worker(void* argc)
+	{
+		Argv argv=*(Argv*)argc;
+		delete (Argv*)argc;
+		if(argv.func!=NULL)
+			argv.func(*argv.pserver,argv.soc);
+		return NULL;
 	}
 public:
 	ServerPool(unsigned short port,unsigned int threadNum=0):ServerTcpIp(port)
@@ -2842,7 +2842,7 @@ public:
 		else
 			return false;
 	}
-	void threadModel(void* (*pfunc)(void*))
+	void threadModel(void (*pfunc)(ServerPool&,int))
 	{
 		if(this->threadNum==0)
 		{
@@ -2856,7 +2856,11 @@ public:
 			if(newClient==-1)
 				continue;
 			this->addFd(newClient);
-			ThreadPool::Task task={pfunc,(void*)(uintptr_t)newClient};
+			Argv* temp=new Argv;
+			temp->pserver=this;
+			temp->func=pfunc;
+			temp->soc=newClient;
+			ThreadPool::Task task={worker,temp};
 			pool->addTask(task);
 		}
 	}
@@ -2940,7 +2944,7 @@ public:
 			}
 		}
 	}
-	void epollThread(void* (*pfunc)(void*))
+	void epollThread(void (*pfunc)(ServerPool&,int))
 	{
 		if(this->threadNum==0)
 		{
@@ -2967,7 +2971,11 @@ public:
 			{
 				if(pfunc!=NULL)
 				{
-					ThreadPool::Task task={pfunc,(void*)(uintptr_t)temp.data.fd};
+					Argv* argv=new Argv;
+					argv->func=pfunc;
+					argv->soc=temp.data.fd;
+					argv->pserver=this;
+					ThreadPool::Task task={worker,argv};
 					pool->addTask(task);
 				}
 			}

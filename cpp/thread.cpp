@@ -160,6 +160,14 @@ void ServerPool::sigCliDeal(int )
 {
 	while(waitpid(-1, NULL, WNOHANG)>0);
 }
+void* ServerPool::worker(void* argc)
+{
+	Argv argv=*(Argv*)argc;
+	delete (Argv*)argc;
+	if(argv.func!=NULL)
+		argv.func(*argv.pserver,argv.soc);
+	return NULL;
+}
 bool ServerPool::mutexTryLock()
 {
 	if(0==pthread_mutex_trylock(&mutex))
@@ -167,7 +175,7 @@ bool ServerPool::mutexTryLock()
 	else
 		return false;
 }
-void ServerPool::threadModel(void* (*pfunc)(void*))
+void ServerPool::threadModel(void (*pfunc)(ServerPool&,int))
 {
 	if(this->threadNum==0)
 	{
@@ -181,11 +189,15 @@ void ServerPool::threadModel(void* (*pfunc)(void*))
 		if(newClient==-1)
 			continue;
 		this->addFd(newClient);
-		ThreadPool::Task task={pfunc,(void*)(uintptr_t)newClient};
+		Argv* temp=new Argv;
+		temp->pserver=this;
+		temp->func=pfunc;
+		temp->soc=newClient;
+		ThreadPool::Task task={worker,temp};
 		pool->addTask(task);
 	}
 }
-void ServerPool::epollThread(void* (*pfunc)(void*))
+void ServerPool::epollThread(void (*pfunc)(ServerPool&,int))
 {
 	if(this->threadNum==0)
 	{
@@ -212,7 +224,11 @@ void ServerPool::epollThread(void* (*pfunc)(void*))
 		{
 			if(pfunc!=NULL)
 			{
-				ThreadPool::Task task={pfunc,(void*)(uintptr_t)temp.data.fd};
+				Argv* argv=new Argv;
+				argv->func=pfunc;
+				argv->soc=temp.data.fd;
+				argv->pserver=this;
+				ThreadPool::Task task={worker,argv};
 				pool->addTask(task);
 			}
 		}
