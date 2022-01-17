@@ -9,7 +9,7 @@
 #include<iostream>
 #include<winsock2.h>
 using namespace std;
-
+namespace cppweb{
 bool ServerTcpIp::addFd(int addsoc)
 {
     bool flag=false;
@@ -800,3 +800,4 @@ bool ClientTcpIp::getDnsIp(const char* name,char* ip,unsigned int ipMaxLen)
 	strcpy(ip,inet_ntoa(addr));
 	return true;
 } 
+}

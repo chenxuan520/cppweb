@@ -5,6 +5,7 @@
 #include<winsock2.h>
 #include"server.h"
 using namespace std;
+namespace cppweb{
 /********************************
 	author:chenxuan
 	date:2021/8/10
@@ -64,19 +65,18 @@ private:
 	unsigned int threadNum;
 private:
 	static void sigCliDeal(int pid);
+	static void* worker(void* argc);
 public:
-	struct ArgvSer{
-		ServerPool& server;
+	struct Argv{
+		ServerPool* pserver;
+		void (*func)(ServerPool&,int);
 		int soc;
-		void* pneed;
-	};
-	struct ArgvSerEpoll{
-		ServerPool& server;
-		int soc;
-		int thing;
-		int len;
-		void* pneed;
-		void* pget;	
+		Argv()
+		{
+			pserver=NULL;
+			soc=-1;
+			func=NULL;
+		}
 	};
 public:
 	ServerPool(unsigned short port,unsigned int threadNum=0);
@@ -90,12 +90,12 @@ public:
 		pthread_mutex_unlock(&mutex);
 	}
 	bool mutexTryLock();
-	void threadModel(void* pneed,void* (*pfunc)(void*));
-	void epollThread(int* pthing,int* pnum,void* pget,int len,void* pneed,void* (*pfunc)(void*));
+	void threadModel(void (*pfunc)(ServerPool&,int));
 	inline bool threadDeleteSoc(int clisoc)
 	{
 		closesocket(clisoc);
 		return this->deleteFd(clisoc);
 	}
 };
+}
 #endif

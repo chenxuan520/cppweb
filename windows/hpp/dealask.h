@@ -3,6 +3,7 @@
 #include"./http.h"
 #include"./server.h"
 //#include"./sql.h"
+using namespace cppweb;
 class DealAsk{
 public:
     bool dealGetAsk(ServerTcpIp&,DealHttp&,void*,void*,int);

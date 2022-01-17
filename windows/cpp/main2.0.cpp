@@ -11,6 +11,7 @@
 #include<string.h>
 char indexName[100]="index.html";
 int memory=0;
+using namespace cppweb;
 /********************************
 	author:chenxuan
 	date:2021.7.5

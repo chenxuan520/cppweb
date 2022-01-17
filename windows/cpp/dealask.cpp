@@ -8,6 +8,7 @@
 #include"../hpp/http.h"
 #include"../hpp/server.h"
 //#include"../hpp/sql.h"
+using namespace cppweb;
 /********************************
 	author:chenxuan
 	date:2021.7.5
