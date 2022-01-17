@@ -634,6 +634,24 @@ int HttpServer::func(int num,void* pget,void* sen,unsigned int senLen,const char
 	}
 	return 0;
 }
+bool HttpServer::deletePath(const char* path)
+{
+	if(strlen(path)>100)
+		return false;
+	if(max-now<=2)
+	{
+		array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
+		if(array==NULL)
+			return false;
+		max+=10;
+	}
+	array[now].type=STATIC;
+	array[now].ask=GET;
+	strcpy(array[now].route,path);
+	array[now].pfunc=deleteFile;
+	now++;
+	return true;
+}
 void HttpServer::epollHttp(void* pget,int len,unsigned int senLen,void* pneed,const char* defaultFile)
 {//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
 	memset(pget,0,sizeof(char)*len);
@@ -662,6 +680,8 @@ void HttpServer::epollHttp(void* pget,int len,unsigned int senLen,void* pneed,co
 			{
 				this->textLen=getNum;
 				func(temp.data.fd,pget,pneed,senLen,defaultFile,*this);
+				if(logFunc!=NULL)
+					logFunc(*this,this->recText(),temp.data.fd);
 				if(isLongCon==false)
 				{
 			  		this->deleteFd(temp.data.fd);
@@ -716,6 +736,8 @@ void HttpServer::forkHttp(void* pget,int len,unsigned int senLen,void* pneed,con
 				{
 					close(sock);
 					func(temp.data.fd,pget,pneed,senLen,defaultFile,*this);
+					if(logFunc!=NULL)
+						logFunc(*this,this->recText(),temp.data.fd);
 					close(temp.data.fd);
 					free(pget);
 					free(pneed);
@@ -759,6 +781,12 @@ void HttpServer::loadFile(DealHttp& http,HttpServer& server,int senLen,void* sen
 		LogSystem::recordFileError(ask);
 		printf("404 get %s wrong\n",buf);
 	}
+}
+void HttpServer::deleteFile(DealHttp& http,HttpServer&,int senLen,void* sen,int& len)
+{
+	http.customizeAddTop(sen,senLen*1024*1024,DealHttp::STATUSFORBIDDEN,strlen("403 forbidden"),"text/plain");
+	http.customizeAddBody(sen,senLen*1024*1024,"403 forbidden",strlen("403 forbidden"));
+	len=strlen((char*)sen);
 }
 void HttpServer::sigCliDeal(int)
 {
