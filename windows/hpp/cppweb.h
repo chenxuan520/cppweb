@@ -4,11 +4,13 @@
 #include<stdlib.h>
 #include<conio.h>
 #include<time.h>
+#include<iostream>
+#include<string>
 #include<winsock2.h>
 #include<pthread.h>
 #include<unordered_map>
 #include<queue>
-namespace cppweb{	
+namespace cppweb{
 
 class WSAinit{
 public:
@@ -80,7 +82,7 @@ public:
 		buffer=NULL;
 		nowLen=0;
 		maxLen=0;
-		memset(this->word,0,sizeof(char)*30);		
+		memset(this->word,0,sizeof(char)*30);
 	}
 	~Json()
 	{
@@ -175,14 +177,14 @@ public:
 		if(strlen(key)>=45)
 		{
 			error="buffer too short";
-			return false;	
+			return false;
 		}
 		if(buffer[strlen(buffer)-1]=='}')
 			buffer[strlen(buffer)-1]=',';
 		int len=sprintf(temp,"\"%s\":%d}",key,value);
 		strcat(this->buffer,temp);
 		nowLen+=len;
-		return true;	
+		return true;
 	}
 	bool addKeyObj(const char* key,const char* value)
 	{
@@ -207,7 +209,7 @@ public:
 		int len=sprintf(temp,"\"%s\":%s}",key,value);
 		strcat(this->buffer,temp);
 		nowLen+=len;
-		return true;		
+		return true;
 	}
 	bool addArray(TypeJson type,const char* key,void** array,unsigned int arrLen,unsigned int floatNum=1)
 	{
@@ -264,7 +266,7 @@ public:
 				buffer[strlen(buffer)-1]=']';
 				strcat(buffer,"}");
 				nowLen+=len;
-				break;				
+				break;
 			case INT:
 				for(unsigned int i=0;i<arrLen;i++)
 				{
@@ -293,7 +295,7 @@ public:
 						strcat(buffer,(char*)array[i]);
 						len+=strlen((char*)array[i]);
 					}
-					strcat(buffer,",");	
+					strcat(buffer,",");
 				}
 				buffer[strlen(buffer)-1]=']';
 				strcat(buffer,"}");
@@ -327,7 +329,7 @@ public:
 		int len=sprintf(temp,"\"%s\":%.*f}",key,output,value);
 		strcat(this->buffer,temp);
 		nowLen+=len;
-		return true;		
+		return true;
 	}
 	void createObject(char* pbuffer,int bufferLen,const Object& obj)
 	{
@@ -355,7 +357,7 @@ public:
 					this->addOBject(obj.pobj[0]);
 				strcat(this->buffer,"}");
 				break;
-		}	
+		}
 	}
 	int createObjInt(char* pbuffer,unsigned int bufferLen,const char* key,int value)
 	{
@@ -626,7 +628,7 @@ private:
 	unsigned int busyThread;//num for busy thread
 	bool isContinue;//if the pool is continue
 private:
-	static void* worker(void* arg)//the worker for user 
+	static void* worker(void* arg)//the worker for user
 	{
 		ThreadPool* poll=(ThreadPool*)arg;
 		while(1)
@@ -746,7 +748,7 @@ public:
 	{
 		pthread_mutex_unlock(&this->lockTask);
 	}
-	static pthread_t createPthread(void* arg,void* (*pfunc)(void*))//create a thread 
+	static pthread_t createPthread(void* arg,void* (*pfunc)(void*))//create a thread
 	{
 		pthread_t thread=0;
 		pthread_create(&thread,NULL,pfunc,arg);
@@ -769,8 +771,8 @@ class ServerTcpIp{
 protected:
 	int sizeAddr;//sizeof(sockaddr_in) connect with addr_in;
 	int backwait;//the most waiting clients ;
-	int numClient;//how many clients now; 
-	char* hostip;//host IP 
+	int numClient;//how many clients now;
+	char* hostip;//host IP
 	char* hostname;//host name
 	const char* error;//error hapen
 	WSADATA wsa;//apply verson of windows;
@@ -820,12 +822,15 @@ protected:
             }
         }
         return false;
-    } 
+    }
 public:
 	ServerTcpIp(unsigned short port=5200,int wait=5)
 	{
 		if(WSAStartup(MAKEWORD(2,2),&wsa)!=0)
-			throw NULL;
+		{
+			error="WSA wrong";
+			return;
+		}
 		sock=socket(AF_INET,SOCK_STREAM,0);//AF=addr family internet
 		addr.sin_addr.S_un.S_addr=htonl(INADDR_ANY);//inaddr_any
 		addr.sin_family=AF_INET;//af_intt IPv4
@@ -954,7 +959,7 @@ public:
 		else
 			return false;
 		return true;
-	}	
+	}
 	bool selectModel(void* pget,int len,void* pneed,int (*pfunc)(int,int ,int ,void* ,void*,ServerTcpIp& ))
 	{//0 out,1 in,2 say
 		fd_set temp=fdClients;
@@ -1065,7 +1070,7 @@ public:
 			return false;
 		for(int i=0;i<fdNumNow&&i<arrayLen;i++)
 			array[i]=pfdn[i];
-		return true;		
+		return true;
 	}
 	bool findSocket(int cliSoc)
 	{
@@ -1100,7 +1105,7 @@ public:
 		if(-1==getpeername(cliSoc,(SOCKADDR*)&cliAddr,&len))
 			return NULL;
 		*pcliPort=cliAddr.sin_port;
-		return inet_ntoa(cliAddr.sin_addr); 
+		return inet_ntoa(cliAddr.sin_addr);
 	}
 };
 class ServerPool:public ServerTcpIp{
@@ -1135,7 +1140,7 @@ public:
 	{
 		this->threadNum=threadNum;
 		if(threadNum>0)
-		{	
+		{
 			pool=new ThreadPool(threadNum);
 			if(pool==NULL)
 			{
@@ -1231,7 +1236,7 @@ public:
 //		if(ssl!=NULL)
 //		{
 //			SSL_shutdown(ssl);
-//			SSL_free(ssl);	
+//			SSL_free(ssl);
 //		}
 //		if(ctx!=NULL)
 //			SSL_CTX_free(ctx);
@@ -1305,7 +1310,7 @@ public:
 			return false;
 		strcpy(ip,inet_ntoa(addr));
 		return true;
-	} 
+	}
 };
 class DealHttp{
 public:
@@ -1384,7 +1389,7 @@ public:
 		int i=0;
 		char* ptemp=local+len+1;
 		char* pend=NULL;
-		while(1)//95 _ 
+		while(1)//95 _
 			if((*ptemp>47&&*ptemp<58)||(*ptemp>96&&*ptemp<123)||(*ptemp>64&&*ptemp<91)||*ptemp==95||*ptemp==37)
 				break;
 			else
@@ -1640,7 +1645,7 @@ public:
 			{
 				if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
 					return 0;
-				else 
+				else
 					return 2;
 			}
 			else
@@ -1651,7 +1656,7 @@ public:
 			if(false==this->createSendMsg(HTML,psend,bufferLen,ask,plen))
 				if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
 					return 0;
-				else 
+				else
 					return 2;
 			else
 				return 1;
@@ -1661,47 +1666,47 @@ public:
 			if(false==this->createSendMsg(EXE,psend,bufferLen,ask,plen))
 				if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
 					return 0;
-				else 
+				else
 					return 2;
 			else
-				return 1;			
+				return 1;
 		}
 		else if(strstr(ask,".zip"))
 		{
 			if(false==this->createSendMsg(ZIP,psend,bufferLen,ask,plen))
 				if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
 					return 0;
-				else 
+				else
 					return 2;
 			else
-				return 1;			
+				return 1;
 		}
 		else if(strstr(ask,".png")||strstr(ask,".PNG")||strstr(ask,".jpg")||strstr(ask,".jpeg"))
 		{
 			if(false==this->createSendMsg(IMAGE,psend,bufferLen,ask,plen))
 				if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
 					return 0;
-				else 
+				else
 					return 2;
 			else
-				return 1;					
+				return 1;
 		}
 		else if(strstr(ask,".css"))
 		{
 			if(false==this->createSendMsg(CSS,psend,bufferLen,ask,plen))
 				if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
 					return 0;
-				else 
+				else
 					return 2;
 			else
-				return 1;					
+				return 1;
 		}
 		else if(strstr(ask,".js"))
 		{
 			if(false==this->createSendMsg(JS,psend,bufferLen,ask,plen))
 				if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
 					return 0;
-				else 
+				else
 					return 2;
 			else
 				return 1;
@@ -1711,17 +1716,17 @@ public:
 			if(false==this->createSendMsg(JSON,psend,bufferLen,ask,plen))
 				if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
 					return 0;
-				else 
+				else
 					return 2;
 			else
 				return 1;
 		}
-		else 
+		else
 		{
 			if(false==this->createSendMsg(UNKNOWN,psend,bufferLen,ask,plen))
 				if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
 					return 0;
-				else 
+				else
 					return 2;
 			else
 				return 1;
@@ -1733,7 +1738,7 @@ public:
 		char* temp=NULL;
 		if(onlyFromBody==false)
 			temp=strstr((char*)message,key);
-		else 
+		else
 		{
 			temp=strstr((char*)message,"\r\n\r\n");
 			if(temp==NULL)
@@ -1960,17 +1965,17 @@ public:
 		if(buffer==NULL)
 			return NULL;
 		memset(buffer,0,sizeof(char)*strlen(srcString));
-		for (unsigned int i=0; i<strlen(srcString); i++) 
+		for (unsigned int i=0; i<strlen(srcString); i++)
 		{
-		    if (int(srcString[i])==37) 
+		    if (int(srcString[i])==37)
 			{
 		        sscanf(srcString+i+1, "%x", &temp);
 		        ch=(char)temp;
 		        buffer[strlen(buffer)]=ch;
 		        buffer[strlen(buffer)+1]=0;
 		        i=i+2;
-		    } 
-			else 
+		    }
+			else
 		        buffer[strlen(buffer)]=srcString[i];
 		}
 		if(srcLen<strlen(buffer))
@@ -2001,7 +2006,7 @@ public:
 		{
 			sprintf(err,"input wrong");
 			return NULL;
-		}	
+		}
 		if(backString!=NULL)
 			free(backString);
 		backString=(char*)malloc(sizeof(char)*strlen(encryption)+30);
@@ -2100,8 +2105,8 @@ public:
 		memset(error,0,sizeof(char)*30);
 		memset(&their_addr, 0, sizeof(their_addr));
 		their_addr.sin_family = AF_INET;
-		their_addr.sin_port = htons(25);	
-		hostent* hptr = gethostbyname(domain);		  
+		their_addr.sin_port = htons(25);
+		hostent* hptr = gethostbyname(domain);
 		memcpy(&their_addr.sin_addr.s_addr, hptr->h_addr_list[0], hptr->h_length);
 	}
 	bool emailSend(const char* sendEmail,const char* passwd,const char* recEmail,const char* body)
@@ -2139,7 +2144,7 @@ public:
 		}
 		if(isDebug)
 			printf("get:%s",recBuffer);
-		
+
 		memset(senBuffer, 0, 1000);
 		sprintf(senBuffer, "EHLO HYL-PC\r\n");
 		send(sockfd, senBuffer, strlen(senBuffer), 0);
@@ -2147,7 +2152,7 @@ public:
 		recv(sockfd, recBuffer, 1000, 0);
 		if(isDebug)
 			printf("EHLO REceive:%s\n",recBuffer);
-		
+
 		memset(senBuffer, 0, 1000);
 		sprintf(senBuffer, "AUTH LOGIN\r\n");
 		send(sockfd, senBuffer, strlen(senBuffer), 0);
@@ -2155,7 +2160,7 @@ public:
 		recv(sockfd, recBuffer, 1000, 0);
 		if(isDebug)
 			printf("Auth Login Receive:%s\n",recBuffer);
-		
+
 		memset(senBuffer, 0, 1000);
 		sprintf(senBuffer, "%s",sendEmail);
 		memset(login, 0, 128);
@@ -2184,7 +2189,7 @@ public:
 
 		// self email
 		memset(recBuffer, 0, 1000);
-		sprintf(senBuffer, "MAIL FROM: <%s>\r\n",sendEmail);  
+		sprintf(senBuffer, "MAIL FROM: <%s>\r\n",sendEmail);
 		send(sockfd, senBuffer, strlen(senBuffer), 0);
 		memset(recBuffer, 0, 1000);
 		recv(sockfd, recBuffer, 1000, 0);
@@ -2342,7 +2347,7 @@ public:
 	}
 	bool getFileMsg(const char* fileName,char* buffer,unsigned int bufferLen)
 	{
-		int i=0,len=0;
+		unsigned int i=0,len=0;
 		len=this->getFileLen(fileName);
 		FILE* fp=fopen(fileName,"rb");
 		if(fp==NULL)
@@ -2401,50 +2406,6 @@ public:
 };
 class LogSystem{
 public:
-	struct CliLog{
-		int socketCli;
-		int time;
-		char ip[20];
-	};
-	static bool dealAttack(int isUpdate,int socketCli,int maxTime)//check if accket
-	{
-		static CliLog cli[41];
-		if(isUpdate==1)
-		{
-			cli[socketCli%41].socketCli=socketCli;
-			cli[socketCli%41].time=1;
-			return true;
-		}
-		else if(isUpdate==2)
-		{
-			cli[socketCli%41].time++;
-			if(cli[socketCli%41].time>maxTime)
-				return false;
-			return true;
-		}
-		else if(isUpdate==0)
-		{
-			cli[socketCli%41].socketCli=0;
-			cli[socketCli%41].time=0;
-			return true;
-		}
-		return true;
-	}
-	static bool attackLog(int port,const char* ip,const char* pfileName)//log accket
-	{
-		time_t temp=time(NULL);
-		struct tm* pt=localtime(&temp);
-		FILE* fp=fopen(pfileName,"a+");
-		if(fp==NULL)
-			if((fp=fopen(pfileName,"w+"))==NULL)		
-				return false;
-			else
-				fprintf(fp,"server attacked log\n");
-		fprintf(fp,"%d year%d month%d day%d hour%d min%d sec:",pt->tm_year+1900,pt->tm_mon+1,pt->tm_mday,pt->tm_hour,pt->tm_min,pt->tm_sec);
-		fprintf(fp,"%s:%d port attack server\n",ip,port);
-		fclose(fp);
-		return true;
-	}
 	static bool recordFileError(const char* fileName)
 	{
 		FILE* fp=fopen("wrong.log","r+");
@@ -2546,7 +2507,7 @@ public:
 		strcpy(array[now].route,route);
 		array[now].pfunc=pfunc;
 		now++;
-		return true;	
+		return true;
 	}
 	bool post(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&))
 	{
@@ -2564,7 +2525,7 @@ public:
 		strcpy(array[now].route,route);
 		array[now].pfunc=pfunc;
 		now++;
-		return true;	
+		return true;
 	}
 	bool all(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&))
 	{
@@ -2582,7 +2543,7 @@ public:
 		strcpy(array[now].route,route);
 		array[now].pfunc=pfunc;
 		now++;
-		return true;	
+		return true;
 	}
 	bool loadStatic(const char* route,const char* staticPath)
 	{
@@ -2781,7 +2742,7 @@ private:
 				{
 					pfunc=array[i].pfunc;
 					pnowRoute=&array[i];
-					break;						
+					break;
 				}
 			}
 			else if(array[i].type==STATIC&&type==GET)
@@ -2814,7 +2775,7 @@ private:
 			if(flag==2)
 			{
 				if(isDebug)
-				{	
+				{
 					LogSystem::recordFileError(ask);
 					printf("404 get %s wrong\n",ask);
 				}
@@ -2870,7 +2831,7 @@ private:
 							{
 						  		this->deleteFd(fdClients.fd_array[i]);
 								FD_CLR(fdClients.fd_array[i],&fdClients);
-								closesocket(fdClients.fd_array[i]);						
+								closesocket(fdClients.fd_array[i]);
 							}
 						}
 						if(sRec<=0)
@@ -2884,7 +2845,7 @@ private:
 							closesocket(fdClients.fd_array[i]);
 							FD_CLR(fdClients.fd_array[i],&fdClients);
 							this->deleteFd(fdClients.fd_array[i]);
-							
+
 						}
 					}
 				}
@@ -2930,7 +2891,7 @@ private:
 							{
 						  		this->deleteFd(fdClients.fd_array[i]);
 								FD_CLR(fdClients.fd_array[i],&fdClients);
-								closesocket(fdClients.fd_array[i]);						
+								closesocket(fdClients.fd_array[i]);
 							}
 						}
 						if(sRec<=0)
@@ -2944,7 +2905,7 @@ private:
 							closesocket(fdClients.fd_array[i]);
 							FD_CLR(fdClients.fd_array[i],&fdClients);
 							this->deleteFd(fdClients.fd_array[i]);
-							
+
 						}
 					}
 				}
