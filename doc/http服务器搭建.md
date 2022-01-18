@@ -2,10 +2,9 @@
 - 使用cppweb搭建简单的http服务器
 ## 安装教程
 1. git clone https://gitee.com/chenxuan520/server-for-static-web.git
-2. chmod 744 ./install.sh
-3. ./install.sh
-4. 填入端口等信息
-5. 服务器运行 
+2. ./install.sh
+3. 填入端口等信息
+4. 服务器运行 
 ## 填入信息
 1. 填入使用的版本 (1或2)(区别请见[这里]() )  
 2. 填入绑定的端口(如5200)

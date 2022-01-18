@@ -340,6 +340,7 @@ HttpServer::HttpServer(unsigned port,bool debug):ServerTcpIp(port)
 	textLen=0;
 	clientIn=NULL;
 	clientOut=NULL;
+	logFunc=NULL;
 	pnowRoute=NULL;
 }
 HttpServer::~HttpServer()

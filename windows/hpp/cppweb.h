@@ -6,8 +6,10 @@
 #include<time.h>
 #include<winsock2.h>
 #include<pthread.h>
+#include<unordered_map>
 #include<queue>
-using namespace std;
+namespace cppweb{	
+
 class WSAinit{
 public:
 	WSAinit()
@@ -606,104 +608,6 @@ public:
 		return this->error;
 	}
 };
-class WebToken{
-private:
-	char* backString;
-	char err[30];
-public:
-	WebToken()
-	{
-		backString=NULL;
-		memset(err,0,sizeof(char)*30);
-		sprintf(err,"no error");
-	}
-	const char* createToken(const char* key,const char* encryption,char* getString,unsigned int stringLen,unsigned int liveSecond)
-	{
-		int temp=0;
-		if(key==NULL||encryption==NULL||getString==NULL||stringLen<sizeof(char)*strlen(encryption)+30)
-		{
-			sprintf(err,"input wrong");
-			return NULL;
-		}	
-		if(backString!=NULL)
-			free(backString);
-		backString=(char*)malloc(sizeof(char)*strlen(encryption)+30);
-		memset(backString,0,sizeof(char)*strlen(encryption)+30);
-		if(backString==NULL)
-		{
-			sprintf(err,"malloc wrong");
-			return NULL;
-		}
-		for(unsigned int i=0;i<strlen(key);i++)
-			temp+=key[i];
-		int end=time(NULL)+liveSecond+temp;
-		temp=temp%4;
-		for(unsigned int i=0;i<strlen(encryption);i++)
-		{
-			backString[i]=encryption[i]-temp;
-			if(backString[i]==94)
-				backString[i]=92;
-		}
-		char tempString[30]={0},endString[30]={0};
-		sprintf(endString,"%d",end);
-		for(unsigned int i=0;i<strlen(endString);i++)
-			endString[i]+=50;
-		sprintf(tempString,"&%s&%c",endString,encryption[0]);
-		strcat(backString,tempString);
-		strcpy(getString,backString);
-		return getString;
-	}
-	const char* decryptToken(const char* key,const char* token,char* buffer,unsigned int bufferLen)
-	{
-		char* temp=strchr((char*)token,'&');
-		if(temp==NULL||key==NULL||token==NULL||buffer==NULL||bufferLen<strlen(token))
-		{
-			sprintf(err,"input wrong");
-			return NULL;
-		}
-		if(backString!=NULL)
-			free(backString);
-		backString=(char*)malloc(sizeof(char)*strlen(token));
-		memset(backString,0,sizeof(char)*strlen(token));
-		char endString[20]={0};
-		if(sscanf(temp+1,"%[^&]",endString)<=0)
-		{
-			sprintf(err,"get time wrong");
-			return NULL;
-		}
-		int keyTemp=0,end=0;
-		for(unsigned int i=0;i<strlen(endString);i++)
-			endString[i]-=50;
-		sscanf(endString,"%d",&end);
-		for(unsigned int i=0;i<strlen(key);i++)
-			keyTemp+=key[i];
-		end-=keyTemp;
-		if(end-time(NULL)<=0)
-		{
-			sprintf(err,"over time");
-			return NULL;
-		}
-		keyTemp=keyTemp%4;
-		unsigned int i=0;
-		for(i=0;i+token<temp;i++)
-			if(token[i]!=92)
-				backString[i]=token[i]+keyTemp;
-			else
-				backString[i]=97;
-		backString[i+1]=0;
-		if(backString[0]!=token[strlen(token)-1])
-		{
-			sprintf(err,"key wrong");
-			return NULL;
-		}
-		strcpy(buffer,backString);
-		return buffer;
-	}
-	inline const char* LastError()
-	{
-		return err;
-	}
-};
 class ThreadPool{
 public://a struct for you to add task
 	struct Task{
@@ -711,7 +615,7 @@ public://a struct for you to add task
 		void* arg;
 	};
 private:
-	queue<Task> thingWork;//a queue for struct task
+	std::queue<Task> thingWork;//a queue for struct task
 	pthread_cond_t condition;//a condition mutex
 	pthread_mutex_t lockPoll;//a lock to lock queue
 	pthread_mutex_t lockTask;//a lock for user to ctrl
@@ -751,7 +655,7 @@ private:
 		}
 		return NULL;
 	}
-	static void* manager(void* arg)//manager for user
+	static void* manager(void* )//manager for user
 	{
 		return NULL;
 	}
@@ -1199,6 +1103,97 @@ public:
 		return inet_ntoa(cliAddr.sin_addr); 
 	}
 };
+class ServerPool:public ServerTcpIp{
+private:
+	struct Argv{
+		ServerPool* pserver;
+		void (*func)(ServerPool&,int);
+		int soc;
+		Argv()
+		{
+			pserver=NULL;
+			soc=-1;
+			func=NULL;
+		}
+	};
+private:
+	ThreadPool* pool;
+	pthread_mutex_t mutex;
+	unsigned int threadNum;
+	bool isEpoll;
+private:
+	static void* worker(void* argc)
+	{
+		Argv argv=*(Argv*)argc;
+		delete (Argv*)argc;
+		if(argv.func!=NULL)
+			argv.func(*argv.pserver,argv.soc);
+		return NULL;
+	}
+public:
+	ServerPool(unsigned short port,unsigned int threadNum=0):ServerTcpIp(port)
+	{
+		this->threadNum=threadNum;
+		if(threadNum>0)
+		{	
+			pool=new ThreadPool(threadNum);
+			if(pool==NULL)
+			{
+				this->error="malloc wrong";
+				return;
+			}
+		}
+		pthread_mutex_init(&mutex,NULL);
+		isEpoll=false;
+	}
+	~ServerPool()
+	{
+		delete pool;
+	   	pthread_mutex_destroy(&mutex);
+	}
+	inline void mutexLock()
+	{
+		pthread_mutex_lock(&mutex);
+	}
+	inline void mutexUnlock()
+	{
+		pthread_mutex_unlock(&mutex);
+	}
+	bool mutexTryLock()
+	{
+		if(0==pthread_mutex_trylock(&mutex))
+			return true;
+		else
+			return false;
+	}
+	void threadModel(void (*pfunc)(ServerPool&,int))
+	{
+		if(this->threadNum==0)
+		{
+			this->error="thread wrong init";
+			return;
+		}
+		while(1)
+		{
+			SOCKADDR_IN newaddr={0,0,{0},{0}};
+			int newClient=accept(sock,(SOCKADDR*)&newaddr,&sizeAddr);
+			if(newClient==-1)
+				continue;
+			this->addFd(newClient);
+			Argv* temp=new Argv;
+			temp->pserver=this;
+			temp->func=pfunc;
+			temp->soc=newClient;
+			ThreadPool::Task task={worker,temp};
+			pool->addTask(task);
+		}
+	}
+	inline bool threadDeleteSoc(int clisoc)
+	{
+		closesocket(clisoc);
+		return this->deleteFd(clisoc);
+	}
+};
 class ClientTcpIp{
 private:
 	WSADATA wsa;//apply for api
@@ -1313,18 +1308,31 @@ public:
 	} 
 };
 class DealHttp{
-private:
-	char ask[256];
-	char* pfind;
-	const char* error;
 public:
 	enum FileKind{
 		UNKNOWN=0,HTML=1,EXE=2,IMAGE=3,NOFOUND=4,CSS=5,JS=6,ZIP=7,JSON=8,
 	};
 	enum Status{
-		STATUSOK=200,STATUSNOCON=204,STATUSMOVED=301,STATUSBADREQUEST=400,STATUSFRORBID=403,
+		STATUSOK=200,STATUSNOCON=204,STATUSMOVED=301,STATUSBADREQUEST=400,STATUSFORBIDDEN=403,
 		STATUSNOFOUND=404,STATUSNOIMPLEMENT=501,
 	};
+	struct Datagram{
+		Status statusCode;
+		FileKind typeFile;
+		unsigned fileLen;
+		std::unordered_map<std::string,std::string> head;
+		std::unordered_map<std::string,std::string> cookie;
+		const void* body;
+	};
+	struct Request{
+		std::string method;
+		std::string askPath;
+		std::string version;
+	};
+private:
+	char ask[256];
+	char* pfind;
+	const char* error;
 public:
 	DealHttp()
 	{
@@ -1363,6 +1371,14 @@ public:
 	{
 		return strstr((char*)message,ptofind);
 	}
+	void getRequestMsg(void* message,Request& request)
+	{
+		char method[30]={0},path[256]={0},version[30]={0};
+		sscanf((char*)message,"%30s%256s%30[^\r]",method,path,version);
+		request.askPath=path;
+		request.method=method;
+		request.version=version;
+	}
 	char* findBackString(char* local,int len,char* word,int maxWordLen)
 	{
 		int i=0;
@@ -1391,30 +1407,30 @@ public:
 			return NULL;
 		switch(statusNum)
 		{
-			case 200:
-				statusEng="OK";
-				break;
-			case 204:
-				statusEng="No Content";
-				break;
-			case 301:
-				statusEng="Moved Permanently";
-				break;
-			case 400:
-				statusEng="Bad Request";
-				break;
-			case 403:
-				statusEng="Forbidden";
-				break;
-			case 404:
-				statusEng="Not Found";
-				break;
-			case 501:
-				statusEng="Not Implemented";
-				break;
-			default:
-				statusEng=staEng;
-				break;
+		case 200:
+			statusEng="OK";
+			break;
+		case 204:
+			statusEng="No Content";
+			break;
+		case 301:
+			statusEng="Moved Permanently";
+			break;
+		case 400:
+			statusEng="Bad Request";
+			break;
+		case 403:
+			statusEng="Forbidden";
+			break;
+		case 404:
+			statusEng="Not Found";
+			break;
+		case 501:
+			statusEng="Not Implemented";
+			break;
+		default:
+			statusEng=staEng;
+			break;
 		}
 		sprintf((char*)buffer,"HTTP/1.1 %d %s\r\n"
 			"Server LCserver/1.1\r\n"
@@ -1498,69 +1514,69 @@ public:
 		}
 		switch (kind)
 		{
-			case UNKNOWN:
-				*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
-				"Server LCserver/1.1\r\n"
-				"Connection: keep-alive\r\n"
-				"Content-Length:%d\r\n\r\n",fileLen);
-				break;
-			case HTML:
-				*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
-				"Server LCserver/1.1\r\n"
-				"Connection: keep-alive\r\n"
-				"Content-Type:text/html\r\n"
-				"Content-Length:%d\r\n\r\n",fileLen);
-				break;
-			case EXE:
-				*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
-				"Server LCserver/1.1\r\n"
-				"Connection: keep-alive\r\n"
-				"Content-Type:application/octet-stream\r\n"
-				"Content-Length:%d\r\n\r\n",fileLen);
-				break;
-			case IMAGE:
-				*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
-				"Server LCserver/1.1\r\n"
-				"Connection: keep-alive\r\n"
-				"Content-Type:image\r\n"
-				"Content-Length:%d\r\n\r\n",fileLen);
-				break;
-			case NOFOUND:
-				*topLen=sprintf(ptop,"HTTP/1.1 404 Not Found\r\n"
-				"Server LCserver/1.1\r\n"
-				"Connection: keep-alive\r\n"
-				"Content-Type: text/plain\r\n"
-				"Content-Length:%d\r\n\r\n"
-				"404 no found",(int)strlen("404 no found"));
-				break;
-			case CSS:
-				*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
-				"Server LCserver/1.1\r\n"
-				"Connection: keep-alive\r\n"
-				"Content-Type:text/css\r\n"
-				"Content-Length:%d\r\n\r\n",fileLen);
-				break;
-			case JS:
-				*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
-				"Server LCserver/1.1\r\n"
-				"Connection: keep-alive\r\n"
-				"Content-Type:text/javascript\r\n"
-				"Content-Length:%d\r\n\r\n",fileLen);
-				break;
-			case ZIP:
-				*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
-				"Server LCserver/1.1\r\n"
-				"Connection: keep-alive\r\n"
-				"Content-Type:application/zip\r\n"
-				"Content-Length:%d\r\n\r\n",fileLen);
-				break;
-			case JSON:
-				*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
-				"Server LCserver/1.1\r\n"
-				"Connection: keep-alive\r\n"
-				"Content-Type:application/json\r\n"
-				"Content-Length:%d\r\n\r\n",fileLen);
-				break;
+		   case UNKNOWN:
+			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
+			"Server LCserver/1.1\r\n"
+			"Connection: keep-alive\r\n"
+			"Content-Length:%d\r\n\r\n",fileLen);
+			break;
+		   case HTML:
+			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
+			"Server LCserver/1.1\r\n"
+			"Connection: keep-alive\r\n"
+			"Content-Type:text/html\r\n"
+			"Content-Length:%d\r\n\r\n",fileLen);
+			break;
+		   case EXE:
+			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
+			"Server LCserver/1.1\r\n"
+			"Connection: keep-alive\r\n"
+			"Content-Type:application/octet-stream\r\n"
+			"Content-Length:%d\r\n\r\n",fileLen);
+			break;
+		   case IMAGE:
+			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
+			"Server LCserver/1.1\r\n"
+			"Connection: keep-alive\r\n"
+			"Content-Type:image\r\n"
+			"Content-Length:%d\r\n\r\n",fileLen);
+			break;
+		   case NOFOUND:
+			*topLen=sprintf(ptop,"HTTP/1.1 404 Not Found\r\n"
+			"Server LCserver/1.1\r\n"
+			"Connection: keep-alive\r\n"
+			"Content-Type: text/plain\r\n"
+			"Content-Length:%d\r\n\r\n"
+			"404 no found",(int)strlen("404 no found"));
+			break;
+		   case CSS:
+			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
+			"Server LCserver/1.1\r\n"
+			"Connection: keep-alive\r\n"
+			"Content-Type:text/css\r\n"
+			"Content-Length:%d\r\n\r\n",fileLen);
+			break;
+		   case JS:
+			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
+			"Server LCserver/1.1\r\n"
+			"Connection: keep-alive\r\n"
+			"Content-Type:text/javascript\r\n"
+			"Content-Length:%d\r\n\r\n",fileLen);
+			break;
+		   case ZIP:
+			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
+			"Server LCserver/1.1\r\n"
+			"Connection: keep-alive\r\n"
+			"Content-Type:application/zip\r\n"
+			"Content-Length:%d\r\n\r\n",fileLen);
+			break;
+		   case JSON:
+			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
+			"Server LCserver/1.1\r\n"
+			"Connection: keep-alive\r\n"
+			"Content-Type:application/json\r\n"
+			"Content-Length:%d\r\n\r\n",fileLen);
+			break;
 		}
 	}
 	bool createSendMsg(FileKind kind,char* buffer,unsigned int bufferLen,const char* pfile,int* plong)
@@ -1730,7 +1746,7 @@ public:
 	}
 	const char* getKeyLine(const void* message,const char* key,char* line,unsigned int maxLineLen,bool onlyFromBody=false)
 	{
-		int i=0;
+		unsigned int i=0;
 		char* ptemp=NULL;
 		if(false==onlyFromBody)
 			ptemp=strstr((char*)message,key);
@@ -1810,6 +1826,96 @@ public:
 		buffer[i+1]=0;
 		return result;
 	}
+	int createDatagram(const Datagram& gram,void* buffer,unsigned bufferLen)
+	{
+		if(gram.fileLen>bufferLen||bufferLen==0)
+			return -1;
+		const char* statusEng=NULL;
+		char temp[200]={0};
+		if(bufferLen<100||bufferLen<gram.fileLen+100)
+		{
+			error="len too short";
+			return -1;
+		}
+		switch(gram.statusCode)
+		{
+		case STATUSOK:
+			statusEng="OK";
+			break;
+		case STATUSNOCON:
+			statusEng="No Content";
+			break;
+		case STATUSMOVED:
+			statusEng="Moved Permanently";
+			break;
+		case STATUSBADREQUEST:
+			statusEng="Bad Request";
+			break;
+		case STATUSFORBIDDEN:
+			statusEng="Forbidden";
+			break;
+		case STATUSNOFOUND:
+			statusEng="Not Found";
+			break;
+		case STATUSNOIMPLEMENT:
+			statusEng="Not Implemented";
+			break;
+		default:
+			error="status code UNKNOWN";
+			return -1;
+		}
+		sprintf((char*)buffer,"HTTP/1.1 %d %s\r\n"
+			"Server LCserver/1.1\r\n"
+			"Connection: keep-alive\r\n",
+			gram.statusCode,statusEng);
+		if(gram.fileLen==0)
+		{
+			sprintf((char*)buffer,"\r\n");
+			return strlen((char*)buffer);
+		}
+		switch(gram.typeFile)
+		{
+		case UNKNOWN:
+		case NOFOUND:
+			strcat((char*)buffer,"\r\n");
+			return strlen((char*)buffer);
+		case HTML:
+			sprintf(temp,"Content-Type:%s\r\n","text/html");
+			break;
+		case EXE:
+			sprintf(temp,"Content-Type:%s\r\n","application/octet-stream");
+			break;
+		case IMAGE:
+			sprintf(temp,"Content-Type:%s\r\n","image");
+			break;
+		case CSS:
+			sprintf(temp,"Content-Type:%s\r\n","text/css");
+			break;
+		case JS:
+			sprintf(temp,"Content-Type:%s\r\n","text/javascript");
+			break;
+		case JSON:
+			sprintf(temp,"Content-Type:%s\r\n","application/json");
+			break;
+		case ZIP:
+			sprintf(temp,"Content-Type:%s\r\n","application/zip");
+			break;
+		}
+		strcat((char*)buffer,temp);
+		sprintf(temp,"Content-Length:%d\r\n",gram.fileLen);
+		strcat((char*)buffer,temp);
+		if(gram.head.size()!=0)
+			for(auto iter=gram.head.begin();iter!=gram.head.end();iter++)
+				customizeAddHead(buffer,bufferLen,iter->first.c_str(),iter->second.c_str());
+		if(gram.cookie.size()!=0)
+			for(auto iter=gram.cookie.begin();iter!=gram.cookie.end();iter++)
+				setCookie(buffer,bufferLen,iter->first.c_str(),iter->second.c_str());
+		return customizeAddBody(buffer,bufferLen,(char*)gram.body,gram.fileLen);
+	}
+	inline const char* lastError()
+	{
+		return error;
+	}
 	static void dealUrl(const char* url,char* urlTop,char* urlEnd,unsigned int topLen,unsigned int endLen)
 	{
 		const char* ptemp=NULL;
@@ -1848,7 +1954,8 @@ public:
 	static const char* urlDecode(char* srcString)
 	{
 		char ch=0;
-		int temp=0,srcLen=strlen(srcString);
+		int temp=0;
+		unsigned int srcLen=strlen(srcString);
 		char* buffer=(char*)malloc(sizeof(char)*strlen(srcString));
 		if(buffer==NULL)
 			return NULL;
@@ -1874,6 +1981,336 @@ public:
 		strcpy(srcString,buffer);
 		free(buffer);
 		return srcString;
+	}
+};
+class WebToken{
+private:
+	char* backString;
+	char err[30];
+public:
+	WebToken()
+	{
+		backString=NULL;
+		memset(err,0,sizeof(char)*30);
+		sprintf(err,"no error");
+	}
+	const char* createToken(const char* key,const char* encryption,char* getString,unsigned int stringLen,unsigned int liveSecond)
+	{
+		int temp=0;
+		if(key==NULL||encryption==NULL||getString==NULL||stringLen<sizeof(char)*strlen(encryption)+30)
+		{
+			sprintf(err,"input wrong");
+			return NULL;
+		}	
+		if(backString!=NULL)
+			free(backString);
+		backString=(char*)malloc(sizeof(char)*strlen(encryption)+30);
+		memset(backString,0,sizeof(char)*strlen(encryption)+30);
+		if(backString==NULL)
+		{
+			sprintf(err,"malloc wrong");
+			return NULL;
+		}
+		for(unsigned int i=0;i<strlen(key);i++)
+			temp+=key[i];
+		int end=time(NULL)+liveSecond+temp;
+		temp=temp%4;
+		for(unsigned int i=0;i<strlen(encryption);i++)
+		{
+			backString[i]=encryption[i]-temp;
+			if(backString[i]==94)
+				backString[i]=92;
+		}
+		char tempString[60]={0},endString[30]={0};
+		sprintf(endString,"%d",end);
+		for(unsigned int i=0;i<strlen(endString);i++)
+			endString[i]+=50;
+		sprintf(tempString,".%s.%c",endString,encryption[0]);
+		strcat(backString,tempString);
+		strcpy(getString,backString);
+		return getString;
+	}
+	const char* decryptToken(const char* key,const char* token,char* buffer,unsigned int bufferLen)
+	{
+		char* temp=strchr((char*)token,'.');
+		if(temp==NULL||key==NULL||token==NULL||buffer==NULL||bufferLen<strlen(token))
+		{
+			sprintf(err,"input wrong");
+			return NULL;
+		}
+		if(backString!=NULL)
+			free(backString);
+		backString=(char*)malloc(sizeof(char)*strlen(token));
+		memset(backString,0,sizeof(char)*strlen(token));
+		char endString[20]={0};
+		if(sscanf(temp+1,"%20[^.]",endString)<=0)
+		{
+			sprintf(err,"get time wrong");
+			return NULL;
+		}
+		int keyTemp=0,end=0;
+		for(unsigned int i=0;i<strlen(endString);i++)
+			endString[i]-=50;
+		sscanf(endString,"%d",&end);
+		for(unsigned int i=0;i<strlen(key);i++)
+			keyTemp+=key[i];
+		end-=keyTemp;
+		if(end-time(NULL)<=0)
+		{
+			sprintf(err,"over time");
+			return NULL;
+		}
+		keyTemp=keyTemp%4;
+		unsigned int i=0;
+		for(i=0;i+token<temp;i++)
+			if(token[i]!=92)
+				backString[i]=token[i]+keyTemp;
+			else
+				backString[i]=97;
+		backString[i+1]=0;
+		if(backString[0]!=token[strlen(token)-1])
+		{
+			sprintf(err,"key wrong");
+			return NULL;
+		}
+		strcpy(buffer,backString);
+		return buffer;
+	}
+	inline const char* LastError()
+	{
+		return err;
+	}
+};
+class Email{
+private:
+	sockaddr_in their_addr;
+	bool isDebug;
+	char error[30];
+	struct Base64Date6
+	{
+		unsigned int d4 : 6;
+		unsigned int d3 : 6;
+		unsigned int d2 : 6;
+		unsigned int d1 : 6;
+	};
+public:
+	Email(const char* domain,bool debug=false)
+	{
+		isDebug=debug;
+		memset(error,0,sizeof(char)*30);
+		memset(&their_addr, 0, sizeof(their_addr));
+		their_addr.sin_family = AF_INET;
+		their_addr.sin_port = htons(25);	
+		hostent* hptr = gethostbyname(domain);		  
+		memcpy(&their_addr.sin_addr.s_addr, hptr->h_addr_list[0], hptr->h_length);
+	}
+	bool emailSend(const char* sendEmail,const char* passwd,const char* recEmail,const char* body)
+	{
+	  	int sockfd = 0;
+	  	char recBuffer[1000]={0},senBuffer[1000]={0},login[128],pass[128];
+		sockfd = socket(PF_INET, SOCK_STREAM, 0);
+		if (sockfd < 0)
+		{
+			sprintf(error,"open socket wrong");
+			return false;
+		}
+		if (connect(sockfd,(struct sockaddr *)&their_addr, sizeof(struct sockaddr)) < 0)
+		{
+			sprintf(error,"connect wrong");
+			return false;
+		}
+		memset(recBuffer,0,sizeof(char)*1000);
+		while (recv(sockfd, recBuffer, 1000, 0) <= 0)
+		{
+			if(isDebug)
+				printf("reconnecting\n");
+			sockfd = socket(PF_INET, SOCK_STREAM, 0);
+			if (sockfd < 0)
+			{
+				sprintf(error,"open socket wrong");
+				return false;
+			}
+			if (connect(sockfd,(struct sockaddr *)&their_addr, sizeof(struct sockaddr)) < 0)
+			{
+				sprintf(error,"connect wrong");
+				return false;
+			}
+			memset(recBuffer, 0, 1000);
+		}
+		if(isDebug)
+			printf("get:%s",recBuffer);
+		
+		memset(senBuffer, 0, 1000);
+		sprintf(senBuffer, "EHLO HYL-PC\r\n");
+		send(sockfd, senBuffer, strlen(senBuffer), 0);
+		memset(recBuffer, 0, 1000);
+		recv(sockfd, recBuffer, 1000, 0);
+		if(isDebug)
+			printf("EHLO REceive:%s\n",recBuffer);
+		
+		memset(senBuffer, 0, 1000);
+		sprintf(senBuffer, "AUTH LOGIN\r\n");
+		send(sockfd, senBuffer, strlen(senBuffer), 0);
+		memset(recBuffer, 0, 1000);
+		recv(sockfd, recBuffer, 1000, 0);
+		if(isDebug)
+			printf("Auth Login Receive:%s\n",recBuffer);
+		
+		memset(senBuffer, 0, 1000);
+		sprintf(senBuffer, "%s",sendEmail);
+		memset(login, 0, 128);
+		EncodeBase64(login, senBuffer, strlen(senBuffer));
+		sprintf(senBuffer, "%s\r\n", login);
+		send(sockfd, senBuffer, strlen(senBuffer), 0);
+		if(isDebug)
+			printf("Base64 UserName:%s\n",senBuffer);
+		memset(recBuffer, 0, 1000);
+		recv(sockfd, recBuffer, 1000, 0);
+		if(isDebug)
+			printf("User Login Receive:%s\n",recBuffer);
+
+		sprintf(senBuffer, "%s",passwd);//password
+		memset(pass, 0, 128);
+		EncodeBase64(pass, senBuffer, strlen(senBuffer));
+		sprintf(senBuffer, "%s\r\n", pass);
+		send(sockfd, senBuffer, strlen(senBuffer), 0);
+		if(isDebug)
+			printf("Base64 Password:%s\n",senBuffer);
+
+		memset(recBuffer, 0, 1000);
+		recv(sockfd, recBuffer, 1000, 0);
+		if(isDebug)
+			printf("Send Password Receive:%s\n",recBuffer);
+
+		// self email
+		memset(recBuffer, 0, 1000);
+		sprintf(senBuffer, "MAIL FROM: <%s>\r\n",sendEmail);  
+		send(sockfd, senBuffer, strlen(senBuffer), 0);
+		memset(recBuffer, 0, 1000);
+		recv(sockfd, recBuffer, 1000, 0);
+		if(isDebug)
+			printf("set Mail From Receive:%s\n",recBuffer);
+
+		// recv email
+		sprintf(recBuffer, "RCPT TO:<%s>\r\n", recEmail);
+		send(sockfd, recBuffer, strlen(recBuffer), 0);
+		memset(recBuffer, 0, 1000);
+		recv(sockfd, recBuffer, 1000, 0);
+		if(isDebug)
+			printf("Tell Sendto Receive:%s\n",recBuffer);
+		int bug=0;
+		sscanf(recBuffer,"%d",&bug);
+		if(bug==550)
+		{
+			sprintf(error,"recemail wrong");
+			return false;
+		}
+		// send body
+		sprintf(senBuffer, "DATA\r\n");
+		send(sockfd, senBuffer, strlen(senBuffer), 0);
+		memset(recBuffer, 0, 1000);
+		recv(sockfd, recBuffer, 1000, 0);
+		if(isDebug)
+			printf("Send Mail Prepare Receive:%s\n",recBuffer);
+
+		// send data
+		sprintf(senBuffer, "%s\r\n.\r\n", body);
+		send(sockfd, senBuffer, strlen(senBuffer), 0);
+		memset(recBuffer, 0, 1000);
+		recv(sockfd, recBuffer, 1000, 0);
+		if(isDebug)
+			printf("Send Mail Receive:%s\n",recBuffer);
+
+		// QUIT
+		sprintf(senBuffer,"QUIT\r\n");
+		send(sockfd, senBuffer, strlen(senBuffer), 0);
+		memset(recBuffer, 0, 1000);
+		recv(sockfd, recBuffer, 1000, 0);
+		if(isDebug)
+			printf("Quit Receive:%s\n",recBuffer);
+		return true;
+	}
+	char ConvertToBase64(char uc)
+	{
+		if (uc < 26)
+			return 'A' + uc;
+		if (uc < 52)
+			return 'a' + (uc - 26);
+		if (uc < 62)
+			return '0' + (uc - 52);
+		if (uc == 62)
+			return '+';
+		return '/';
+	}
+	void EncodeBase64(char *dbuf, char *buf128, int len)
+	{
+		struct Base64Date6 *ddd = NULL;
+		int i = 0;
+		char buf[256] = { 0 };
+		char* tmp = NULL;
+		char cc = '\0';
+		memset(buf, 0, 256);
+		strcpy(buf, buf128);
+		for (i = 1; i <= len / 3; i++)
+		{
+			tmp = buf + (i - 1) * 3;
+			cc = tmp[2];
+			tmp[2] = tmp[0];
+			tmp[0] = cc;
+			ddd = (struct Base64Date6 *)tmp;
+			dbuf[(i - 1) * 4 + 0] = ConvertToBase64((unsigned int)ddd->d1);
+			dbuf[(i - 1) * 4 + 1] = ConvertToBase64((unsigned int)ddd->d2);
+			dbuf[(i - 1) * 4 + 2] = ConvertToBase64((unsigned int)ddd->d3);
+			dbuf[(i - 1) * 4 + 3] = ConvertToBase64((unsigned int)ddd->d4);
+		}
+		if (len % 3 == 1)
+		{
+			tmp = buf + (i - 1) * 3;
+			cc = tmp[2];
+			tmp[2] = tmp[0];
+			tmp[0] = cc;
+			ddd = (struct Base64Date6 *)tmp;
+			dbuf[(i - 1) * 4 + 0] = ConvertToBase64((unsigned int)ddd->d1);
+			dbuf[(i - 1) * 4 + 1] = ConvertToBase64((unsigned int)ddd->d2);
+			dbuf[(i - 1) * 4 + 2] = '=';
+			dbuf[(i - 1) * 4 + 3] = '=';
+		}
+		if (len % 3 == 2)
+		{
+			tmp = buf + (i - 1) * 3;
+			cc = tmp[2];
+			tmp[2] = tmp[0];
+			tmp[0] = cc;
+			ddd = (struct Base64Date6 *)tmp;
+			dbuf[(i - 1) * 4 + 0] = ConvertToBase64((unsigned int)ddd->d1);
+			dbuf[(i - 1) * 4 + 1] = ConvertToBase64((unsigned int)ddd->d2);
+			dbuf[(i - 1) * 4 + 2] = ConvertToBase64((unsigned int)ddd->d3);
+			dbuf[(i - 1) * 4 + 3] = '=';
+		}
+		return;
+	}
+	void CreateSend(const char* youName,const char* toName,const char* from,const char* to,const char* subject,const char* body,char* buf)
+	{
+		sprintf(buf,"From: \"%s\"<%s>\r\n"
+				"To: \"%s\"<%s>\r\n"
+				"Subject:%s\r\n\r\n"
+				"%s\n",youName,from,toName,to,subject,body);
+	}
+	inline const char* LastError()
+	{
+		return error;
+	}
+	static const char* getDomainBySelfEmail(const char* email,char* buffer,int bufferLen)
+	{
+		char* temp=strrchr((char*)email,'@');
+		if(temp==NULL)
+			return NULL;
+		if(bufferLen<=20)
+			return NULL;
+		if(strlen(temp)>15)
+			return NULL;
+		sprintf(buffer,"smtp.%s",temp+1);
+		return buffer;
 	}
 };
 class FileGet{
@@ -2048,6 +2485,7 @@ private:
 	bool isFork;
 	void (*clientIn)(HttpServer&,int num,void* ip,int port);
 	void (*clientOut)(HttpServer&,int num,void* ip,int port);
+	void (*logFunc)(HttpServer&,const void*,int);
 public:
 	HttpServer(unsigned port,bool debug=false):ServerTcpIp(port)
 	{
@@ -2066,6 +2504,7 @@ public:
 		textLen=0;
 		clientIn=NULL;
 		clientOut=NULL;
+		logFunc=NULL;
 		pnowRoute=NULL;
 	}
 	~HttpServer()
@@ -2161,6 +2600,24 @@ public:
 		strcpy(array[now].route,route);
 		array[now].path=staticPath;
 		array[now].pfunc=loadFile;
+		now++;
+		return true;
+	}
+	bool deletePath(const char* path)
+	{
+		if(strlen(path)>100)
+			return false;
+		if(max-now<=2)
+		{
+			array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
+			if(array==NULL)
+				return false;
+			max+=10;
+		}
+		array[now].type=STATIC;
+		array[now].ask=GET;
+		strcpy(array[now].route,path);
+		array[now].pfunc=deleteFile;
 		now++;
 		return true;
 	}
@@ -2510,5 +2967,12 @@ private:
 			printf("404 get %s wrong\n",buf);
 		}
 	}
+	static void deleteFile(DealHttp& http,HttpServer&,int senLen,void* sen,int& len)
+	{
+		http.customizeAddTop(sen,senLen*1024*1024,DealHttp::STATUSFORBIDDEN,strlen("403 forbidden"),"text/plain");
+		http.customizeAddBody(sen,senLen*1024*1024,"403 forbidden",strlen("403 forbidden"));
+		len=strlen((char*)sen);
+	}
 };
+}
 #endif

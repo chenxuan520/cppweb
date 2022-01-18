@@ -1,6 +1,7 @@
 #ifndef _ROUTE_H_
 #define _ROUTE_H_
 #include"./server.h"
+using namespace cppweb;
 /********************************
 	author:chenxuan
 	date:2021/11/7
@@ -8,6 +9,6 @@
 *********************************/
 bool addHandle(HttpServer& server)
 {
-	
+	return true;
 }
 #endif
