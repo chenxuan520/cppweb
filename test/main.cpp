@@ -2,6 +2,7 @@
 #include <string.h>
 #include "../lib/server.h"
 #include "../lib/http.h"
+using namespace cppweb;
 using namespace std;
 void root(DealHttp & http, HttpServer & server, int, void * send, int & len)
 {

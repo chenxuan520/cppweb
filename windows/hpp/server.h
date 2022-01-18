@@ -6,6 +6,7 @@
 #include<winsock2.h>
 
 using namespace std;
+namespace cppweb{
 class ServerTcpIp{
 protected:
 	int sizeAddr;//sizeof(sockaddr_in) connect with addr_in;
@@ -162,4 +163,5 @@ public:
 	char* getSelfName();
 	static bool getDnsIp(const char* name,char* ip,unsigned int ipMaxLen);
 };
+}
 #endif

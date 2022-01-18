@@ -4,6 +4,7 @@
 #include<pthread.h>
 #include"../hpp/server.h"
 using namespace std;
+namespace cppweb{
 void* ThreadPool::worker(void* arg)//the worker for user 
 {
 	ThreadPool* poll=(ThreadPool*)arg;
@@ -160,86 +161,34 @@ bool ServerPool::mutexTryLock()
 	else
 		return false;
 }
-void ServerPool::threadModel(void* pneed,void* (*pfunc)(void*))
+void ServerPool::threadModel(void (*pfunc)(ServerPool&,int))
 {
 	if(this->threadNum==0)
 	{
 		this->error="thread wrong init";
 		return;
 	}
-	ServerPool::ArgvSer argv={*this,0,pneed};
-	ThreadPool::Task task={pfunc,&argv};
 	while(1)
 	{
-		SOCKADDR_IN newaddr={0};
-		int newClient=accept(sock,(sockaddr*)&newaddr,&sizeAddr);
+		sockaddr_in newaddr={0,0,{0},{0}};
+		int newClient=accept(sock,(SOCKADDR*)&newaddr,&sizeAddr);
 		if(newClient==-1)
 			continue;
 		this->addFd(newClient);
-		argv.soc=newClient;
-		task.ptask=pfunc;
-		task.arg=&argv;
+		Argv* temp=new Argv;
+		temp->pserver=this;
+		temp->func=pfunc;
+		temp->soc=newClient;
+		ThreadPool::Task task={worker,temp};
 		pool->addTask(task);
 	}
 }
-void ServerPool::epollThread(int* pthing,int* pnum,void* pget,int len,void* pneed,void* (*pfunc)(void*))
+void* ServerPool::worker(void* argc)
 {
-	if(this->threadNum==0)
-	{
-		this->error="thread wrong init";
-		return;
-	}
-	int thing=0,num=0;
-	fd_set temp=fdClients;
-	int sign=select(0,&temp,NULL,NULL,NULL);
-	if(sign>0)
-	{
-		for(int i=0;i<(int)fdClients.fd_count;i++)
-		{
-			if(FD_ISSET(fdClients.fd_array[i],&temp))
-			{
-				if(fdClients.fd_array[i]==sock)
-				{
-					if(fdClients.fd_count<FD_SETSIZE)
-					{
-						SOCKADDR_IN newaddr={0};
-						SOCKET newClient=accept(sock,(sockaddr*)&newaddr,&sizeAddr);
-						FD_SET(newClient,&fdClients);
-						this->addFd(newClient);
-						thing=1;
-						num=newClient;
-						strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
-						ServerPool::ArgvSerEpoll argv={*this,num,thing,0,pneed,pget};
-						ThreadPool::Task task={pfunc,&argv};
-						if(pfunc!=NULL)
-							pool->addTask(task);
-					}
-					else
-						continue;
-				}
-				else
-				{
-					int sRec=recv(fdClients.fd_array[i],(char*)pget,len,0);
-					num=fdClients.fd_array[i];
-					if(sRec>0)
-						thing=2;
-					if(sRec<=0)
-					{
-						closesocket(fdClients.fd_array[i]);
-						FD_CLR(fdClients.fd_array[i],&fdClients);
-						this->deleteFd(fdClients.fd_array[i]);
-						thing=0;
-					}
-					if(pfunc!=NULL)
-					{
-						ServerPool::ArgvSerEpoll argv={*this,num,thing,sRec,pneed,pget};
-						ThreadPool::Task task={pfunc,&argv};
-						if(pfunc!=NULL)
-							pool->addTask(task);
-					}
-				}
-			}
-		}
-	}
-	return;
+	Argv argv=*(Argv*)argc;
+	delete (Argv*)argc;
+	if(argv.func!=NULL)
+		argv.func(*argv.pserver,argv.soc);
+	return NULL;
+}
 }
