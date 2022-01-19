@@ -2676,7 +2676,7 @@ public:
 			threadNum=10;
 		thread=new pthread_t[threadNum];
 		if(thread==NULL)
-			throw NULL;
+			return;
 		for(unsigned int i=0;i<threadNum;i++)
 			thread[i]=0;
 		pthread_cond_init(&condition,NULL);
