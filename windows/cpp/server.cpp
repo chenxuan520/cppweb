@@ -51,7 +51,7 @@ bool ServerTcpIp::deleteFd(int clisoc)
 ServerTcpIp::ServerTcpIp(unsigned short port,int epollNum,int wait)
 {
 	if(WSAStartup(MAKEWORD(2,2),&wsa)!=0)
-		throw NULL;
+		return;
 	sock=socket(AF_INET,SOCK_STREAM,0);//AF=addr family internet
 	addr.sin_addr.S_un.S_addr=htonl(INADDR_ANY);//inaddr_any
 	addr.sin_family=AF_INET;//af_intt IPv4
@@ -456,12 +456,14 @@ bool HttpServer::clientInHandle(void (*pfunc)(HttpServer&,int num,void* ip,int p
 	if(clientIn!=NULL)
 		return false;
 	clientIn=pfunc;
+	return true;
 }
 bool HttpServer::clientOutHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port))
 {
 	if(clientOut!=NULL)
 		return false;
 	clientOut=pfunc;
+	return true;
 }
 int HttpServer::httpSend(int num,void* buffer,int sendLen)
 {

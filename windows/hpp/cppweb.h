@@ -668,7 +668,7 @@ public:
 			threadNum=10;
 		thread=new pthread_t[threadNum];
 		if(thread==NULL)
-			throw NULL;
+			return ;
 		for(unsigned int i=0;i<threadNum;i++)
 			thread[i]=0;
 		pthread_cond_init(&condition,NULL);
@@ -2614,12 +2614,14 @@ public:
 		if(clientIn!=NULL)
 			return false;
 		clientIn=pfunc;
+		return true;
 	}
 	bool clientOutHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port))
 	{
 		if(clientOut!=NULL)
 			return false;
 		clientOut=pfunc;
+		return true;
 	}
 	void run(unsigned int memory,unsigned int recBufLenChar,const char* defaultFile)
 	{
