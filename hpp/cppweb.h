@@ -1082,6 +1082,8 @@ public:
 		std::string method;
 		std::string askPath;
 		std::string version;
+		std::unordered_map<std::string,std::string> head;
+		const char* body;
 	};
 private:
 	char ask[256];
@@ -1579,6 +1581,34 @@ public:
 			buffer[i]=*top;
 		buffer[i+1]=0;
 		return result;
+	}
+	bool analysisRequest(Request& req,void* recvText)
+	{
+		char one[100]={0},two[512]={0},three[512]={0};
+		const char* now=(char*)recvText,*end=strstr(now,"\r\n\r\n");
+		if(strstr(now,"\r\n\r\n")==NULL)
+		{
+			this->error="error request";
+			return false;
+		}
+		sscanf(now,"%100s %100s %100s",one,two,three);
+		now+=strlen(one)+strlen(two)+strlen(three)+4;
+		req.method=one;
+		req.askPath=two;
+		req.version=three;
+		req.body=end+4;
+		while(end>now)
+		{
+			sscanf(now,"%512[^:]: %512[^\r]",two,three);
+			if(strlen(two)==512||strlen(three)==512)
+			{
+				error="head too long";
+				return false;
+			}
+			now+=strlen(two)+strlen(three)+4;
+			req.head.insert(std::pair<std::string,std::string>{two,three});
+		}
+		return true;
 	}
 	int createDatagram(const Datagram& gram,void* buffer,unsigned bufferLen)
 	{
