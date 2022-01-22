@@ -1097,6 +1097,7 @@ public:
 		pfind=NULL;
 		error=NULL;
 	}
+private:
 	bool cutLineAsk(char* message,const char* pcutIn)
 	{
 		if(message==NULL||pcutIn==NULL)
@@ -1111,29 +1112,135 @@ public:
 		*ptemp=0;
 		return true;
 	}
-	const char* analysisHttpAsk(void* message,const char* pneed="GET")
-	{
-		if(message==NULL)
-		{
-			error="wrong NULL";
-			return NULL;
-		}
-		pfind=strstr((char*)message,pneed);
-		if(pfind==NULL)
-			return NULL;
-		return this->findBackString(pfind,strlen(pneed),ask,256);
-	}
 	inline char* findFirst(void* message,const char* ptofind)
 	{
 		return strstr((char*)message,ptofind);
 	}
-	void getRequestMsg(void* message,Request& request)
+	void createTop(FileKind kind,char* ptop,unsigned int bufLen,int* topLen,unsigned int fileLen)//1:http 2:down 3:pic
 	{
-		char method[30]={0},path[256]={0},version[30]={0};
-		sscanf((char*)message,"%30s%256s%30[^\r]",method,path,version);
-		request.askPath=path;
-		request.method=method;
-		request.version=version;
+		if(bufLen<100)
+		{
+			this->error="buffer too short";
+			return;
+		}
+		switch (kind)
+		{
+		   case UNKNOWN:
+			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
+			"Server LCserver/1.1\r\n"
+			"Connection: keep-alive\r\n"
+			"Content-Length:%d\r\n\r\n",fileLen);
+			break;
+		   case HTML:
+			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
+			"Server LCserver/1.1\r\n"
+			"Connection: keep-alive\r\n"
+			"Content-Type:text/html\r\n"
+			"Content-Length:%d\r\n\r\n",fileLen);
+			break;
+		   case EXE:
+			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
+			"Server LCserver/1.1\r\n"
+			"Connection: keep-alive\r\n"
+			"Content-Type:application/octet-stream\r\n"
+			"Content-Length:%d\r\n\r\n",fileLen);
+			break;
+		   case IMAGE:
+			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
+			"Server LCserver/1.1\r\n"
+			"Connection: keep-alive\r\n"
+			"Content-Type:image\r\n"
+			"Content-Length:%d\r\n\r\n",fileLen);
+			break;
+		   case NOFOUND:
+			*topLen=sprintf(ptop,"HTTP/1.1 404 Not Found\r\n"
+			"Server LCserver/1.1\r\n"
+			"Connection: keep-alive\r\n"
+			"Content-Type: text/plain\r\n"
+			"Content-Length:%d\r\n\r\n"
+			"404 no found",(int)strlen("404 no found"));
+			break;
+		   case CSS:
+			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
+			"Server LCserver/1.1\r\n"
+			"Connection: keep-alive\r\n"
+			"Content-Type:text/css\r\n"
+			"Content-Length:%d\r\n\r\n",fileLen);
+			break;
+		   case JS:
+			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
+			"Server LCserver/1.1\r\n"
+			"Connection: keep-alive\r\n"
+			"Content-Type:text/javascript\r\n"
+			"Content-Length:%d\r\n\r\n",fileLen);
+			break;
+		   case ZIP:
+			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
+			"Server LCserver/1.1\r\n"
+			"Connection: keep-alive\r\n"
+			"Content-Type:application/zip\r\n"
+			"Content-Length:%d\r\n\r\n",fileLen);
+			break;
+		   case JSON:
+			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
+			"Server LCserver/1.1\r\n"
+			"Connection: keep-alive\r\n"
+			"Content-Type:application/json\r\n"
+			"Content-Length:%d\r\n\r\n",fileLen);
+			break;
+		}
+	}
+	char* findFileMsg(const char* pname,int* plen,char* buffer,unsigned int bufferLen)
+	{
+		FILE* fp=fopen(pname,"rb+");
+		unsigned int flen=0,i=0;
+		if(fp==NULL)
+			return NULL;
+		fseek(fp,0,SEEK_END);
+		flen=ftell(fp);
+		if(flen>=bufferLen)
+		{
+			this->error="buffer too short";
+			fclose(fp);
+			return NULL;
+		}
+		fseek(fp,0,SEEK_SET);
+		for(i=0;i<flen;i++)
+			buffer[i]=fgetc(fp);
+		buffer[i]=0;
+		*plen=flen;
+		fclose(fp);
+		return buffer;
+	}
+	int getFileLen(const char* pname)
+	{
+		FILE* fp=fopen(pname,"r+");
+		int len=0;
+		if(fp==NULL)
+			return 0;
+		fseek(fp,0,SEEK_END);
+		len=ftell(fp);
+		fclose(fp);
+		return len;
+	}
+public:
+	bool createSendMsg(FileKind kind,char* buffer,unsigned int bufferLen,const char* pfile,int* plong)
+	{
+		int temp=0;
+		int len=0,noUse=0;
+		if(kind==NOFOUND)
+		{
+			this->createTop(kind,buffer,bufferLen,&temp,len);
+			*plong=len+temp+1;
+			return true;
+		}
+		len=this->getFileLen(pfile);
+		if(len==0)
+			return false;
+		this->createTop(kind,buffer,bufferLen,&temp,len);
+		this->findFileMsg(pfile,&noUse,buffer+temp,bufferLen);
+		*plong=len+temp+1;
+		return true;
 	}
 	char* findBackString(char* local,int len,char* word,int maxWordLen)
 	{
@@ -1155,6 +1262,18 @@ public:
 			word[i++]=*pi;
 		word[i]=0;
 		return word;
+	}
+	const char* analysisHttpAsk(void* message,const char* pneed="GET")
+	{
+		if(message==NULL)
+		{
+			error="wrong NULL";
+			return NULL;
+		}
+		pfind=strstr((char*)message,pneed);
+		if(pfind==NULL)
+			return NULL;
+		return this->findBackString(pfind,strlen(pneed),ask,256);
 	}
 	void* customizeAddTop(void* buffer,unsigned int bufferLen,int statusNum,unsigned int contentLen,const char* contentType="application/json",const char* connection="keep-alive",const char* staEng=NULL)
 	{
@@ -1260,131 +1379,6 @@ public:
 		this->findBackString(cookie,strlen(key),value,valueLen);
 		*temp='\r';
 		return value;
-	}
-	void createTop(FileKind kind,char* ptop,unsigned int bufLen,int* topLen,unsigned int fileLen)//1:http 2:down 3:pic
-	{
-		if(bufLen<100)
-		{
-			this->error="buffer too short";
-			return;
-		}
-		switch (kind)
-		{
-		   case UNKNOWN:
-			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
-			"Server LCserver/1.1\r\n"
-			"Connection: keep-alive\r\n"
-			"Content-Length:%d\r\n\r\n",fileLen);
-			break;
-		   case HTML:
-			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
-			"Server LCserver/1.1\r\n"
-			"Connection: keep-alive\r\n"
-			"Content-Type:text/html\r\n"
-			"Content-Length:%d\r\n\r\n",fileLen);
-			break;
-		   case EXE:
-			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
-			"Server LCserver/1.1\r\n"
-			"Connection: keep-alive\r\n"
-			"Content-Type:application/octet-stream\r\n"
-			"Content-Length:%d\r\n\r\n",fileLen);
-			break;
-		   case IMAGE:
-			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
-			"Server LCserver/1.1\r\n"
-			"Connection: keep-alive\r\n"
-			"Content-Type:image\r\n"
-			"Content-Length:%d\r\n\r\n",fileLen);
-			break;
-		   case NOFOUND:
-			*topLen=sprintf(ptop,"HTTP/1.1 404 Not Found\r\n"
-			"Server LCserver/1.1\r\n"
-			"Connection: keep-alive\r\n"
-			"Content-Type: text/plain\r\n"
-			"Content-Length:%d\r\n\r\n"
-			"404 no found",(int)strlen("404 no found"));
-			break;
-		   case CSS:
-			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
-			"Server LCserver/1.1\r\n"
-			"Connection: keep-alive\r\n"
-			"Content-Type:text/css\r\n"
-			"Content-Length:%d\r\n\r\n",fileLen);
-			break;
-		   case JS:
-			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
-			"Server LCserver/1.1\r\n"
-			"Connection: keep-alive\r\n"
-			"Content-Type:text/javascript\r\n"
-			"Content-Length:%d\r\n\r\n",fileLen);
-			break;
-		   case ZIP:
-			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
-			"Server LCserver/1.1\r\n"
-			"Connection: keep-alive\r\n"
-			"Content-Type:application/zip\r\n"
-			"Content-Length:%d\r\n\r\n",fileLen);
-			break;
-		   case JSON:
-			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
-			"Server LCserver/1.1\r\n"
-			"Connection: keep-alive\r\n"
-			"Content-Type:application/json\r\n"
-			"Content-Length:%d\r\n\r\n",fileLen);
-			break;
-		}
-	}
-	bool createSendMsg(FileKind kind,char* buffer,unsigned int bufferLen,const char* pfile,int* plong)
-	{
-		int temp=0;
-		int len=0,noUse=0;
-		if(kind==NOFOUND)
-		{
-			this->createTop(kind,buffer,bufferLen,&temp,len);
-			*plong=len+temp+1;
-			return true;
-		}
-		len=this->getFileLen(pfile);
-		if(len==0)
-			return false;
-		this->createTop(kind,buffer,bufferLen,&temp,len);
-		this->findFileMsg(pfile,&noUse,buffer+temp,bufferLen);
-		*plong=len+temp+1;
-		return true;
-	}
-	char* findFileMsg(const char* pname,int* plen,char* buffer,unsigned int bufferLen)
-	{
-		FILE* fp=fopen(pname,"rb+");
-		unsigned int flen=0,i=0;
-		if(fp==NULL)
-			return NULL;
-		fseek(fp,0,SEEK_END);
-		flen=ftell(fp);
-		if(flen>=bufferLen)
-		{
-			this->error="buffer too short";
-			fclose(fp);
-			return NULL;
-		}
-		fseek(fp,0,SEEK_SET);
-		for(i=0;i<flen;i++)
-			buffer[i]=fgetc(fp);
-		buffer[i]=0;
-		*plen=flen;
-		fclose(fp);
-		return buffer;
-	}
-	int getFileLen(const char* pname)
-	{
-		FILE* fp=fopen(pname,"r+");
-		int len=0;
-		if(fp==NULL)
-			return 0;
-		fseek(fp,0,SEEK_END);
-		len=ftell(fp);
-		fclose(fp);
-		return len;
 	}
 	int autoAnalysisGet(const char* message,char* psend,unsigned int bufferLen,const char* pfirstFile,int* plen)
 	{
@@ -1533,7 +1527,7 @@ public:
 		sscanf(temp+strlen(askWay)+1,format,buffer);
 		return buffer;
 	}
-	const char* getRouteValue(const void* routeMsg,const char* key,char* value,unsigned int valueLen)
+	const char* getRouteKeyValue(const void* routeMsg,const char* key,char* value,unsigned int valueLen)
 	{
 		char* temp=strstr((char*)routeMsg,key);
 		if(temp==NULL)
