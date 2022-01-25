@@ -2,7 +2,6 @@
 #define _CPPWEB_H_
 #include<iostream>
 #include<cstdlib>
-#include<stdio.h>
 #include<stdarg.h>
 #include<time.h>
 #include<signal.h>
@@ -18,6 +17,7 @@
 #include<netdb.h>
 #include<pthread.h>
 #include<queue>
+#include<vector>
 #include<stack>
 #include<unordered_map>
 #include<string>
