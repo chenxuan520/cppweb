@@ -1674,7 +1674,7 @@ public:
 		buffer[i+1]=0;
 		return result;
 	}
-	bool analysisRequest(Request& req,void* recvText)
+	bool analysisRequest(Request& req,const void* recvText)
 	{
 		char one[100]={0},two[512]={0},three[512]={0};
 		const char* now=(char*)recvText,*end=strstr(now,"\r\n\r\n");
@@ -2106,6 +2106,21 @@ public:
 		fclose(fp);
 		return true;
 	}
+	static void httpLog(const void * text,int )
+	{
+		DealHttp http;
+		FILE* fp=fopen("ask.log","a+");
+		if(fp==NULL)
+			fp=fopen("ask.log","w+");
+		if(fp==NULL)
+			return ;
+		DealHttp::Request req;
+		http.analysisRequest(req,text);
+		time_t now=time(NULL);
+		fprintf(fp,"%s %s %s\n",ctime(&now),req.method.c_str(),req.askPath.c_str());
+		fclose(fp);
+		return ;
+	}
 };
 class HttpServer:private ServerTcpIp{
 public://main class for http server2.0
@@ -2134,7 +2149,7 @@ private:
 	bool isFork;
 	void (*clientIn)(HttpServer&,int num,void* ip,int port);
 	void (*clientOut)(HttpServer&,int num,void* ip,int port);
-	void (*logFunc)(HttpServer&,const void*,int);
+	void (*logFunc)(const void*,int);
 public:
 	HttpServer(unsigned port,bool debug=false):ServerTcpIp(port)
 	{
@@ -2284,7 +2299,7 @@ public:
 		clientOut=pfunc;
 		return true;
 	}
-	bool setLog(void (*pfunc)(HttpServer&,const void*,int))
+	bool setLog(void (*pfunc)(const void*,int))
 	{
 		if(logFunc!=NULL)
 			return false;
@@ -2526,7 +2541,7 @@ private:
 					this->textLen=getNum;
 					func(temp.data.fd,pget,pneed,senLen,defaultFile,*this);
 					if(logFunc!=NULL)
-						logFunc(*this,this->recText(),temp.data.fd);
+						logFunc(this->recText(),temp.data.fd);
 					if(isLongCon==false)
 					{
 				  		this->deleteFd(temp.data.fd);
@@ -2582,7 +2597,7 @@ private:
 						close(sock);
 						func(temp.data.fd,pget,pneed,senLen,defaultFile,*this);
 						if(logFunc!=NULL)
-							logFunc(*this,this->recText(),temp.data.fd);
+							logFunc(this->recText(),temp.data.fd);
 						close(temp.data.fd);
 						free(pget);
 						free(pneed);
