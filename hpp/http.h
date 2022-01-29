@@ -69,7 +69,7 @@ public:
 class Json{
 public:
 	enum TypeJson{
-		INT=0,FLOAT=1,ARRAY=2,OBJ=3,STRING=4,BOOL=5,STRUCT=6
+		INT=0,FLOAT=1,ARRAY=2,OBJ=3,STRING=4,BOOL=5,STRUCT=6,EMPTY=7
 	};
 	struct Object{
 		TypeJson type;
@@ -110,7 +110,7 @@ private:
 	unsigned maxLen;
 	unsigned floNum;
 	Object* obj;
-	std::vector<char*> memory;
+	std::unordered_map<char*,unsigned> memory;
 	std::unordered_map<std::string,Object*> hashMap;
 	std::unordered_map<char*,char*> bracket;
 public:
@@ -149,6 +149,7 @@ private:
 	}
 	void deleteSpace();
 	void deleteNode(Object* root);
+	void deleteComment();
 	bool pairBracket();
 	bool printObj(char* buffer,const Object* obj);
 	bool printArr(char* buffer,TypeJson type,const std::vector<Object*>& arr);

@@ -75,7 +75,7 @@ public:
 		ONEWAY,WILD,STATIC,
 	};
 	enum AskType{
-		GET,POST,PUT,DELETE,ALL,
+		GET,POST,PUT,DELETE,OPTIONS,ALL,
 	};
 	struct RouteFuntion{
 		AskType ask;
@@ -90,6 +90,7 @@ private:
 	void* getText;
 	unsigned int max;
 	unsigned int now;
+	unsigned int boundPort;
 	int textLen;
 	bool isDebug;
 	bool isLongCon;
@@ -135,6 +136,7 @@ private:
 	{
 		return pnowRoute;
 	}
+	void messagePrint();
 	int func(int num,void* pget,void* sen,unsigned int senLen,const char* defaultFile,HttpServer& server);
 	void epollHttp(void* pget,int len,unsigned int senLen,void* pneed,const char* defaultFile);
 	void forkHttp(void* pget,int len,unsigned int senLen,void* pneed,const char* defaultFile);

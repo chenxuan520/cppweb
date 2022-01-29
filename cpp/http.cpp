@@ -690,6 +690,7 @@ Json::Json(const char* jsonText)
 	}
 	memset(text,0,strlen(jsonText)+10);
 	strcpy(text,jsonText);
+	deleteComment();
 	deleteSpace();
 	if(false==pairBracket())
 	{
@@ -708,9 +709,8 @@ Json::~Json()
 	deleteNode(obj);
 	if(text!=NULL)
 		free(text);
-	if(!memory.empty())
-		for(unsigned i=0;i<memory.size();i++)
-			free(memory[i]);
+	for(auto iter=memory.begin();iter!=memory.end();iter++)
+		free(iter->first);
 }
 const char* Json::formatPrint(const Json::Object* exmaple,unsigned buffLen)
 {
@@ -721,7 +721,7 @@ const char* Json::formatPrint(const Json::Object* exmaple,unsigned buffLen)
 		return NULL;
 	}
 	memset(buffer,0,sizeof(char)*buffLen);
-	memory.push_back(buffer);
+	memory.insert(std::pair<char*,unsigned>{buffer,buffLen});
 	printObj(buffer,exmaple);
 	return buffer;
 }
@@ -747,6 +747,16 @@ bool Json::addKeyVal(char* obj,TypeJson type,const char* key,...)
 		else
 			obj[strlen(obj)-1]=0;
 	}
+	if(memory.find(obj)==memory.end())
+	{
+		error="wrong object";
+		return false;
+	}
+	if(memory[obj]-strlen(obj)<strlen(key)+4)
+	{
+		error="obj too short";
+		return false;
+	}
 	sprintf(obj,"%s\"%s\":",obj,key);
 	int valInt=0;
 	char* valStr=NULL;
@@ -756,10 +766,20 @@ bool Json::addKeyVal(char* obj,TypeJson type,const char* key,...)
 	{
 	case INT:
 		valInt=va_arg(args,int);
+		if(memory[obj]-strlen(obj)<15)
+		{
+			error="obj too short";
+			return false;
+		}
 		sprintf(obj,"%s%d",obj,valInt);
 		break;
 	case FLOAT:
 		valFlo=va_arg(args,double);
+		if(memory[obj]-strlen(obj)<15)
+		{
+			error="obj too short";
+			return false;
+		}
 		sprintf(obj,"%s%.*f",obj,floNum,valFlo);
 		break;
 	case STRING:
@@ -769,10 +789,28 @@ bool Json::addKeyVal(char* obj,TypeJson type,const char* key,...)
 			error="null input";
 			return false;
 		}
+		if(memory[obj]-strlen(obj)<strlen(obj)+5)
+		{
+			error="obj too short";
+			return false;
+		}
 		sprintf(obj,"%s\"%s\"",obj,valStr);
+		break;
+	case EMPTY:
+		if(memory[obj]-strlen(obj)<5)
+		{
+			error="obj too short";
+			return false;
+		}
+		strcat(obj,"null");
 		break;
 	case BOOL:
 		valBool=va_arg(args,int);
+		if(memory[obj]-strlen(obj)<5)
+		{
+			error="obj too short";
+			return false;
+		}
 		if(valBool==true)
 			strcat(obj,"true");
 		else
@@ -781,6 +819,11 @@ bool Json::addKeyVal(char* obj,TypeJson type,const char* key,...)
 	case OBJ:
 	case ARRAY:
 		valStr=va_arg(args,char*);
+		if(memory[obj]-strlen(obj)<strlen(obj)+5)
+		{
+			error="obj too short";
+			return false;
+		}
 		if(valStr==NULL)
 		{
 			error="null input";
@@ -805,7 +848,7 @@ char* Json::createObject(unsigned maxBuffLen)
 		return NULL;
 	}
 	else
-		memory.push_back(now);
+		memory.insert(std::pair<char*,int>{now,maxBuffLen});
 	memset(now,0,sizeof(char)*maxBuffLen);
 	strcpy(now,"{}");
 	return now;
@@ -824,7 +867,7 @@ char* Json::createArray(unsigned maxBuffLen,TypeJson type,unsigned arrLen,void* 
 		return NULL;
 	}
 	else
-		memory.push_back(now);
+		memory.insert(std::pair<char*,int>{now,maxBuffLen});
 	memset(now,0,sizeof(char)*maxBuffLen);
 	strcat(now,"[");
 	int* arrInt=(int*)arr;
@@ -836,24 +879,57 @@ char* Json::createArray(unsigned maxBuffLen,TypeJson type,unsigned arrLen,void* 
 	{
 	case INT:
 		for(i=0;i<arrLen;i++)
+		{
+			if(maxBuffLen-strlen(now)<std::to_string(arrInt[i]).size()+3)
+			{
+				error="bufferLen is too small";
+				return NULL;
+			}
 			sprintf(now,"%s%d,",now,arrInt[i]);
+		}
 		break;
 	case FLOAT:
 		for(i=0;i<arrLen;i++)
+		{
+			if(maxBuffLen-strlen(now)<std::to_string(arrFlo[i]).size()+3)
+			{
+				error="bufferLen is too small";
+				return NULL;
+			}
 			sprintf(now,"%s%.*f,",now,floNum,arrFlo[i]);
+		}
 		break;
 	case STRING:
 		for(i=0;i<arrLen;i++)
+		{
+			if(maxBuffLen-strlen(now)<strlen(arrStr[i])+5)
+			{
+				error="bufferLen is too small";
+				return NULL;
+			}
 			sprintf(now,"%s\"%s\",",now,arrStr[i]);
+		}
 		break;
 	case OBJ:
 	case ARRAY:
 		for(i=0;i<arrLen;i++)
+		{
+			if(maxBuffLen-strlen(now)<strlen(arrStr[i])+4)
+			{
+				error="bufferLen is too small";
+				return NULL;
+			}
 			sprintf(now,"%s%s,",now,arrStr[i]);
+		}
 		break;
 	case BOOL:
 		for(i=0;i<arrLen;i++)
 		{
+			if(maxBuffLen-strlen(now)<6)
+			{
+				error="bufferLen is too small";
+				return NULL;
+			}
 			if(arrBool)
 				strcat(now,"true,");
 			else
@@ -972,6 +1048,13 @@ Json::Object* Json::analyseObj(char* begin,char* end)
 				now++;
 			nextObj->boolVal=false;
 		}
+		else if(strncmp(now,"null",4)==0)
+		{
+			nextObj->type=EMPTY;
+			now+=4;
+			if(*now==',')
+				now++;
+		}
 		else
 		{
 			error="text wrong";
@@ -986,6 +1069,39 @@ Json::Object* Json::analyseObj(char* begin,char* end)
 	free(word);
 	free(val);
 	return root;
+}
+void Json::deleteComment()
+{
+	unsigned flag=0;
+	for(unsigned i=0;i<strlen(text);i++)
+	{
+		if(text[i]=='\"'&&text[i-1]!='\\')
+			flag++;
+		else if(flag%2==0&&text[i]=='/'&&i+1<strlen(text)&&text[i+1]=='/')
+		{
+			while(text[i]!='\n'&&i<strlen(text))
+			{
+				text[i]=' ';
+				i++;
+			}
+		}
+		else if(flag%2==0&&text[i]=='/'&&i+1<strlen(text)&&text[i+1]=='*')
+		{
+			while(i+1<strlen(text))
+			{
+				if(text[i+1]=='/'&&text[i]=='*')
+				{
+					text[i]=' ';
+					text[i+1]=' ';
+					break;
+				}
+				text[i]=' ';
+				i++;
+			}
+		}
+		else 
+			continue;
+	}
 }
 Json::TypeJson Json::analyseArray(char* begin,char* end,std::vector<Object*>& array)
 {
@@ -1221,6 +1337,9 @@ bool Json::printObj(char* buffer,const Object* obj)
 			sprintf(buffer,"%s\"%s\":",buffer,now->key.c_str());
 			printArr(buffer,now->arrType,now->arr);
 			strcat(buffer,",");
+			break;
+		case EMPTY:
+			sprintf(buffer,"%s\"%s\":null",buffer,now->key.c_str());
 			break;
 		default:
 			error="struct cannot print";

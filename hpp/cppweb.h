@@ -19,13 +19,13 @@
 #include<queue>
 #include<vector>
 #include<stack>
-#include<unordered_map>
 #include<string>
+#include<unordered_map>
 namespace cppweb{
 class Json{
 public:
 	enum TypeJson{
-		INT=0,FLOAT=1,ARRAY=2,OBJ=3,STRING=4,BOOL=5,STRUCT=6
+		INT=0,FLOAT=1,ARRAY=2,OBJ=3,STRING=4,BOOL=5,STRUCT=6,EMPTY=7
 	};
 	struct Object{
 		TypeJson type;
@@ -66,7 +66,7 @@ private:
 	unsigned maxLen;
 	unsigned floNum;
 	Object* obj;
-	std::vector<char*> memory;
+	std::unordered_map<char*,unsigned> memory;
 	std::unordered_map<std::string,Object*> hashMap;
 	std::unordered_map<char*,char*> bracket;
 public:
@@ -97,6 +97,7 @@ public:
 		}
 		memset(text,0,strlen(jsonText)+10);
 		strcpy(text,jsonText);
+		deleteComment();
 		deleteSpace();
 		if(false==pairBracket())
 		{
@@ -115,9 +116,8 @@ public:
 		deleteNode(obj);
 		if(text!=NULL)
 			free(text);
-		if(!memory.empty())
-			for(unsigned i=0;i<memory.size();i++)
-				free(memory[i]);
+		for(auto iter=memory.begin();iter!=memory.end();iter++)
+			free(iter->first);
 	}
 	const char* formatPrint(const Object* exmaple,unsigned buffLen)
 	{
@@ -128,7 +128,7 @@ public:
 			return NULL;
 		}
 		memset(buffer,0,sizeof(char)*buffLen);
-		memory.push_back(buffer);
+		memory.insert(std::pair<char*,unsigned>{buffer,buffLen});
 		printObj(buffer,exmaple);
 		return buffer;
 	}
@@ -154,6 +154,16 @@ public:
 			else
 				obj[strlen(obj)-1]=0;
 		}
+		if(memory.find(obj)==memory.end())
+		{
+			error="wrong object";
+			return false;
+		}
+		if(memory[obj]-strlen(obj)<strlen(key)+4)
+		{
+			error="obj too short";
+			return false;
+		}
 		sprintf(obj,"%s\"%s\":",obj,key);
 		int valInt=0;
 		char* valStr=NULL;
@@ -163,10 +173,20 @@ public:
 		{
 		case INT:
 			valInt=va_arg(args,int);
+			if(memory[obj]-strlen(obj)<15)
+			{
+				error="obj too short";
+				return false;
+			}
 			sprintf(obj,"%s%d",obj,valInt);
 			break;
 		case FLOAT:
 			valFlo=va_arg(args,double);
+			if(memory[obj]-strlen(obj)<15)
+			{
+				error="obj too short";
+				return false;
+			}
 			sprintf(obj,"%s%.*f",obj,floNum,valFlo);
 			break;
 		case STRING:
@@ -176,10 +196,28 @@ public:
 				error="null input";
 				return false;
 			}
+			if(memory[obj]-strlen(obj)<strlen(obj)+5)
+			{
+				error="obj too short";
+				return false;
+			}
 			sprintf(obj,"%s\"%s\"",obj,valStr);
+			break;
+		case EMPTY:
+			if(memory[obj]-strlen(obj)<5)
+			{
+				error="obj too short";
+				return false;
+			}
+			strcat(obj,"null");
 			break;
 		case BOOL:
 			valBool=va_arg(args,int);
+			if(memory[obj]-strlen(obj)<5)
+			{
+				error="obj too short";
+				return false;
+			}
 			if(valBool==true)
 				strcat(obj,"true");
 			else
@@ -188,6 +226,11 @@ public:
 		case OBJ:
 		case ARRAY:
 			valStr=va_arg(args,char*);
+			if(memory[obj]-strlen(obj)<strlen(obj)+5)
+			{
+				error="obj too short";
+				return false;
+			}
 			if(valStr==NULL)
 			{
 				error="null input";
@@ -212,7 +255,7 @@ public:
 			return NULL;
 		}
 		else
-			memory.push_back(now);
+			memory.insert(std::pair<char*,int>{now,maxBuffLen});
 		memset(now,0,sizeof(char)*maxBuffLen);
 		strcpy(now,"{}");
 		return now;
@@ -231,7 +274,7 @@ public:
 			return NULL;
 		}
 		else
-			memory.push_back(now);
+			memory.insert(std::pair<char*,int>{now,maxBuffLen});
 		memset(now,0,sizeof(char)*maxBuffLen);
 		strcat(now,"[");
 		int* arrInt=(int*)arr;
@@ -243,24 +286,57 @@ public:
 		{
 		case INT:
 			for(i=0;i<arrLen;i++)
+			{
+				if(maxBuffLen-strlen(now)<std::to_string(arrInt[i]).size()+3)
+				{
+					error="bufferLen is too small";
+					return NULL;
+				}
 				sprintf(now,"%s%d,",now,arrInt[i]);
+			}
 			break;
 		case FLOAT:
 			for(i=0;i<arrLen;i++)
+			{
+				if(maxBuffLen-strlen(now)<std::to_string(arrFlo[i]).size()+3)
+				{
+					error="bufferLen is too small";
+					return NULL;
+				}
 				sprintf(now,"%s%.*f,",now,floNum,arrFlo[i]);
+			}
 			break;
 		case STRING:
 			for(i=0;i<arrLen;i++)
+			{
+				if(maxBuffLen-strlen(now)<strlen(arrStr[i])+5)
+				{
+					error="bufferLen is too small";
+					return NULL;
+				}
 				sprintf(now,"%s\"%s\",",now,arrStr[i]);
+			}
 			break;
 		case OBJ:
 		case ARRAY:
 			for(i=0;i<arrLen;i++)
+			{
+				if(maxBuffLen-strlen(now)<strlen(arrStr[i])+4)
+				{
+					error="bufferLen is too small";
+					return NULL;
+				}
 				sprintf(now,"%s%s,",now,arrStr[i]);
+			}
 			break;
 		case BOOL:
 			for(i=0;i<arrLen;i++)
 			{
+				if(maxBuffLen-strlen(now)<6)
+				{
+					error="bufferLen is too small";
+					return NULL;
+				}
 				if(arrBool)
 					strcat(now,"true,");
 				else
@@ -392,6 +468,13 @@ private:
 				if(*now==',')
 					now++;
 				nextObj->boolVal=false;
+			}
+			else if(strncmp(now,"null",4)==0)
+			{
+				nextObj->type=EMPTY;
+				now+=4;
+				if(*now==',')
+					now++;
 			}
 			else
 			{
@@ -554,6 +637,39 @@ private:
 				return FLOAT;
 		return INT;
 	}
+	void deleteComment()
+	{
+		unsigned flag=0;
+		for(unsigned i=0;i<strlen(text);i++)
+		{
+			if(text[i]=='\"'&&text[i-1]!='\\')
+				flag++;
+			else if(flag%2==0&&text[i]=='/'&&i+1<strlen(text)&&text[i+1]=='/')
+			{
+				while(text[i]!='\n'&&i<strlen(text))
+				{
+					text[i]=' ';
+					i++;
+				}
+			}
+			else if(flag%2==0&&text[i]=='/'&&i+1<strlen(text)&&text[i+1]=='*')
+			{
+				while(i+1<strlen(text))
+				{
+					if(text[i+1]=='/'&&text[i]=='*')
+					{
+						text[i]=' ';
+						text[i+1]=' ';
+						break;
+					}
+					text[i]=' ';
+					i++;
+				}
+			}
+			else 
+				continue;
+		}
+	}
 	void deleteSpace()
 	{
 	    unsigned j=0,k=0;
@@ -649,6 +765,9 @@ private:
 				sprintf(buffer,"%s\"%s\":",buffer,now->key.c_str());
 				printArr(buffer,now->arrType,now->arr);
 				strcat(buffer,",");
+				break;
+			case EMPTY:
+				sprintf(buffer,"%s\"%s\":null",buffer,now->key.c_str());
 				break;
 			default:
 				error="struct cannot print";
@@ -2143,6 +2262,7 @@ private:
 	void* getText;
 	unsigned int max;
 	unsigned int now;
+	unsigned int boundPort;
 	int textLen;
 	bool isDebug;
 	bool isLongCon;
@@ -2154,6 +2274,7 @@ public:
 	HttpServer(unsigned port,bool debug=false):ServerTcpIp(port)
 	{
 		getText=NULL;
+		boundPort=port;
 		array=NULL;
 		array=(RouteFuntion*)malloc(sizeof(RouteFuntion)*20);
 		if(array==NULL)
@@ -2329,7 +2450,7 @@ public:
 		}
 		this->getText=get;
 		if(isDebug)
-			printf("server is ok\n");
+			messagePrint();
 		if(isFork==false)
 			while(1)
 				this->epollHttp(get,recBufLenChar,memory,sen,defaultFile);
@@ -2399,6 +2520,52 @@ public:
 		return this->disconnectSocket(soc);
 	}
 private:
+	void messagePrint()
+	{
+		printf("server bound in %u is ok\n",boundPort);
+		for(unsigned i=0;i<now;i++)
+		{
+			switch(array[i].type)
+			{
+			case ONEWAY:
+				printf("%s\t->\t",array[i].route);
+				break;
+			case WILD:
+				printf("%s*\t->\t",array[i].route);
+				break;
+			case STATIC:
+				printf("%s\t->\t%s\n",array[i].route,array[i].path);
+				continue;
+			}
+			switch(array[i].ask)
+			{
+			case GET:
+				printf("GET\n");
+				break;
+			case POST:
+				printf("POST\n");
+				break;
+			case ALL:
+				printf("All\n");
+				break;
+			case PUT:
+				printf("PUT\n");
+				break;
+			case DELETE:
+				printf("DELETE\n");
+				break;
+			case OPTIONS:
+				printf("OPTIONS\n");
+				break;
+			}
+		}
+		if(logFunc!=NULL)
+			printf("set log function\n");
+		if(clientIn!=NULL)
+			printf("client in function set\n");
+		if(clientOut!=NULL)
+			printf("client out function set\n");
+	}
 	int func(int num,void* pget,void* sen,unsigned int senLen,const char* defaultFile,HttpServer& server)
 	{
 		static DealHttp http;
