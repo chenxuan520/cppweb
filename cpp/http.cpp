@@ -988,7 +988,7 @@ Json::Object* Json::analyseObj(char* begin,char* end)
 			if(*now==',')
 				now++;
 		}
-		else if('0'<=*now&&'9'>=*now)
+		else if(('0'<=*now&&'9'>=*now)||*now=='-')
 		{
 			next=now;
 			nextObj->type=INT;
@@ -1113,7 +1113,7 @@ Json::TypeJson Json::analyseArray(char* begin,char* end,std::vector<Object*>& ar
 	}
 	memset(word,0,sizeof(char)*maxLen);
 	Object* nextObj=NULL;
-	if(*now>='0'&&*now<='9')
+	if(('0'<=*now&&'9'>=*now)||*now=='-')
 	{
 		next=now;
 		while(next<end&&*next!=',')

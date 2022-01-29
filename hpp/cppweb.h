@@ -409,7 +409,7 @@ private:
 				if(*now==',')
 					now++;
 			}
-			else if('0'<=*now&&'9'>=*now)
+			else if(('0'<=*now&&'9'>=*now)||*now=='-')
 			{
 				next=now;
 				nextObj->type=INT;
@@ -501,7 +501,7 @@ private:
 		}
 		memset(word,0,sizeof(char)*maxLen);
 		Object* nextObj=NULL;
-		if(*now>='0'&&*now<='9')
+		if((*now>='0'&&*now<='9')||*now=='-')
 		{
 			next=now;
 			while(next<end&&*next!=',')
