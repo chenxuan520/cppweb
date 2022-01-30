@@ -697,6 +697,11 @@ Json::Json(const char* jsonText)
 		error="pair bracket wrong";
 		return;
 	}
+	if(text[0]!='{')
+	{
+		error="text wrong";
+		return;
+	}
 	obj=analyseObj(text,bracket[text]);
 	if(obj==NULL)
 	{
@@ -973,7 +978,7 @@ Json::Object* Json::analyseObj(char* begin,char* end)
 		{
 			nextObj->type=STRING;
 			next=strchr(now+1,'\"');
-			while(*(next-1)=='\\')
+			while(next!=NULL&&*(next-1)=='\\')
 				next=strchr(next+1,'\"');
 			if(next==NULL)
 			{
@@ -1223,7 +1228,7 @@ void Json::findString(const char* begin,char* buffer,unsigned buffLen)
 {
 	const char* now=begin+1,*next=now;
 	next=strchr(now+1,'\"');
-	while(*(next-1)=='\\')
+	while(next!=NULL&&*(next-1)=='\\')
 		next=strchr(next+1,'\"');
 	for(unsigned i=0;now+i<next&&i<buffLen;i++)
 		buffer[i]=*(now+i);

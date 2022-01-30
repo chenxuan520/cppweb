@@ -104,6 +104,11 @@ public:
 			error="pair bracket wrong";
 			return;
 		}
+		if(text[0]!='{')
+		{
+			error="text wrong";
+			return;
+		}
 		obj=analyseObj(text,bracket[text]);
 		if(obj==NULL)
 		{
@@ -394,7 +399,7 @@ private:
 			{
 				nextObj->type=STRING;
 				next=strchr(now+1,'\"');
-				while(*(next-1)=='\\')
+				while(next!=NULL&&*(next-1)=='\\')
 					next=strchr(next+1,'\"');
 				if(next==NULL)
 				{
@@ -611,8 +616,13 @@ private:
 	{
 		const char* now=begin+1,*next=now;
 		next=strchr(now+1,'\"');
-		while(*(next-1)=='\\')
+		while(next!=NULL&&*(next-1)=='\\')
 			next=strchr(next+1,'\"');
+		if(next==NULL)
+		{
+			error="text wrong";
+			return;
+		}
 		for(unsigned i=0;now+i<next&&i<buffLen;i++)
 			buffer[i]=*(now+i);
 		buffer[strlen(buffer)]=0;
@@ -645,15 +655,12 @@ private:
 			if(text[i]=='\"'&&text[i-1]!='\\')
 				flag++;
 			else if(flag%2==0&&text[i]=='/'&&i+1<strlen(text)&&text[i+1]=='/')
-			{
 				while(text[i]!='\n'&&i<strlen(text))
 				{
 					text[i]=' ';
 					i++;
 				}
-			}
 			else if(flag%2==0&&text[i]=='/'&&i+1<strlen(text)&&text[i+1]=='*')
-			{
 				while(i+1<strlen(text))
 				{
 					if(text[i+1]=='/'&&text[i]=='*')
@@ -665,7 +672,6 @@ private:
 					text[i]=' ';
 					i++;
 				}
-			}
 			else 
 				continue;
 		}
