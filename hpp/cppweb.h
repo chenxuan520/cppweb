@@ -1760,9 +1760,14 @@ public:
 	const char* getWildUrl(const void* getText,const char* route,char* buffer,unsigned int maxLen)
 	{
 		char* temp=strstr((char*)getText,route);
-		if(temp==NULL)
+		if(temp==NULL||maxLen==0)
 			return NULL;
 		temp+=strlen(route);
+		if(*temp==' ')
+		{
+			buffer[0]=0;
+			return buffer;
+		}
 		char format[20]={0};
 		sprintf(format,"%%%us",maxLen);
 		sscanf(temp,format,buffer);
@@ -1825,6 +1830,38 @@ public:
 			now+=strlen(two)+strlen(three)+4;
 			req.head.insert(std::pair<std::string,std::string>{two,three});
 		}
+		return true;
+	}
+	bool createAskRequest(const Request& req,void* buffer,unsigned buffLen)
+	{
+		if(buffLen<200)
+		{
+			error="buffer len too short";
+			return false;
+		}
+		if(req.head.find("Host")==req.head.end())
+		{
+			error="cannot not find host";
+			return false;
+		}
+		sprintf((char*)buffer,"%s %s %s\r\n",req.method.c_str(),req.askPath.c_str(),req.version.c_str());
+		for(auto iter=req.head.begin();iter!=req.head.end();iter++)
+		{
+			if(strlen((char*)buffer)+iter->first.size()+iter->second.size()+2>buffLen)
+			{
+				error="buffer len too short";
+				return false;
+			}
+			strcat((char*)buffer,iter->first.c_str());
+			strcat((char*)buffer,": ");
+			strcat((char*)buffer,iter->second.c_str());
+			strcat((char*)buffer,"\r\n");
+		}
+		if(req.head.find("Connection")==req.head.end())
+			strcat((char*)buffer,"Connection: keep-alive\r\n");
+		strcat((char*)buffer,"\r\n");
+		if(req.body!=NULL)
+			strcat((char*)buffer,req.body);
 		return true;
 	}
 	int createDatagram(const Datagram& gram,void* buffer,unsigned bufferLen)

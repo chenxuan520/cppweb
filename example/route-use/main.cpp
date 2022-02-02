@@ -1,6 +1,5 @@
 #include <iostream>
-#include "../../lib/server.h"
-#include "../../lib/http.h"
+#include "../../hpp/cppweb.h"
 using namespace cppweb;
 using namespace std;
 void pfunc(DealHttp & http, HttpServer & server, int , void * sen, int & len)
@@ -9,7 +8,7 @@ void pfunc(DealHttp & http, HttpServer & server, int , void * sen, int & len)
 	Json json;
 	char* strJson=json.createObject(200);
 	http.getWildUrl(server.recText(),"/root/",url,100);//get url wild
-	http.getRouteValue(url,"name",value,30);//get name value
+	/* http.getRouteValue(url,"name",value,30);//get name value */
 	printf("value:%s\n",value);
 	json.addKeyVal(strJson,Json::STRING,"name",url);
 	json.addKeyVal(strJson,Json::STRING,"welcome","you");
