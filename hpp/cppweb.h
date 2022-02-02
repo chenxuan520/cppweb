@@ -1189,6 +1189,7 @@ public:
 	{
 		memset(ip,0,100);
 		memset(selfIp,0,100);
+		error=NULL;
 		hostip=(char*)malloc(sizeof(char)*50);
 		if(hostip==NULL)
 		{
@@ -1210,7 +1211,6 @@ public:
 			addrC.sin_addr.s_addr=inet_addr(hostIp);
 		addrC.sin_family=AF_INET;//af_intt IPv4
 		addrC.sin_port=htons(port);
-		error=NULL;
 	}
 	~ClientTcpIp()
 	{
@@ -1270,6 +1270,10 @@ public:
 		memcpy(hostname,name,strlen(name));
 		return hostname;
 	}
+	inline const char* lastError()
+	{
+		return error;
+	}
 	static bool getDnsIp(const char* name,char* ip,unsigned int ipMaxLen)
 	{
 		hostent* phost=gethostbyname(name);
@@ -1307,6 +1311,7 @@ public:
 		std::string version;
 		std::unordered_map<std::string,std::string> head;
 		const char* body;
+		Request():body(NULL){};
 	};
 private:
 	char ask[256];
@@ -1832,7 +1837,7 @@ public:
 		}
 		return true;
 	}
-	bool createAskRequest(const Request& req,void* buffer,unsigned buffLen)
+	bool createAskRequest(Request& req,void* buffer,unsigned buffLen)
 	{
 		if(buffLen<200)
 		{
@@ -1844,6 +1849,12 @@ public:
 			error="cannot not find host";
 			return false;
 		}
+		if(req.method.size()==0)
+			req.method="GET";
+		if(req.askPath.size()==0)
+			req.askPath="/";
+		if(req.version.size()==0)
+			req.version="HTTP/1.1";
 		sprintf((char*)buffer,"%s %s %s\r\n",req.method.c_str(),req.askPath.c_str(),req.version.c_str());
 		for(auto iter=req.head.begin();iter!=req.head.end();iter++)
 		{
@@ -1858,7 +1869,7 @@ public:
 			strcat((char*)buffer,"\r\n");
 		}
 		if(req.head.find("Connection")==req.head.end())
-			strcat((char*)buffer,"Connection: keep-alive\r\n");
+			strcat((char*)buffer,"Connection: Close\r\n");
 		strcat((char*)buffer,"\r\n");
 		if(req.body!=NULL)
 			strcat((char*)buffer,req.body);
