@@ -2586,19 +2586,25 @@ public:
 private:
 	void messagePrint()
 	{
-		printf("server bound in %u is ok\n",boundPort);
+		printf("server is ok\n");
+		printf("port:\t\t%u",boundPort);
 		for(unsigned i=0;i<now;i++)
 		{
 			switch(array[i].type)
 			{
 			case ONEWAY:
-				printf("%s\t->\t",array[i].route);
+				printf("%s\t\t->\t",array[i].route);
 				break;
 			case WILD:
-				printf("%s*\t->\t",array[i].route);
+				printf("%s*\t\t->\t",array[i].route);
 				break;
 			case STATIC:
-				printf("%s\t->\t%s\n",array[i].route,array[i].path);
+				if(array[i].pfunc==loadFile)
+					printf("%s\t\t->%s\n",array[i].route,array[i].path);
+				else if(array[i].pfunc==deleteFile)
+					printf("%s\t\t->delete",array[i].route);
+				else
+					printf("undefine funtion please check the server");
 				continue;
 			}
 			switch(array[i].ask)
@@ -2624,7 +2630,7 @@ private:
 			}
 		}
 		if(logFunc!=NULL)
-			printf("set log function\n");
+			printf("log function set\n");
 		if(clientIn!=NULL)
 			printf("client in function set\n");
 		if(clientOut!=NULL)
