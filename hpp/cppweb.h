@@ -1214,8 +1214,10 @@ public:
 	}
 	~ClientTcpIp()
 	{
-		free(hostip);
-		free(hostname);
+		if(hostip!=NULL)
+			free(hostip);
+		if(hostname!=NULL)
+			free(hostname);
 		close(sock);
 	}
 	void addHostIp(const char* ip,unsigned short port=0)
@@ -2372,6 +2374,11 @@ public:
 				return false;
 			max+=10;
 		}
+		if(type==STATIC)
+		{
+			error="cannot set static route";
+			return false;
+		}
 		array[now].type=type;
 		array[now].ask=ask;
 		strcpy(array[now].route,route);
@@ -2677,6 +2684,13 @@ private:
 			if(isDebug)
 				printf("OPTIONS url:%s\n",ask);
 			type=OPTIONS;
+		}
+		else 
+		{
+			memset(ask,0,sizeof(char)*200);
+			if(isDebug)
+				printf("way not support\n");
+			type=GET;
 		}
 		void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&)=NULL;
 		for(unsigned int i=0;i<now;i++)
