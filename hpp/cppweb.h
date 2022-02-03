@@ -1291,7 +1291,7 @@ public:
 class DealHttp{
 public:
 	enum FileKind{
-		UNKNOWN=0,HTML=1,EXE=2,IMAGE=3,NOFOUND=4,CSS=5,JS=6,ZIP=7,JSON=8,
+		UNKNOWN=0,HTML=1,TXT=2,IMAGE=3,NOFOUND=4,CSS=5,JS=6,ZIP=7,JSON=8,
 	};
 	enum Status{
 		STATUSOK=200,STATUSNOCON=204,STATUSMOVED=301,STATUSBADREQUEST=400,STATUSFORBIDDEN=403,
@@ -1303,7 +1303,9 @@ public:
 		unsigned fileLen;
 		std::unordered_map<std::string,std::string> head;
 		std::unordered_map<std::string,std::string> cookie;
+		std::string typeName;
 		const void* body;
+		Datagram():statusCode(STATUSOK),typeFile(TXT),body(NULL){};
 	};
 	struct Request{
 		std::string method;
@@ -1366,7 +1368,7 @@ private:
 			"Content-Type:text/html\r\n"
 			"Content-Length:%d\r\n\r\n",fileLen);
 			break;
-		   case EXE:
+		   case TXT:
 			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
 			"Server LCserver/1.1\r\n"
 			"Connection: keep-alive\r\n"
@@ -1634,9 +1636,9 @@ public:
 			else
 				return 1;
 		}
-		else if(strstr(ask,".exe"))
+		else if(strstr(ask,".txt"))
 		{
-			if(false==this->createSendMsg(EXE,psend,bufferLen,ask,plen))
+			if(false==this->createSendMsg(TXT,psend,bufferLen,ask,plen))
 				if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
 					return 0;
 				else 
@@ -1925,14 +1927,22 @@ public:
 		switch(gram.typeFile)
 		{
 		case UNKNOWN:
+			if(gram.typeName.size()==0||gram.typeName.size()>200)
+			{
+				error="type name wrong";
+				strcat((char*)buffer,"\r\n");
+				return strlen((char*)buffer);
+			}
+			sprintf(temp,"Content-Type:%s\r\n",gram.typeName.c_str());
+			break;
 		case NOFOUND:
 			strcat((char*)buffer,"\r\n");
 			return strlen((char*)buffer);
 		case HTML:
 			sprintf(temp,"Content-Type:%s\r\n","text/html");
 			break;
-		case EXE:
-			sprintf(temp,"Content-Type:%s\r\n","application/octet-stream");
+		case TXT:
+			sprintf(temp,"Content-Type:%s\r\n","text/plain");
 			break;
 		case IMAGE:
 			sprintf(temp,"Content-Type:%s\r\n","image");
@@ -2248,7 +2258,7 @@ public:
 				"Subject:%s\r\n\r\n"
 				"%s\n",youName,from,toName,to,subject,body);
 	}
-	inline const char* LastError()
+	inline const char* lastError()
 	{
 		return error;
 	}

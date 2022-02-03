@@ -2,6 +2,16 @@
 #include "../../hpp/cppweb.h"
 using namespace cppweb;
 using namespace std;
+void pfuncTwo(DealHttp & http, HttpServer & , int , void * sen, int & len)
+{
+	char temp[]="is a text file";
+	DealHttp::Datagram gram;
+	gram.typeFile=DealHttp::TXT;
+	gram.body=temp;
+	gram.fileLen=strlen(temp);
+	gram.statusCode=DealHttp::STATUSOK;
+	len=http.createDatagram(gram,sen,1024*1024);
+}
 void pfunc(DealHttp & http, HttpServer & server, int , void * sen, int & len)
 {
 	char url[100]={0},value[30]={0};
@@ -28,6 +38,7 @@ int main()
 		return -1;
 	}
 	server.routeHandle(HttpServer::GET,HttpServer::WILD,"/root/",pfunc);
+	server.get(HttpServer::ONEWAY,"/txt",pfuncTwo);
 	server.run(1,4000,"index.html");
     return 0; 
 }  
