@@ -326,6 +326,7 @@ bool ServerTcpIp::deleteFd(int clisoc)
 HttpServer::HttpServer(unsigned port,bool debug):ServerTcpIp(port)
 {
 	getText=NULL;
+	boundPort=port;
 	array=NULL;
 	array=(RouteFuntion*)malloc(sizeof(RouteFuntion)*20);
 	if(array==NULL)
@@ -489,7 +490,7 @@ void HttpServer::run(unsigned int memory,unsigned int recBufLenChar,const char* 
 	}
 	this->getText=get;
 	if(isDebug)
-		printf("server is ok\n");
+		messagePrint();
 	if(isFork==false)
 		while(1)
 			this->epollHttp(get,recBufLenChar,memory,sen,defaultFile);
@@ -652,6 +653,52 @@ bool HttpServer::deletePath(const char* path)
 	array[now].pfunc=deleteFile;
 	now++;
 	return true;
+}
+void HttpServer::messagePrint()
+{
+	printf("server bound in %u is ok\n",boundPort);
+	for(unsigned i=0;i<now;i++)
+	{
+		switch(array[i].type)
+		{
+		case ONEWAY:
+			printf("%s\t->\t",array[i].route);
+			break;
+		case WILD:
+			printf("%s*\t->\t",array[i].route);
+			break;
+		case STATIC:
+			printf("%s\t->\t%s\n",array[i].route,array[i].path);
+			continue;
+		}
+		switch(array[i].ask)
+		{
+		case GET:
+			printf("GET\n");
+			break;
+		case POST:
+			printf("POST\n");
+			break;
+		case ALL:
+			printf("All\n");
+			break;
+		case PUT:
+			printf("PUT\n");
+			break;
+		case DELETE:
+			printf("DELETE\n");
+			break;
+		case OPTIONS:
+			printf("OPTIONS\n");
+			break;
+		}
+	}
+	if(logFunc!=NULL)
+		printf("set log function\n");
+	if(clientIn!=NULL)
+		printf("client in function set\n");
+	if(clientOut!=NULL)
+		printf("client out function set\n");
 }
 void HttpServer::epollHttp(void* pget,int len,unsigned int senLen,void* pneed,const char* defaultFile)
 {//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things

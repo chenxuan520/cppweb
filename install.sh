@@ -8,11 +8,11 @@ echo 'choose index html';
 read index;
 echo 'choose input memory';
 read memory;
-echo 'choose if run in background';
+echo 'choose if run in background(true or false)';
 read back;
-echo 'choose if use mysql';
+echo 'choose if use mysql(y or n)';
 read if_sql;
-echo 'choose if use guard';
+echo 'choose if use guard(y or n)';
 read if_guard;
 if [ $if_sql == 'y' ]
 then
@@ -20,7 +20,14 @@ then
 fi
 make
 make clean
-echo $port $index $memory $back > my.ini
+
+sed -i  's!\("version":\).*!\1'"${version}"',!g' config.json
+sed -i  's!\("port":\).*!\1'"${port}"',!g' config.json
+sed -i  's!\("memory":\).*!\1'"${memory}"',!g' config.json
+sed -i  's!\("background":\).*!\1'"${back}"',!g' config.json
+sed -i  's!\("default file":"\).*!\1'"${index}"'",!g' config.json
+
+
 if [ $version == '1' ]
 then
 	./main $port $index $memory $back
