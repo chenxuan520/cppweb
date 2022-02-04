@@ -2,6 +2,8 @@
 #define _HTTP_H_
 #include<string.h>
 #include<string>
+#include<stack>
+#include<vector>
 #include<unordered_map>
 namespace cppweb{
 class DealHttp{
@@ -65,72 +67,92 @@ public:
 	static bool recordFileError(const char* filename);
 };
 class Json{
-private:
-	char* buffer;
-	char word[30];
-	const char* text;
-	const char* obj;
-	const char* error;
-	unsigned int nowLen;
-	unsigned int maxLen;
 public:
 	enum TypeJson{
-		INT=0,FLOAT=1,ARRAY=2,OBJ=3,STRING=4,STRUCT=5,
+		INT=0,FLOAT=1,ARRAY=2,OBJ=3,STRING=4,BOOL=5,STRUCT=6,EMPTY=7
 	};
 	struct Object{
 		TypeJson type;
-		TypeJson arrTyp;
-		const char* key;
-		int valInt;
-		float valFlo;
-		unsigned int floOut;
-		unsigned int arrLen;
-		const char* valStr;
-		void** array;
-		Object* pobj;
-	public:
+		TypeJson arrType;
+		std::string key;
+		std::string strVal;
+		std::vector<Object*> arr;
+		Object* objVal;
+		Object* nextObj;
+		float floVal;
+		int intVal;
+		bool boolVal;
+		bool isData;
 		Object()
 		{
-			type=INT;
-			arrTyp=INT;
-			key=NULL;
-			valFlo=0;
-			valInt=0;
-			valStr=NULL;
-			array=NULL;
-			pobj=NULL;
+			floVal=0;
+			intVal=0;
+			boolVal=false;
+			isData=false;
+			nextObj=NULL;
+			objVal=NULL;
+		}
+		Object* operator[](const char* key)
+		{
+			Object* now=this->nextObj;
+			while(now!=NULL)
+			{
+				if(now->key==key)
+					return now;
+				now=now->nextObj;
+			}
+			return NULL;
 		}
 	};
+private:
+	char* text;
+	const char* error;
+	unsigned maxLen;
+	unsigned floNum;
+	Object* obj;
+	std::unordered_map<char*,unsigned> memory;
+	std::unordered_map<std::string,Object*> hashMap;
+	std::unordered_map<char*,char*> bracket;
 public:
 	Json();
 	Json(const char* jsonText);
 	~Json();
-	bool init(unsigned int bufferLen);
-	int httpJsonCreate(void* buffer,unsigned int buffLen);
-	void addOBject(const Object& obj);
-	bool addKeyValue(const char* key,const char* value);
-	bool addKeyValInt(const char* key,int value);
-	bool addKeyObj(const char* key,const char* value);
-	bool addKeyValFloat(const char* key,float value,int output);
-	void createObject(char* pbuffer,int bufferLen,const Object& obj);
-	int createObjInt(char* pbuffer,unsigned int bufferLen,const char* key,int value);
-	int createObjFloat(char* pbuffer,unsigned int bufferLen,const char* key,float value,int output=1);
-	int createObjValue(char* pbuffer,unsigned int bufferLen,const char* key,const char* value);
-	bool createObjArray(char* pbuffer,unsigned int bufferLen,TypeJson type,const char* key,void** array,unsigned int arrLen,unsigned int floatNum=1);
-	int createObjObj(char* pbuffer,unsigned int bufferLen,const char* key,const char* value);
-	bool addArray(TypeJson type,const char* key,void** array,unsigned int arrLen,unsigned int floatNum=1);
-	inline const char* resultText()
+	const char* formatPrint(const Object* exmaple,unsigned buffLen);
+	Object* operator[](const char* key);
+	bool addKeyVal(char* obj,TypeJson type,const char* key,...);
+	char* createObject(unsigned maxBuffLen);
+	char* createArray(unsigned maxBuffLen,TypeJson type,unsigned arrLen,void* arr);
+	inline Object* getRootObj()
 	{
-		return buffer;
+		return obj;
 	}
-	inline const char* getLastError()
+	inline const char* lastError()
 	{
-		return this->error;
+		return error;
 	}
-	bool jsonToFile(const char* fileName);
-	const char* operator[](const char* key);
-	float getValueFloat(const char* key,bool& flag);
-	int getValueInt(const char* key,bool& flag);
+	inline void changeSetting(unsigned keyValMaxLen,unsigned floNum)
+	{
+		this->maxLen=keyValMaxLen>maxLen?keyValMaxLen:maxLen;
+		this->floNum=floNum;
+	}
+private:
+	Object* analyseObj(char* begin,char* end);
+	TypeJson analyseArray(char* begin,char* end,std::vector<Object*>& array);
+	void findString(const char* begin,char* buffer,unsigned buffLen);
+	void findNum(const char* begin,TypeJson type,void* pnum);
+	inline TypeJson judgeNum(const char* begin,const char* end)
+	{
+		for(unsigned i=0;i+begin<end;i++)
+			if(begin[i]=='.')
+				return FLOAT;
+		return INT;
+	}
+	void deleteSpace();
+	void deleteNode(Object* root);
+	void deleteComment();
+	bool pairBracket();
+	bool printObj(char* buffer,const Object* obj);
+	bool printArr(char* buffer,TypeJson type,const std::vector<Object*>& arr);
 };
 class WebToken{
 private:

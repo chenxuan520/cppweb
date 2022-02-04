@@ -1,0 +1,16 @@
+{
+	//choose the version
+	"version":2,
+	//set the bound port
+	"port":5200,
+	//default file when ask /
+	"default file":"./index.html",
+	//malloc memory
+	"memory":1,
+	//if run in background
+	"background":false,
+	//remove path array
+	"delete path":[],
+	//set agent array
+	"path replace":{}
+}

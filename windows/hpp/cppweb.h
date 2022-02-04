@@ -4,11 +4,16 @@
 #include<stdlib.h>
 #include<conio.h>
 #include<time.h>
+#include<iostream>
+#include<string>
 #include<winsock2.h>
 #include<pthread.h>
-#include<unordered_map>
 #include<queue>
-namespace cppweb{	
+#include<vector>
+#include<stack>
+#include<string>
+#include<unordered_map>
+namespace cppweb{
 
 class WSAinit{
 public:
@@ -27,585 +32,816 @@ public:
 	}
 };
 class Json{
-private:
-	char* buffer;
-	char word[30];
-	const char* text;
-	const char* obj;
-	const char* error;
-	unsigned int nowLen;
-	unsigned int maxLen;
 public:
 	enum TypeJson{
-		INT=0,FLOAT=1,ARRAY=2,OBJ=3,STRING=4,STRUCT=5,
+		INT=0,FLOAT=1,ARRAY=2,OBJ=3,STRING=4,BOOL=5,STRUCT=6,EMPTY=7
 	};
 	struct Object{
 		TypeJson type;
-		TypeJson arrTyp;
-		const char* key;
-		int valInt;
-		float valFlo;
-		unsigned int floOut;
-		unsigned int arrLen;
-		const char* valStr;
-		void** array;
-		Object* pobj;
-	public:
+		TypeJson arrType;
+		std::string key;
+		std::string strVal;
+		std::vector<Object*> arr;
+		Object* objVal;
+		Object* nextObj;
+		float floVal;
+		int intVal;
+		bool boolVal;
+		bool isData;
 		Object()
 		{
-			type=INT;
-			arrTyp=INT;
-			key=NULL;
-			valFlo=0;
-			valInt=0;
-			valStr=NULL;
-			array=NULL;
-			pobj=NULL;
+			floVal=0;
+			intVal=0;
+			boolVal=false;
+			isData=false;
+			nextObj=NULL;
+			objVal=NULL;
+		}
+		Object* operator[](const char* key)
+		{
+			Object* now=this->nextObj;
+			while(now!=NULL)
+			{
+				if(now->key==key)
+					return now;
+				now=now->nextObj;
+			}
+			return NULL;
 		}
 	};
+private:
+	char* text;
+	const char* error;
+	unsigned maxLen;
+	unsigned floNum;
+	Object* obj;
+	std::unordered_map<char*,unsigned> memory;
+	std::unordered_map<std::string,Object*> hashMap;
+	std::unordered_map<char*,char*> bracket;
 public:
 	Json()
 	{
-		buffer=NULL;
-		text=NULL;
-		obj=NULL;
 		error=NULL;
-		nowLen=0;
-		maxLen=0;
-		memset(this->word,0,sizeof(char)*30);
+		obj=NULL;
+		text=NULL;
+		maxLen=256;
+		floNum=3;
 	}
 	Json(const char* jsonText)
 	{
-		text=jsonText;
-		buffer=NULL;
-		nowLen=0;
-		maxLen=0;
-		memset(this->word,0,sizeof(char)*30);		
+		error=NULL;
+		obj=NULL;
+		maxLen=256;
+		floNum=3;
+		if(jsonText==NULL||strlen(jsonText)==0)
+		{
+			error="message error";
+			return;
+		}
+		text=(char*)malloc(strlen(jsonText)+10);
+		if(text==NULL)
+		{
+			error="malloc wrong";
+			return;
+		}
+		memset(text,0,strlen(jsonText)+10);
+		strcpy(text,jsonText);
+		deleteComment();
+		deleteSpace();
+		if(false==pairBracket())
+		{
+			error="pair bracket wrong";
+			return;
+		}
+		obj=analyseObj(text,bracket[text]);
+		if(obj==NULL)
+		{
+			error="malloc wrong";
+			return;
+		}
 	}
 	~Json()
 	{
-		if(this->buffer!=NULL)
-			free(buffer);
+		deleteNode(obj);
+		if(text!=NULL)
+			free(text);
+		for(auto iter=memory.begin();iter!=memory.end();iter++)
+			free(iter->first);
 	}
-	bool init(unsigned int bufferLen)
+	const char* formatPrint(const Object* exmaple,unsigned buffLen)
 	{
-		if(bufferLen<=10)
-		{
-			error="buffer len too small";
-			return false;
-		}
-		buffer=(char*)malloc(sizeof(char)*bufferLen);
-		memset(buffer,0,sizeof(char)*bufferLen);
+		char* buffer=(char*)malloc(sizeof(char)*buffLen);
 		if(buffer==NULL)
 		{
 			error="malloc wrong";
-			return false;
+			return NULL;
 		}
-		this->maxLen=bufferLen;
-		strcat(this->buffer,"{");
-		this->nowLen+=2;
-		return true;
-	}
-	void addOBject(const Object& obj)
-	{
-		switch(obj.type)
-		{
-			case INT:
-				this->addKeyValInt(obj.key,obj.valInt);
-				break;
-			case FLOAT:
-				this->addKeyValFloat(obj.key,obj.valFlo,obj.floOut);
-				break;
-			case STRING:
-				this->addKeyValue(obj.key,obj.valStr);
-				break;
-			case ARRAY:
-				this->addArray(obj.arrTyp,obj.key,obj.array,obj.arrLen,obj.floOut);
-				break;
-			case OBJ:
-			case STRUCT:
-				strcat(this->buffer,"\"");
-				if(obj.key!=NULL)
-					strcat(this->buffer,obj.key);
-				strcat(this->buffer,"\":{");
-				for(unsigned int i=0;i<obj.arrLen;i++)
-					this->addOBject(obj.pobj[0]);
-				strcat(this->buffer,"}");
-				break;
-		}
-	}
-	bool addKeyValue(const char* key,const char* value)
-	{
-		char temp[200]={0};
-		if(key==NULL||value==NULL)
-		{
-			error="key or value NULL";
-			return false;
-		}
-		if(nowLen+strlen(key)+strlen(value)>maxLen)
-		{
-			error="buffer too short";
-			return false;
-		}
-		if(strlen(key)+strlen(value)>=180)
-		{
-			error="buffer too short";
-			return false;
-		}
-		if(buffer[strlen(buffer)-1]=='}')
-			buffer[strlen(buffer)-1]=',';
-		int len=sprintf(temp,"\"%s\":\"%s\"}",key,value);
-		strcat(this->buffer,temp);
-		nowLen+=len;
-		return true;
-	}
-	bool addKeyValInt(const char* key,int value)
-	{
-		char temp[50]={0};
-		if(key==NULL)
-		{
-			error="key is NULL";
-			return false;
-		}
-		if(nowLen+50>maxLen)
-		{
-			error="buffer too short";
-			return false;
-		}
-		if(strlen(key)>=45)
-		{
-			error="buffer too short";
-			return false;	
-		}
-		if(buffer[strlen(buffer)-1]=='}')
-			buffer[strlen(buffer)-1]=',';
-		int len=sprintf(temp,"\"%s\":%d}",key,value);
-		strcat(this->buffer,temp);
-		nowLen+=len;
-		return true;	
-	}
-	bool addKeyObj(const char* key,const char* value)
-	{
-		char temp[1000]={0};
-		if(key==NULL||value==NULL)
-		{
-			error="key or value NULL";
-			return false;
-		}
-		if(nowLen+strlen(key)+strlen(value)>maxLen)
-		{
-			error="buffer too short";
-			return false;
-		}
-		if(strlen(key)+strlen(value)>=980)
-		{
-			error="buffer too short";
-			return false;
-		}
-		if(buffer[strlen(buffer)-1]=='}')
-			buffer[strlen(buffer)-1]=',';
-		int len=sprintf(temp,"\"%s\":%s}",key,value);
-		strcat(this->buffer,temp);
-		nowLen+=len;
-		return true;		
-	}
-	bool addArray(TypeJson type,const char* key,void** array,unsigned int arrLen,unsigned int floatNum=1)
-	{
-		char temp[1000]={0};
-		int len=0;
-		if(array==NULL||arrLen==0)
-			return false;
-		if(buffer[strlen(buffer)-1]=='}')
-			buffer[strlen(buffer)-1]=',';
-		sprintf(temp,"\"%s\":[",key);
-		strcat(buffer,temp);
-		int* arr=(int*)array;
-		float* arrF=(float*)array;
-		Object* pobj=(Object*)array;
-		switch(type)
-		{
-			case OBJ:
-				for(unsigned int i=0;i<arrLen;i++)
-				{
-					strcat(buffer,"{");
-					switch(pobj[i].type)
-					{
-						case OBJ:
-							this->addOBject(pobj[i]);
-							break;
-						case INT:
-							this->addKeyValInt(pobj[i].key,pobj[i].valInt);
-							break;
-						case STRING:
-							this->addKeyValue(pobj[i].key,pobj[i].valStr);
-							break;
-						case FLOAT:
-							this->addKeyValFloat(pobj[i].key,pobj[i].valFlo,pobj[i].floOut);
-							break;
-						case ARRAY:
-							this->addArray(pobj[i].arrTyp,pobj[i].key,pobj[i].array,pobj[i].arrLen,pobj[i].floOut);
-							break;
-						case STRUCT:
-							strcat(buffer,pobj[i].valStr);
-							break;
-					}
-					strcat(buffer,",");
-				}
-				buffer[strlen(buffer)-1]=']';
-				strcat(buffer,"}");
-				nowLen+=len;
-				break;
-			case STRING:
-				for(unsigned int i=0;i<arrLen;i++)
-				{
-					len=sprintf(temp,"\"%s\",",(char*)array[i]);
-					strcat(buffer,temp);
-				}
-				buffer[strlen(buffer)-1]=']';
-				strcat(buffer,"}");
-				nowLen+=len;
-				break;				
-			case INT:
-				for(unsigned int i=0;i<arrLen;i++)
-				{
-					len=sprintf(temp,"%d,",arr[i]);
-					strcat(buffer,temp);
-				}
-				buffer[strlen(buffer)-1]=']';
-				strcat(buffer,"}");
-				nowLen+=len;
-				break;
-			case FLOAT:
-				for(unsigned int i=0;i<arrLen;i++)
-				{
-					len=sprintf(temp,"%.*f,",floatNum,arrF[i]);
-					strcat(buffer,temp);
-				}
-				buffer[strlen(buffer)-1]=']';
-				strcat(buffer,"}");
-				nowLen+=len;
-				break;
-			case STRUCT:
-				for(unsigned int i=0;i<arrLen;i++)
-				{
-					if((char*)array[i]!=NULL)
-					{
-						strcat(buffer,(char*)array[i]);
-						len+=strlen((char*)array[i]);
-					}
-					strcat(buffer,",");	
-				}
-				buffer[strlen(buffer)-1]=']';
-				strcat(buffer,"}");
-				nowLen+=len;
-				break;
-			default:
-				return false;
-		}
-		return true;
-	}
-	bool addKeyValFloat(const char* key,float value,int output)
-	{
-		char temp[70]={0};
-		if(nowLen+50>maxLen)
-		{
-			error="buffer too short";
-			return false;
-		}
-		if(NULL==key)
-		{
-			error="key is NULL";
-			return false;
-		}
-		if(strlen(key)>=45)
-		{
-			error="buffer too short";
-			return false;
-		}
-		if(buffer[strlen(buffer)-1]=='}')
-			buffer[strlen(buffer)-1]=',';
-		int len=sprintf(temp,"\"%s\":%.*f}",key,output,value);
-		strcat(this->buffer,temp);
-		nowLen+=len;
-		return true;		
-	}
-	void createObject(char* pbuffer,int bufferLen,const Object& obj)
-	{
-		switch(obj.type)
-		{
-			case INT:
-				this->createObjInt(pbuffer,bufferLen,obj.key,obj.valInt);
-				break;
-			case FLOAT:
-				this->createObjFloat(pbuffer,bufferLen,obj.key,obj.valFlo,obj.floOut);
-				break;
-			case STRING:
-				this->createObjValue(pbuffer,bufferLen,obj.key,obj.valStr);
-				break;
-			case ARRAY:
-				this->createObjArray(pbuffer,bufferLen,obj.arrTyp,obj.key,obj.array,obj.arrLen,obj.floOut);
-				break;
-			case OBJ:
-			case STRUCT:
-				strcat(this->buffer,"\"");
-				if(obj.key!=NULL)
-					strcat(this->buffer,obj.key);
-				strcat(this->buffer,"\":{");
-				for(unsigned int i=0;i<obj.arrLen;i++)
-					this->addOBject(obj.pobj[0]);
-				strcat(this->buffer,"}");
-				break;
-		}	
-	}
-	int createObjInt(char* pbuffer,unsigned int bufferLen,const char* key,int value)
-	{
-		if(pbuffer==NULL||key==NULL)
-		{
-			error="buffer or key NULL";
-			return -1;
-		}
-		if(pbuffer[strlen(pbuffer)-1]=='}')
-			pbuffer[strlen(pbuffer)-1]=',';
-		if(strlen(pbuffer)==0)
-			strcat(pbuffer,"{");
-		if(bufferLen<strlen(pbuffer)+strlen(key))
-		{
-			error="buffer is too short";
-			return -1;
-		}
-		char temp[100]={0};
-		int len=sprintf(temp,"\"%s\":%d}",key,value);
-		strcat(pbuffer,temp);
-		return len;
-	}
-	int createObjFloat(char* pbuffer,unsigned int bufferLen,const char* key,float value,int output=1)
-	{
-		if(pbuffer==NULL||key==NULL)
-		{
-			error="buffer or key NULL";
-			return -1;
-		}
-		if(pbuffer[strlen(pbuffer)-1]=='}')
-			pbuffer[strlen(pbuffer)-1]=',';
-		if(strlen(pbuffer)==0)
-			strcat(pbuffer,"{");
-		if(bufferLen<strlen(pbuffer)+strlen(key))
-		{
-			error="buffer is too short";
-			return -1;
-		}
-		char temp[100]={0};
-		int len=sprintf(temp,"\"%s\":%.*f}",key,output,value);
-		strcat(pbuffer,temp);
-		return len;
-	}
-	int createObjValue(char* pbuffer,unsigned int bufferLen,const char* key,const char* value)
-	{
-		if(pbuffer==NULL||key==NULL||value==NULL)
-		{
-			error="buffer or key NULL";
-			return -1;
-		}
-		char temp[200]={0};
-		if(strlen(pbuffer)+strlen(key)+strlen(value)>bufferLen)
-		{
-			error="buffer is too short";
-			return -1;
-		}
-		if(strlen(key)+strlen(value)>=180)
-		{
-			error="buffer is too short";
-			return -1;
-		}
-		if(pbuffer[strlen(pbuffer)-1]=='}')
-			pbuffer[strlen(pbuffer)-1]=',';
-		if(strlen(pbuffer)==0)
-			strcat(pbuffer,"{");
-		int len=sprintf(temp,"\"%s\":\"%s\"}",key,value);
-		strcat(pbuffer,temp);
-		return len;
-	}
-	bool createObjArray(char* pbuffer,unsigned int bufferLen,TypeJson type,const char* key,void** array,unsigned int arrLen,unsigned int floatNum=1)
-	{
-		char temp[200]={0};
-		if(array==NULL||arrLen==0||pbuffer==NULL)
-		{
-			error="buffer is NULL";
-			return false;
-		}
-		if(strlen(pbuffer)+strlen(key)>bufferLen)
-		{
-			error="buffer is too short";
-			return false;
-		}
-		if(pbuffer[strlen(pbuffer)-1]=='}')
-			pbuffer[strlen(pbuffer)-1]=',';
-		if(strlen(pbuffer)==0)
-			strcat(pbuffer,"{");
-		sprintf(temp,"\"%s\":[",key);
-		strcat(pbuffer,temp);
-		int* arr=(int*)array;
-		float* arrF=(float*)array;
-		switch(type)
-		{
-			case STRING:
-				for(unsigned int i=0;i<arrLen;i++)
-				{
-					sprintf(temp,"\"%s\",",(char*)array[i]);
-					strcat(pbuffer,temp);
-				}
-				pbuffer[strlen(pbuffer)-1]=']';
-				strcat(pbuffer,"}");
-				break;
-			case INT:
-				for(unsigned int i=0;i<arrLen;i++)
-				{
-					sprintf(temp,"%d,",arr[i]);
-					strcat(pbuffer,temp);
-				}
-				pbuffer[strlen(pbuffer)-1]=']';
-				strcat(pbuffer,"}");
-				break;
-			case FLOAT:
-				for(unsigned int i=0;i<arrLen;i++)
-				{
-					sprintf(temp,"%.*f,",floatNum,arrF[i]);
-					strcat(pbuffer,temp);
-				}
-				pbuffer[strlen(pbuffer)-1]=']';
-				strcat(pbuffer,"}");
-				break;
-			default:
-				return false;
-		}
-		return true;
-	}
-	int createObjObj(char* pbuffer,unsigned int bufferLen,const char* key,const char* value)
-	{
-		char temp[500]={0};
-		if(pbuffer==NULL||key==NULL||value==NULL)
-		{
-			error="pbuffer NULL or key NULL or value NULL";
-			return -1;
-		}
-		if(strlen(pbuffer)+strlen(key)+strlen(value)>bufferLen)
-		{
-			error="buffer is too short";
-			return -1;
-		}
-		if(strlen(key)+strlen(value)>=490)
-		{
-			error="buffer is too short";
-			return -1;
-		}
-		if(pbuffer[strlen(pbuffer)-1]=='}')
-			pbuffer[strlen(pbuffer)-1]=',';
-		if(strlen(pbuffer)==0)
-			strcat(pbuffer,"{");
-		int len=sprintf(temp,"\"%s\":%s}",key,value);
-		strcat(pbuffer,temp);
-		nowLen+=len;
-		return nowLen;
-	}
-	inline const char* resultText()
-	{
+		memset(buffer,0,sizeof(char)*buffLen);
+		memory.insert(std::pair<char*,unsigned>{buffer,buffLen});
+		printObj(buffer,exmaple);
 		return buffer;
 	}
-	bool jsonToFile(const char* fileName)
+	Object* operator[](const char* key)
 	{
-		FILE* fp=fopen(fileName,"w+");
-		if(fp==NULL)
+		if(hashMap.find(std::string(key))==hashMap.end())
+			return NULL;
+		return hashMap.find(std::string(key))->second;
+	}
+	bool addKeyVal(char* obj,TypeJson type,const char* key,...)
+	{
+		if(obj==NULL)
+		{
+			error="null buffer";
 			return false;
-		fprintf(fp,"%s",this->buffer);
-		fclose(fp);
+		}
+		va_list args;
+		va_start(args,key);
+		if(obj[strlen(obj)-1]=='}')
+		{
+			if(obj[strlen(obj)-2]!='{')
+				obj[strlen(obj)-1]=',';
+			else
+				obj[strlen(obj)-1]=0;
+		}
+		if(memory.find(obj)==memory.end())
+		{
+			error="wrong object";
+			return false;
+		}
+		if(memory[obj]-strlen(obj)<strlen(key)+4)
+		{
+			error="obj too short";
+			return false;
+		}
+		sprintf(obj,"%s\"%s\":",obj,key);
+		int valInt=0;
+		char* valStr=NULL;
+		float valFlo=9;
+		bool valBool=false;
+		switch(type)
+		{
+		case INT:
+			valInt=va_arg(args,int);
+			if(memory[obj]-strlen(obj)<15)
+			{
+				error="obj too short";
+				return false;
+			}
+			sprintf(obj,"%s%d",obj,valInt);
+			break;
+		case FLOAT:
+			valFlo=va_arg(args,double);
+			if(memory[obj]-strlen(obj)<15)
+			{
+				error="obj too short";
+				return false;
+			}
+			sprintf(obj,"%s%.*f",obj,floNum,valFlo);
+			break;
+		case STRING:
+			valStr=va_arg(args,char*);
+			if(valStr==NULL)
+			{
+				error="null input";
+				return false;
+			}
+			if(memory[obj]-strlen(obj)<strlen(obj)+5)
+			{
+				error="obj too short";
+				return false;
+			}
+			sprintf(obj,"%s\"%s\"",obj,valStr);
+			break;
+		case EMPTY:
+			if(memory[obj]-strlen(obj)<5)
+			{
+				error="obj too short";
+				return false;
+			}
+			strcat(obj,"null");
+			break;
+		case BOOL:
+			valBool=va_arg(args,int);
+			if(memory[obj]-strlen(obj)<5)
+			{
+				error="obj too short";
+				return false;
+			}
+			if(valBool==true)
+				strcat(obj,"true");
+			else
+				strcat(obj,"false");
+			break;
+		case OBJ:
+		case ARRAY:
+			valStr=va_arg(args,char*);
+			if(memory[obj]-strlen(obj)<strlen(obj)+5)
+			{
+				error="obj too short";
+				return false;
+			}
+			if(valStr==NULL)
+			{
+				error="null input";
+				return false;
+			}
+			sprintf(obj,"%s%s",obj,valStr);
+			break;
+			default:
+				error="can not insert this type";
+				strcat(obj,"}");
+				return false;
+		}
+		strcat(obj,"}");
 		return true;
 	}
-	const char* operator[](const char* key)
+	char* createObject(unsigned maxBuffLen)
 	{
-		char* temp=NULL;
-		if(key==NULL)
+		char* now=(char*)malloc(sizeof(char)*maxBuffLen);
+		if(now==NULL||maxBuffLen<4)
+		{
+			error="init worng";
 			return NULL;
-		if((temp=strstr((char*)this->text,key))==NULL)
-			return NULL;
-		temp=strchr(temp,'\"');
-		if(temp==NULL)
-			return NULL;
-		temp=strchr(temp+1,'\"');
-		if(temp==NULL)
-			return NULL;
-		temp++;
-		if(strchr(temp,'\"')-temp>30)
-			return NULL;
-		memset(this->word,0,sizeof(char)*30);
-		for(unsigned int i=0;*temp!='\"';i++,temp++)
-			word[i]=*temp;
-		return word;
+		}
+		else
+			memory.insert(std::pair<char*,int>{now,maxBuffLen});
+		memset(now,0,sizeof(char)*maxBuffLen);
+		strcpy(now,"{}");
+		return now;
 	}
-	float getValueFloat(const char* key,bool& flag)
+	char* createArray(unsigned maxBuffLen,TypeJson type,unsigned arrLen,void* arr)
 	{
-		float value=0;
-		if(key==NULL)
-			return -1;
-		char* temp=strstr((char*)text,key);
-		if(temp==NULL)
+		if(arr==NULL||maxBuffLen<4)
 		{
-			flag=false;
-			return -1;
+			error="null input";
+			return NULL;
 		}
-		temp=strchr(temp,'\"');
-		if(temp==NULL)
+		char* now=(char*)malloc(sizeof(char)*maxBuffLen);
+		if(now==NULL)
 		{
-			flag=false;
-			return -1;
+			error="malloc worng";
+			return NULL;
 		}
-		temp=strchr(temp+1,':');
-		if(temp==NULL)
+		else
+			memory.insert(std::pair<char*,int>{now,maxBuffLen});
+		memset(now,0,sizeof(char)*maxBuffLen);
+		strcat(now,"[");
+		int* arrInt=(int*)arr;
+		float* arrFlo=(float*)arr;
+		char** arrStr=(char**)arr;
+		bool* arrBool=(bool*)arr;
+		unsigned i=0;
+		switch(type)
 		{
-			flag=false;
-			return -1;
+		case INT:
+			for(i=0;i<arrLen;i++)
+			{
+				if(maxBuffLen-strlen(now)<std::to_string(arrInt[i]).size()+3)
+				{
+					error="bufferLen is too small";
+					return NULL;
+				}
+				sprintf(now,"%s%d,",now,arrInt[i]);
+			}
+			break;
+		case FLOAT:
+			for(i=0;i<arrLen;i++)
+			{
+				if(maxBuffLen-strlen(now)<std::to_string(arrFlo[i]).size()+3)
+				{
+					error="bufferLen is too small";
+					return NULL;
+				}
+				sprintf(now,"%s%.*f,",now,floNum,arrFlo[i]);
+			}
+			break;
+		case STRING:
+			for(i=0;i<arrLen;i++)
+			{
+				if(maxBuffLen-strlen(now)<strlen(arrStr[i])+5)
+				{
+					error="bufferLen is too small";
+					return NULL;
+				}
+				sprintf(now,"%s\"%s\",",now,arrStr[i]);
+			}
+			break;
+		case OBJ:
+		case ARRAY:
+			for(i=0;i<arrLen;i++)
+			{
+				if(maxBuffLen-strlen(now)<strlen(arrStr[i])+4)
+				{
+					error="bufferLen is too small";
+					return NULL;
+				}
+				sprintf(now,"%s%s,",now,arrStr[i]);
+			}
+			break;
+		case BOOL:
+			for(i=0;i<arrLen;i++)
+			{
+				if(maxBuffLen-strlen(now)<6)
+				{
+					error="bufferLen is too small";
+					return NULL;
+				}
+				if(arrBool)
+					strcat(now,"true,");
+				else
+					strcat(now,"false,");
+			}
+			break;
+			default:
+				error="struct cannot be a array";
+				break;
 		}
-		if(sscanf(temp+1,"%f",&value)<=0)
-		{
-			flag=true;
-			return -1;
-		}
-		flag=true;
-		return value;
+		if(now[strlen(now)-1]==',')
+			now[strlen(now)-1]=']';
+		else
+			strcat(now,"]");
+		now[strlen(now)]=0;
+		return now;
 	}
-	int getValueInt(const char* key,bool& flag)
+	inline Object* getRootObj()
 	{
-		int value=0;
-		if(key==NULL)
-			return -1;
-		char* temp=strstr((char*)text,key);
-		if(temp==NULL)
-		{
-			flag=false;
-			return -1;
-		}
-		temp=strchr(temp,'\"');
-		if(temp==NULL)
-		{
-			flag=false;
-			return -1;
-		}
-		temp=strchr(temp+1,':');
-		if(temp==NULL)
-		{
-			flag=false;
-			return -1;
-		}
-		if(sscanf(temp+1,"%d",&value)<=0)
-		{
-			flag=true;
-			return -1;
-		}
-		flag=true;
-		return value;
+		return obj;
 	}
-	inline const char* getLastError()
+	inline const char* lastError()
 	{
-		return this->error;
+		return error;
+	}
+	inline void changeSetting(unsigned keyValMaxLen,unsigned floNum)
+	{
+		this->maxLen=keyValMaxLen>maxLen?keyValMaxLen:maxLen;
+		this->floNum=floNum;
+	}
+private:
+	Object* analyseObj(char* begin,char* end)
+	{
+		Object * root=new Object,*last=root;
+		root->type=STRUCT;
+		char* now=begin+1,*next=now;
+		char* word=(char*)malloc(sizeof(char)*maxLen),*val=(char*)malloc(sizeof(char)*maxLen),temp=*end;
+		if(word==NULL||val==NULL)
+		{
+			error="malloc wrong";
+			return NULL;
+		}
+		memset(word,0,sizeof(char)*maxLen);
+		memset(val,0,sizeof(char)*maxLen);
+		*end=0;
+		while(now<end)
+		{
+			Object* nextObj=new Object;
+			memset(word,0,sizeof(char)*maxLen);
+			findString(now,word,maxLen);
+			nextObj->key=word;
+			hashMap.insert(std::pair<std::string,Object*>{word,nextObj});
+			now+=strlen(word)+3;
+			if(*now=='\"')
+			{
+				nextObj->type=STRING;
+				next=strchr(now+1,'\"');
+				while(*(next-1)=='\\')
+					next=strchr(next+1,'\"');
+				if(next==NULL)
+				{
+					error="string wrong";
+					return NULL;
+				}
+				for(unsigned i=0;now+i+1<next;i++)
+					val[i]=*(now+i+1);
+				val[strlen(val)]=0;
+				nextObj->strVal=val;
+				now=next+1;
+				if(*now==',')
+					now++;
+			}
+			else if(('0'<=*now&&'9'>=*now)||*now=='-')
+			{
+				next=now;
+				nextObj->type=INT;
+				while(*next!=','&&*next!=0)
+				{
+					next++;
+					if(*next=='.')
+						nextObj->type=FLOAT;
+				}
+				if(nextObj->type==INT)
+					sscanf(now,"%d",&nextObj->intVal);
+				else
+					sscanf(now,"%f",&nextObj->floVal);
+				now=next+1;
+			}
+			else if(*now=='[')
+			{
+				next=bracket[now];
+				if(next==NULL)
+				{
+					error="format wrong";
+					return root;
+				}
+				nextObj->type=ARRAY;
+				nextObj->arrType=analyseArray(now,next,nextObj->arr);
+				now=next+1;
+				if(*now==',')
+					now++;
+			}
+			else if(*now=='{')
+			{
+				next=bracket[now];
+				if(next==NULL)
+				{
+					error="format wrong";
+					return root;
+				}
+				nextObj->type=OBJ;
+				nextObj->objVal=analyseObj(now,next);
+				now=next+1;
+				if(*now==',')
+					now++;
+			}
+			else if(strncmp(now,"true",4)==0)
+			{
+				nextObj->type=BOOL;
+				now+=4;
+				if(*now==',')
+					now++;
+				nextObj->boolVal=true;
+			}
+			else if(strncmp(now,"false",5)==0)
+			{
+				nextObj->type=BOOL;
+				now+=5;
+				if(*now==',')
+					now++;
+				nextObj->boolVal=false;
+			}
+			else if(strncmp(now,"null",4)==0)
+			{
+				nextObj->type=EMPTY;
+				now+=4;
+				if(*now==',')
+					now++;
+			}
+			else
+			{
+				error="text wrong";
+				free(word);
+				free(val);
+				return root;
+			}
+			last->nextObj=nextObj;
+			last=nextObj;
+		}
+		*end=temp;
+		free(word);
+		free(val);
+		return root;
+	}
+	TypeJson analyseArray(char* begin,char* end,std::vector<Object*>& array)
+	{
+		char* now=begin+1,*next=end,*word=(char*)malloc(sizeof(char)*maxLen);
+		if(word==NULL)
+		{
+			error="malloc wrong";
+			return INT;
+		}
+		memset(word,0,sizeof(char)*maxLen);
+		Object* nextObj=NULL;
+		if((*now>='0'&&*now<='9')||*now=='-')
+		{
+			next=now;
+			while(next<end&&*next!=',')
+				next++;
+			TypeJson type=judgeNum(now,next);
+			while(now<end&&now!=NULL)
+			{
+				nextObj=new Object;
+				nextObj->isData=true;
+				nextObj->type=type;
+				if(nextObj->type==INT)
+				{
+					findNum(now,type,&nextObj->intVal);
+					array.push_back(nextObj);
+				}
+				else
+				{
+					findNum(now,type,&nextObj->floVal);
+					array.push_back(nextObj);
+				}
+				now=strchr(now+1,',');
+				if(now!=NULL)
+					now++;
+			}
+			nextObj->arrType=type;
+		}
+		else if(*now=='\"')
+		{
+			while(now<end&&now!=NULL)
+			{
+				findString(now,word,maxLen);
+				nextObj=new Object;
+				nextObj->type=STRING;
+				nextObj->isData=true;
+				nextObj->strVal=word;
+				array.push_back(nextObj);
+				now=strchr(now+1,',');
+				if(now==NULL)
+					break;
+				now+=1;
+			}
+		}
+		else if(strncmp(now,"true",4)==0||strncmp(now,"false",5)==0)
+		{
+			while(now<end&&now!=NULL)
+			{
+				nextObj=new Object;
+				nextObj->type=BOOL;
+				nextObj->isData=true;
+				nextObj->boolVal=strncmp(now,"true",4)==0;
+				array.push_back(nextObj);
+				now=strchr(now+1,',');
+				if(now==NULL)
+					break;
+				now+=1;
+			}
+		}
+		else if(*now=='{')
+		{
+			while(now<end&&now!=NULL)
+			{
+				next=bracket[now];
+				nextObj=analyseObj(now,next);
+				nextObj->type=OBJ;
+				nextObj->isData=true;
+				array.push_back(nextObj);
+				now=next;
+				now=strchr(now+1,',');
+				if(now==NULL)
+					break;
+				now+=1;
+			}
+		}
+		else if(*now=='[')
+		{
+			while(now<end&&now!=NULL)
+			{
+				next=bracket[now];
+				nextObj=new Object;
+				TypeJson type=analyseArray(now,next,nextObj->arr);
+				nextObj->type=ARRAY;
+				nextObj->arrType=type;
+				nextObj->isData=true;
+				array.push_back(nextObj);
+				now=next;
+				now=strchr(now+1,',');
+				if(now==NULL)
+					break;
+				now+=1;
+			}
+		}
+		else if(*now==']')
+		{
+			free(word);
+			return INT;
+		}
+		else
+		{
+			error="array find wrong";
+			free(word);
+			return INT;
+		}
+		free(word);
+		return nextObj->type;
+	}
+	void findString(const char* begin,char* buffer,unsigned buffLen)
+	{
+		const char* now=begin+1,*next=now;
+		next=strchr(now+1,'\"');
+		while(*(next-1)=='\\')
+			next=strchr(next+1,'\"');
+		for(unsigned i=0;now+i<next&&i<buffLen;i++)
+			buffer[i]=*(now+i);
+		buffer[strlen(buffer)]=0;
+	}
+	void findNum(const char* begin,TypeJson type,void* pnum)
+	{
+		if(type==INT)
+		{
+			if(sscanf(begin,"%d",(int*)pnum)<1)
+				error="num wrong";
+		}
+		else
+		{
+			if(sscanf(begin,"%f",(float*)pnum)<1)
+				error="num wrong";
+		}
+	}
+	inline TypeJson judgeNum(const char* begin,const char* end)
+	{
+		for(unsigned i=0;i+begin<end;i++)
+			if(begin[i]=='.')
+				return FLOAT;
+		return INT;
+	}
+	void deleteComment()
+	{
+		unsigned flag=0;
+		for(unsigned i=0;i<strlen(text);i++)
+		{
+			if(text[i]=='\"'&&text[i-1]!='\\')
+				flag++;
+			else if(flag%2==0&&text[i]=='/'&&i+1<strlen(text)&&text[i+1]=='/')
+			{
+				while(text[i]!='\n'&&i<strlen(text))
+				{
+					text[i]=' ';
+					i++;
+				}
+			}
+			else if(flag%2==0&&text[i]=='/'&&i+1<strlen(text)&&text[i+1]=='*')
+			{
+				while(i+1<strlen(text))
+				{
+					if(text[i+1]=='/'&&text[i]=='*')
+					{
+						text[i]=' ';
+						text[i+1]=' ';
+						break;
+					}
+					text[i]=' ';
+					i++;
+				}
+			}
+			else
+				continue;
+		}
+	}
+	void deleteSpace()
+	{
+		unsigned j=0,k=0;
+		unsigned flag=0;
+		for(j=0,k=0; text[j]!='\0'; j++)
+		{
+			if(text[j]!='\r'&&text[j]!='\n'&&text[j]!='\t'&&(text[j]!=' '||flag%2!=0))
+				text[k++]=text[j];
+			if(text[j]=='\"'&&j>0&&text[j-1]!='\\')
+				flag++;
+		}
+		text[k]=0;
+	}
+	void deleteNode(Object* root)
+	{
+		if(root==NULL)
+			return;
+		if(root->nextObj!=NULL)
+			deleteNode(root->nextObj);
+		if(root->arr.size()>0)
+			for(unsigned i=0;i<root->arr.size();i++)
+				deleteNode(root->arr[i]);
+		if(root->objVal!=NULL)
+			deleteNode(root->objVal);
+		delete root;
+		root=NULL;
+	}
+	bool pairBracket()
+	{
+		unsigned flag=0;
+		std::stack<char*> sta;
+		for(unsigned i=0;i<strlen(text);i++)
+		{
+			if((text[i]=='['||text[i]=='{')&&flag%2==0)
+				sta.push(text+i);
+			else if(text[i]==']'||text[i]=='}')
+			{
+				if(sta.empty())
+					return false;
+				if(text[i]==']'&&*sta.top()!='[')
+					return false;
+				if(text[i]=='}'&&*sta.top()!='{')
+					return false;
+				bracket.insert(std::pair<char*,char*>{sta.top(),&text[i]});
+				sta.pop();
+			}
+			else if(text[i]=='\"'&&i>0&&text[i-1]!='\\')
+				flag++;
+			else
+				continue;
+		}
+		if(!sta.empty())
+			return false;
+		return true;
+	}
+	bool printObj(char* buffer,const Object* obj)
+	{
+		unsigned deep=0;
+		char* line=strrchr(buffer,'\n');
+		if(line==NULL)
+			deep=1;
+		else
+			deep=buffer+strlen(buffer)-line;
+		strcat(buffer,"{\n");
+		Object* now=obj->nextObj;
+		while(now!=NULL)
+		{
+			for(unsigned i=0;i<deep+4;i++)
+				strcat(buffer," ");
+			switch(now->type)
+			{
+			case INT:
+				sprintf(buffer,"%s\"%s\":%d,",buffer,now->key.c_str(),now->intVal);
+				break;
+			case FLOAT:
+				sprintf(buffer,"%s\"%s\":%.*f,",buffer,now->key.c_str(),floNum,now->floVal);
+				break;
+			case STRING:
+				sprintf(buffer,"%s\"%s\":\"%s\",",buffer,now->key.c_str(),now->strVal.c_str());
+				break;
+			case BOOL:
+				if(now->boolVal)
+					sprintf(buffer,"%s\"%s\":true,",buffer,now->key.c_str());
+				else
+					sprintf(buffer,"%s\"%s\":false,",buffer,now->key.c_str());
+				break;
+			case OBJ:
+				sprintf(buffer,"%s\"%s\":",buffer,now->key.c_str());
+				printObj(buffer,now->objVal);
+				strcat(buffer,",");
+				break;
+			case ARRAY:
+				sprintf(buffer,"%s\"%s\":",buffer,now->key.c_str());
+				printArr(buffer,now->arrType,now->arr);
+				strcat(buffer,",");
+				break;
+			case EMPTY:
+				sprintf(buffer,"%s\"%s\":null",buffer,now->key.c_str());
+				break;
+				default:
+					error="struct cannot print";
+					return false;
+			}
+			strcat(buffer,"\n");
+			now=now->nextObj;
+			if(now==NULL)
+				*strrchr(buffer,',')=' ';
+		}
+		for(unsigned i=0;i<deep-1;i++)
+			strcat(buffer," ");
+		strcat(buffer,"}");
+		return true;
+	}
+	bool printArr(char* buffer,TypeJson type,const std::vector<Object*>& arr)
+	{
+		unsigned deep=0;
+		char* line=strrchr(buffer,'\n');
+		if(line==NULL)
+			deep=0;
+		else
+			deep=buffer+strlen(buffer)-line;
+		strcat(buffer,"[\n");
+		for(unsigned i=0;i<arr.size();i++)
+		{
+			for(unsigned i=0;i<deep+4;i++)
+				strcat(buffer," ");
+			switch(type)
+			{
+			case INT:
+				sprintf(buffer,"%s%d,",buffer,arr[i]->intVal);
+				break;
+			case FLOAT:
+				sprintf(buffer,"%s%.*f,",buffer,floNum,arr[i]->floVal);
+				break;
+			case STRING:
+				sprintf(buffer,"%s\"%s\",",buffer,arr[i]->strVal.c_str());
+				break;
+			case BOOL:
+				if(arr[i]->boolVal)
+					strcat(buffer,"true,");
+				else
+					strcat(buffer,"false,");
+				break;
+			case OBJ:
+				printObj(buffer,arr[i]);
+				strcat(buffer,",");
+				break;
+			case ARRAY:
+				printArr(buffer,arr[i]->arrType,arr[i]->arr);
+				strcat(buffer,",");
+				break;
+				default:
+					error="struct cannot print";
+					return false;
+			}
+			strcat(buffer,"\n");
+			if(i==arr.size()-1)
+				*strrchr(buffer,',')=' ';
+		}
+		for(unsigned i=0;i<deep-1;i++)
+			strcat(buffer," ");
+		strcat(buffer,"]");
+		return true;
 	}
 };
 class ThreadPool{
@@ -626,7 +862,7 @@ private:
 	unsigned int busyThread;//num for busy thread
 	bool isContinue;//if the pool is continue
 private:
-	static void* worker(void* arg)//the worker for user 
+	static void* worker(void* arg)//the worker for user
 	{
 		ThreadPool* poll=(ThreadPool*)arg;
 		while(1)
@@ -666,7 +902,7 @@ public:
 			threadNum=10;
 		thread=new pthread_t[threadNum];
 		if(thread==NULL)
-			throw NULL;
+			return ;
 		for(unsigned int i=0;i<threadNum;i++)
 			thread[i]=0;
 		pthread_cond_init(&condition,NULL);
@@ -746,7 +982,7 @@ public:
 	{
 		pthread_mutex_unlock(&this->lockTask);
 	}
-	static pthread_t createPthread(void* arg,void* (*pfunc)(void*))//create a thread 
+	static pthread_t createPthread(void* arg,void* (*pfunc)(void*))//create a thread
 	{
 		pthread_t thread=0;
 		pthread_create(&thread,NULL,pfunc,arg);
@@ -769,8 +1005,8 @@ class ServerTcpIp{
 protected:
 	int sizeAddr;//sizeof(sockaddr_in) connect with addr_in;
 	int backwait;//the most waiting clients ;
-	int numClient;//how many clients now; 
-	char* hostip;//host IP 
+	int numClient;//how many clients now;
+	char* hostip;//host IP
 	char* hostname;//host name
 	const char* error;//error hapen
 	WSADATA wsa;//apply verson of windows;
@@ -820,12 +1056,15 @@ protected:
             }
         }
         return false;
-    } 
+    }
 public:
 	ServerTcpIp(unsigned short port=5200,int wait=5)
 	{
 		if(WSAStartup(MAKEWORD(2,2),&wsa)!=0)
-			throw NULL;
+		{
+			error="WSA wrong";
+			return;
+		}
 		sock=socket(AF_INET,SOCK_STREAM,0);//AF=addr family internet
 		addr.sin_addr.S_un.S_addr=htonl(INADDR_ANY);//inaddr_any
 		addr.sin_family=AF_INET;//af_intt IPv4
@@ -954,7 +1193,7 @@ public:
 		else
 			return false;
 		return true;
-	}	
+	}
 	bool selectModel(void* pget,int len,void* pneed,int (*pfunc)(int,int ,int ,void* ,void*,ServerTcpIp& ))
 	{//0 out,1 in,2 say
 		fd_set temp=fdClients;
@@ -1065,7 +1304,7 @@ public:
 			return false;
 		for(int i=0;i<fdNumNow&&i<arrayLen;i++)
 			array[i]=pfdn[i];
-		return true;		
+		return true;
 	}
 	bool findSocket(int cliSoc)
 	{
@@ -1100,7 +1339,7 @@ public:
 		if(-1==getpeername(cliSoc,(SOCKADDR*)&cliAddr,&len))
 			return NULL;
 		*pcliPort=cliAddr.sin_port;
-		return inet_ntoa(cliAddr.sin_addr); 
+		return inet_ntoa(cliAddr.sin_addr);
 	}
 };
 class ServerPool:public ServerTcpIp{
@@ -1135,7 +1374,7 @@ public:
 	{
 		this->threadNum=threadNum;
 		if(threadNum>0)
-		{	
+		{
 			pool=new ThreadPool(threadNum);
 			if(pool==NULL)
 			{
@@ -1231,7 +1470,7 @@ public:
 //		if(ssl!=NULL)
 //		{
 //			SSL_shutdown(ssl);
-//			SSL_free(ssl);	
+//			SSL_free(ssl);
 //		}
 //		if(ctx!=NULL)
 //			SSL_CTX_free(ctx);
@@ -1305,7 +1544,7 @@ public:
 			return false;
 		strcpy(ip,inet_ntoa(addr));
 		return true;
-	} 
+	}
 };
 class DealHttp{
 public:
@@ -1384,7 +1623,7 @@ public:
 		int i=0;
 		char* ptemp=local+len+1;
 		char* pend=NULL;
-		while(1)//95 _ 
+		while(1)//95 _
 			if((*ptemp>47&&*ptemp<58)||(*ptemp>96&&*ptemp<123)||(*ptemp>64&&*ptemp<91)||*ptemp==95||*ptemp==37)
 				break;
 			else
@@ -1640,7 +1879,7 @@ public:
 			{
 				if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
 					return 0;
-				else 
+				else
 					return 2;
 			}
 			else
@@ -1651,7 +1890,7 @@ public:
 			if(false==this->createSendMsg(HTML,psend,bufferLen,ask,plen))
 				if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
 					return 0;
-				else 
+				else
 					return 2;
 			else
 				return 1;
@@ -1661,47 +1900,47 @@ public:
 			if(false==this->createSendMsg(EXE,psend,bufferLen,ask,plen))
 				if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
 					return 0;
-				else 
+				else
 					return 2;
 			else
-				return 1;			
+				return 1;
 		}
 		else if(strstr(ask,".zip"))
 		{
 			if(false==this->createSendMsg(ZIP,psend,bufferLen,ask,plen))
 				if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
 					return 0;
-				else 
+				else
 					return 2;
 			else
-				return 1;			
+				return 1;
 		}
 		else if(strstr(ask,".png")||strstr(ask,".PNG")||strstr(ask,".jpg")||strstr(ask,".jpeg"))
 		{
 			if(false==this->createSendMsg(IMAGE,psend,bufferLen,ask,plen))
 				if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
 					return 0;
-				else 
+				else
 					return 2;
 			else
-				return 1;					
+				return 1;
 		}
 		else if(strstr(ask,".css"))
 		{
 			if(false==this->createSendMsg(CSS,psend,bufferLen,ask,plen))
 				if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
 					return 0;
-				else 
+				else
 					return 2;
 			else
-				return 1;					
+				return 1;
 		}
 		else if(strstr(ask,".js"))
 		{
 			if(false==this->createSendMsg(JS,psend,bufferLen,ask,plen))
 				if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
 					return 0;
-				else 
+				else
 					return 2;
 			else
 				return 1;
@@ -1711,17 +1950,17 @@ public:
 			if(false==this->createSendMsg(JSON,psend,bufferLen,ask,plen))
 				if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
 					return 0;
-				else 
+				else
 					return 2;
 			else
 				return 1;
 		}
-		else 
+		else
 		{
 			if(false==this->createSendMsg(UNKNOWN,psend,bufferLen,ask,plen))
 				if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
 					return 0;
-				else 
+				else
 					return 2;
 			else
 				return 1;
@@ -1733,7 +1972,7 @@ public:
 		char* temp=NULL;
 		if(onlyFromBody==false)
 			temp=strstr((char*)message,key);
-		else 
+		else
 		{
 			temp=strstr((char*)message,"\r\n\r\n");
 			if(temp==NULL)
@@ -1960,17 +2199,17 @@ public:
 		if(buffer==NULL)
 			return NULL;
 		memset(buffer,0,sizeof(char)*strlen(srcString));
-		for (unsigned int i=0; i<strlen(srcString); i++) 
+		for (unsigned int i=0; i<strlen(srcString); i++)
 		{
-		    if (int(srcString[i])==37) 
+		    if (int(srcString[i])==37)
 			{
 		        sscanf(srcString+i+1, "%x", &temp);
 		        ch=(char)temp;
 		        buffer[strlen(buffer)]=ch;
 		        buffer[strlen(buffer)+1]=0;
 		        i=i+2;
-		    } 
-			else 
+		    }
+			else
 		        buffer[strlen(buffer)]=srcString[i];
 		}
 		if(srcLen<strlen(buffer))
@@ -2001,7 +2240,7 @@ public:
 		{
 			sprintf(err,"input wrong");
 			return NULL;
-		}	
+		}
 		if(backString!=NULL)
 			free(backString);
 		backString=(char*)malloc(sizeof(char)*strlen(encryption)+30);
@@ -2100,8 +2339,8 @@ public:
 		memset(error,0,sizeof(char)*30);
 		memset(&their_addr, 0, sizeof(their_addr));
 		their_addr.sin_family = AF_INET;
-		their_addr.sin_port = htons(25);	
-		hostent* hptr = gethostbyname(domain);		  
+		their_addr.sin_port = htons(25);
+		hostent* hptr = gethostbyname(domain);
 		memcpy(&their_addr.sin_addr.s_addr, hptr->h_addr_list[0], hptr->h_length);
 	}
 	bool emailSend(const char* sendEmail,const char* passwd,const char* recEmail,const char* body)
@@ -2139,7 +2378,7 @@ public:
 		}
 		if(isDebug)
 			printf("get:%s",recBuffer);
-		
+
 		memset(senBuffer, 0, 1000);
 		sprintf(senBuffer, "EHLO HYL-PC\r\n");
 		send(sockfd, senBuffer, strlen(senBuffer), 0);
@@ -2147,7 +2386,7 @@ public:
 		recv(sockfd, recBuffer, 1000, 0);
 		if(isDebug)
 			printf("EHLO REceive:%s\n",recBuffer);
-		
+
 		memset(senBuffer, 0, 1000);
 		sprintf(senBuffer, "AUTH LOGIN\r\n");
 		send(sockfd, senBuffer, strlen(senBuffer), 0);
@@ -2155,7 +2394,7 @@ public:
 		recv(sockfd, recBuffer, 1000, 0);
 		if(isDebug)
 			printf("Auth Login Receive:%s\n",recBuffer);
-		
+
 		memset(senBuffer, 0, 1000);
 		sprintf(senBuffer, "%s",sendEmail);
 		memset(login, 0, 128);
@@ -2184,7 +2423,7 @@ public:
 
 		// self email
 		memset(recBuffer, 0, 1000);
-		sprintf(senBuffer, "MAIL FROM: <%s>\r\n",sendEmail);  
+		sprintf(senBuffer, "MAIL FROM: <%s>\r\n",sendEmail);
 		send(sockfd, senBuffer, strlen(senBuffer), 0);
 		memset(recBuffer, 0, 1000);
 		recv(sockfd, recBuffer, 1000, 0);
@@ -2342,7 +2581,7 @@ public:
 	}
 	bool getFileMsg(const char* fileName,char* buffer,unsigned int bufferLen)
 	{
-		int i=0,len=0;
+		unsigned int i=0,len=0;
 		len=this->getFileLen(fileName);
 		FILE* fp=fopen(fileName,"rb");
 		if(fp==NULL)
@@ -2401,50 +2640,6 @@ public:
 };
 class LogSystem{
 public:
-	struct CliLog{
-		int socketCli;
-		int time;
-		char ip[20];
-	};
-	static bool dealAttack(int isUpdate,int socketCli,int maxTime)//check if accket
-	{
-		static CliLog cli[41];
-		if(isUpdate==1)
-		{
-			cli[socketCli%41].socketCli=socketCli;
-			cli[socketCli%41].time=1;
-			return true;
-		}
-		else if(isUpdate==2)
-		{
-			cli[socketCli%41].time++;
-			if(cli[socketCli%41].time>maxTime)
-				return false;
-			return true;
-		}
-		else if(isUpdate==0)
-		{
-			cli[socketCli%41].socketCli=0;
-			cli[socketCli%41].time=0;
-			return true;
-		}
-		return true;
-	}
-	static bool attackLog(int port,const char* ip,const char* pfileName)//log accket
-	{
-		time_t temp=time(NULL);
-		struct tm* pt=localtime(&temp);
-		FILE* fp=fopen(pfileName,"a+");
-		if(fp==NULL)
-			if((fp=fopen(pfileName,"w+"))==NULL)		
-				return false;
-			else
-				fprintf(fp,"server attacked log\n");
-		fprintf(fp,"%d year%d month%d day%d hour%d min%d sec:",pt->tm_year+1900,pt->tm_mon+1,pt->tm_mday,pt->tm_hour,pt->tm_min,pt->tm_sec);
-		fprintf(fp,"%s:%d port attack server\n",ip,port);
-		fclose(fp);
-		return true;
-	}
 	static bool recordFileError(const char* fileName)
 	{
 		FILE* fp=fopen("wrong.log","r+");
@@ -2546,7 +2741,7 @@ public:
 		strcpy(array[now].route,route);
 		array[now].pfunc=pfunc;
 		now++;
-		return true;	
+		return true;
 	}
 	bool post(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&))
 	{
@@ -2564,7 +2759,7 @@ public:
 		strcpy(array[now].route,route);
 		array[now].pfunc=pfunc;
 		now++;
-		return true;	
+		return true;
 	}
 	bool all(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&))
 	{
@@ -2582,7 +2777,7 @@ public:
 		strcpy(array[now].route,route);
 		array[now].pfunc=pfunc;
 		now++;
-		return true;	
+		return true;
 	}
 	bool loadStatic(const char* route,const char* staticPath)
 	{
@@ -2653,12 +2848,14 @@ public:
 		if(clientIn!=NULL)
 			return false;
 		clientIn=pfunc;
+		return true;
 	}
 	bool clientOutHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port))
 	{
 		if(clientOut!=NULL)
 			return false;
 		clientOut=pfunc;
+		return true;
 	}
 	void run(unsigned int memory,unsigned int recBufLenChar,const char* defaultFile)
 	{
@@ -2781,7 +2978,7 @@ private:
 				{
 					pfunc=array[i].pfunc;
 					pnowRoute=&array[i];
-					break;						
+					break;
 				}
 			}
 			else if(array[i].type==STATIC&&type==GET)
@@ -2814,7 +3011,7 @@ private:
 			if(flag==2)
 			{
 				if(isDebug)
-				{	
+				{
 					LogSystem::recordFileError(ask);
 					printf("404 get %s wrong\n",ask);
 				}
@@ -2870,7 +3067,7 @@ private:
 							{
 						  		this->deleteFd(fdClients.fd_array[i]);
 								FD_CLR(fdClients.fd_array[i],&fdClients);
-								closesocket(fdClients.fd_array[i]);						
+								closesocket(fdClients.fd_array[i]);
 							}
 						}
 						if(sRec<=0)
@@ -2884,7 +3081,7 @@ private:
 							closesocket(fdClients.fd_array[i]);
 							FD_CLR(fdClients.fd_array[i],&fdClients);
 							this->deleteFd(fdClients.fd_array[i]);
-							
+
 						}
 					}
 				}
@@ -2930,7 +3127,7 @@ private:
 							{
 						  		this->deleteFd(fdClients.fd_array[i]);
 								FD_CLR(fdClients.fd_array[i],&fdClients);
-								closesocket(fdClients.fd_array[i]);						
+								closesocket(fdClients.fd_array[i]);
 							}
 						}
 						if(sRec<=0)
@@ -2944,7 +3141,7 @@ private:
 							closesocket(fdClients.fd_array[i]);
 							FD_CLR(fdClients.fd_array[i],&fdClients);
 							this->deleteFd(fdClients.fd_array[i]);
-							
+
 						}
 					}
 				}

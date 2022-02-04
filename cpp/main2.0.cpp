@@ -53,43 +53,27 @@ void chooseModel(unsigned int* port,bool* pflag)
 *********************************/
 void ifChoose(bool* pb,unsigned int* pport,bool* is_back)
 {
-	char temp[10]={0};
-	FILE* fp=fopen("my.ini","r+");
-	if(fp==NULL)
-	{
-		*pb=false;
-		return;
-	}
-	if(fscanf(fp,"%u",pport)!=1)
-	{
-		*pb=false;
-		printf("port=%u\n",*pport);
-		return;
-	}
-	if(fscanf(fp,"%s",indexName)!=1)
-	{
-		*pb=false;
-		printf("name:%s\n",indexName);
-		return;
-	}
-	if(fscanf(fp,"%d",&memory)!=1)
-	{
-		*pb=false;
-		printf("memory=%d\n",memory);
-		return;
-	}
-	if(fscanf(fp,"%s",temp)!=1)
-	{
-		*pb=false;
-		printf("is back wrong\n");
-		return;
-	}
-	if(strchr(temp,'y')!=NULL)
-		*is_back=true;
+	char temp[4000]={0};
+	FileGet file;
+	file.getFileMsg("config.json",temp,4000);
+	Json json(temp);
+	if(json["port"]!=NULL)
+		*pport=json["port"]->intVal;
 	else
-		*is_back=false;
+		*pb=false;
+	if(json["default file"]!=NULL)
+		strcpy(indexName,json["default file"]->strVal.c_str());
+	else
+		*pb=false;
+	if(json["memory"]!=NULL)
+		memory=json["memory"]->intVal;
+	else
+		*pb=false;
+	if(json["background"]!=NULL)
+		*is_back=json["background"]->boolVal;
+	else
+		*pb=false;
 	*pb=true;
-	fclose(fp);
 	return;
 }
 /********************************
@@ -112,7 +96,7 @@ bool ifArgc(int argc,char** argv,bool* pis_back,unsigned int* pport)
 		printf("memory wrong\n");
 		return false;
 	}
-	if(strchr(argv[4],'y')!=NULL)
+	if(strstr(argv[4],"true")!=NULL)
 		*pis_back=true;
 	return true;
 }

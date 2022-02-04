@@ -1659,7 +1659,6 @@ void selectTry()
 }
 void serverHttp()
 {
-	int pid=0;
 //	if((pid=fork())!=0)
 //	{
 //		printf("pid=%d",pid);
@@ -1680,8 +1679,7 @@ void serverHttp()
 		exit(0);
 	printf("server ip is:%s\nthe server is ok\n",server.getHostIp());
 	while(1)
-		if(false==server.epollModel(&thing,&num,get,2048,sen,funcTwo))
-			break;
+		server.pollModel(&thing,&num,get,2048,sen,funcTwo);
 	free(sen);
 }
 int main(int argc, char** argv) 
