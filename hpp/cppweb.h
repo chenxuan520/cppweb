@@ -3016,7 +3016,7 @@ public:
 		pthread_mutex_unlock(&this->lockPoll);
 		pthread_cond_signal(&this->condition);
 	}
-	void endPool()//user delete the pool
+	void stopPool()//user delete the pool
 	{
 		isContinue=false;
 		pthread_join(threadManager,NULL);
