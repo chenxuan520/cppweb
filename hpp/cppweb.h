@@ -711,7 +711,7 @@ private:
 		{
 			if((text[i]=='['||text[i]=='{')&&flag%2==0)
 				sta.push(text+i);
-			else if(text[i]==']'||text[i]=='}')
+			else if((text[i]==']'||text[i]=='}')&&flag%2==0)
 			{
 				if(sta.empty())
 					return false;
