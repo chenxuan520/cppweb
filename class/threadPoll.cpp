@@ -80,7 +80,9 @@ private:
 			{
 				unique_lock<mutex> guard(pool.queLock);
 				if(pool.isContinue&&pool.que.size()==0)
-					pool.condition.wait(guard);
+					pool.condition.wait(guard,[&]()->bool{
+										return pool.que.size()>0||pool.isContinue==false;
+										});
 				if(pool.isContinue==false)
 					return ;
 				if(pool.que.size()==0)

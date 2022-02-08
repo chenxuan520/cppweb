@@ -2917,7 +2917,7 @@ public://a struct for you to add task
 private:
 	std::queue<Task> thingWork;//a queue for struct task
 	pthread_cond_t condition;//a condition mutex
-	pthread_mutex_t lockPoll;//a lock to lock queue
+	pthread_mutex_t lockPool;//a lock to lock queue
 	pthread_mutex_t lockTask;//a lock for user to ctrl
 	pthread_mutex_t lockBusy;//a lock for busy thread
 	pthread_t* thread;//an array for thread
@@ -2928,29 +2928,29 @@ private:
 private:
 	static void* worker(void* arg)//the worker for user 
 	{
-		ThreadPool* poll=(ThreadPool*)arg;
+		ThreadPool* pool=(ThreadPool*)arg;
 		while(1)
 		{
-			pthread_mutex_lock(&poll->lockPoll);
-			while(poll->isContinue==true&&poll->thingWork.size()==0)
-				pthread_cond_wait(&poll->condition,&poll->lockPoll);
-			if(poll->isContinue==false)
+			pthread_mutex_lock(&pool->lockPool);
+			while(pool->isContinue==true&&pool->thingWork.size()==0)
+				pthread_cond_wait(&pool->condition,&pool->lockPool);
+			if(pool->isContinue==false)
 			{
-				pthread_mutex_unlock(&poll->lockPoll);
+				pthread_mutex_unlock(&pool->lockPool);
 				pthread_exit(NULL);
 			}
-			if(poll->thingWork.size()>0)
+			if(pool->thingWork.size()>0)
 			{
-				pthread_mutex_lock(&poll->lockBusy);
-				poll->busyThread++;
-				pthread_mutex_unlock(&poll->lockBusy);
-				ThreadPool::Task task=poll->thingWork.front();
-				poll->thingWork.pop();
-				pthread_mutex_unlock(&poll->lockPoll);
+				pthread_mutex_lock(&pool->lockBusy);
+				pool->busyThread++;
+				pthread_mutex_unlock(&pool->lockBusy);
+				ThreadPool::Task task=pool->thingWork.front();
+				pool->thingWork.pop();
+				pthread_mutex_unlock(&pool->lockPool);
 				task.ptask(task.arg);
-				pthread_mutex_lock(&poll->lockBusy);
-				poll->busyThread--;
-				pthread_mutex_unlock(&poll->lockBusy);
+				pthread_mutex_lock(&pool->lockBusy);
+				pool->busyThread--;
+				pthread_mutex_unlock(&pool->lockBusy);
 			}
 		}
 		return NULL;
@@ -2970,7 +2970,7 @@ public:
 		for(unsigned int i=0;i<threadNum;i++)
 			thread[i]=0;
 		pthread_cond_init(&condition,NULL);
-		pthread_mutex_init(&lockPoll,NULL);
+		pthread_mutex_init(&lockPool,NULL);
 		pthread_mutex_init(&lockTask,NULL);
 		pthread_mutex_init(&lockBusy,NULL);
 		liveThread=threadNum;
@@ -2984,17 +2984,7 @@ public:
 	{
 		if(isContinue==false)
 			return;
-		isContinue=false;
-		pthread_join(threadManager,NULL);
-		for(unsigned int i=0;i<liveThread;i++)
-			pthread_cond_signal(&condition);
-		for(unsigned int i=0;i<liveThread;i++)
-			pthread_join(thread[i],NULL);
-		pthread_cond_destroy(&condition);
-		pthread_mutex_destroy(&lockPoll);
-		pthread_mutex_destroy(&lockTask);
-		pthread_mutex_destroy(&lockBusy);
-		delete[] thread;
+		stopPool();
 	}
 	void threadExit()// a no use funtion
 	{
@@ -3011,9 +3001,9 @@ public:
 	{
 		if(isContinue==false)
 			return;
-		pthread_mutex_lock(&this->lockPoll);
+		pthread_mutex_lock(&this->lockPool);
 		this->thingWork.push(task);
-		pthread_mutex_unlock(&this->lockPoll);
+		pthread_mutex_unlock(&this->lockPool);
 		pthread_cond_signal(&this->condition);
 	}
 	void stopPool()//user delete the pool
@@ -3025,8 +3015,9 @@ public:
 		for(unsigned int i=0;i<liveThread;i++)
 			pthread_join(thread[i],NULL);
 		pthread_cond_destroy(&condition);
-		pthread_mutex_destroy(&lockPoll);
+		pthread_mutex_destroy(&lockPool);
 		pthread_mutex_destroy(&lockTask);
+		pthread_mutex_destroy(&lockBusy);
 		delete[] thread;
 	}
 	void getBusyAndTask(unsigned int* pthread,unsigned int* ptask)//get busy live and task num
@@ -3034,9 +3025,9 @@ public:
 		pthread_mutex_lock(&lockBusy);
 		*pthread=busyThread;
 		pthread_mutex_unlock(&lockBusy);
-		pthread_mutex_lock(&lockPoll);
+		pthread_mutex_lock(&lockPool);
 		*ptask=thingWork.size();
-		pthread_mutex_unlock(&lockPoll);
+		pthread_mutex_unlock(&lockPool);
 	}
 	inline void mutexLock()//user to lock ctrl
 	{
