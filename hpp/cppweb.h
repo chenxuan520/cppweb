@@ -1321,6 +1321,8 @@ private:
 	char ask[256];
 	char* pfind;
 	const char* error;
+	const char* connect;
+	const char* serverName;
 public:
 	DealHttp()
 	{
@@ -1328,6 +1330,8 @@ public:
 			ask[i]=0;
 		pfind=NULL;
 		error=NULL;
+		connect="keep-alive";
+		serverName="LCserver/1.1";
 	}
 private:
 	bool cutLineAsk(char* message,const char* pcutIn)
@@ -1355,72 +1359,52 @@ private:
 			this->error="buffer too short";
 			return;
 		}
+		sprintf(ptop,"HTTP/1.1 200 OK\r\n"
+				"Server %s\r\n"
+				"Connection: %s\r\n",serverName,connect);
 		switch (kind)
 		{
 		   case UNKNOWN:
-			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
-			"Server LCserver/1.1\r\n"
-			"Connection: keep-alive\r\n"
-			"Content-Length:%d\r\n\r\n",fileLen);
+			sprintf(ptop,"%sContent-Length:%d\r\n\r\n",ptop,fileLen);
 			break;
 		   case HTML:
-			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
-			"Server LCserver/1.1\r\n"
-			"Connection: keep-alive\r\n"
-			"Content-Type:text/html\r\n"
-			"Content-Length:%d\r\n\r\n",fileLen);
+			sprintf(ptop,"%sContent-Type:text/html\r\n"
+					"Content-Length:%d\r\n\r\n",ptop,fileLen);
 			break;
 		   case TXT:
-			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
-			"Server LCserver/1.1\r\n"
-			"Connection: keep-alive\r\n"
-			"Content-Type:application/octet-stream\r\n"
-			"Content-Length:%d\r\n\r\n",fileLen);
+			sprintf(ptop,"%sContent-Type:text/plain\r\n"
+					"Content-Length:%d\r\n\r\n",ptop,fileLen);
 			break;
 		   case IMAGE:
-			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
-			"Server LCserver/1.1\r\n"
-			"Connection: keep-alive\r\n"
-			"Content-Type:image\r\n"
-			"Content-Length:%d\r\n\r\n",fileLen);
+			sprintf(ptop,"%sContent-Type:image\r\n"
+					"Content-Length:%d\r\n\r\n",ptop,fileLen);
 			break;
 		   case NOFOUND:
-			*topLen=sprintf(ptop,"HTTP/1.1 404 Not Found\r\n"
-			"Server LCserver/1.1\r\n"
-			"Connection: keep-alive\r\n"
-			"Content-Type: text/plain\r\n"
-			"Content-Length:%d\r\n\r\n"
-			"404 no found",(int)strlen("404 no found"));
+			sprintf(ptop,"HTTP/1.1 404 Not Found\r\n"
+					"Server %s/1.1\r\n"
+					"Connection: %s\r\n"
+					"Content-Type: text/plain\r\n"
+					"Content-Length:%d\r\n\r\n"
+					"404 no found",serverName,connect,(int)strlen("404 no found"));
 			break;
 		   case CSS:
-			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
-			"Server LCserver/1.1\r\n"
-			"Connection: keep-alive\r\n"
-			"Content-Type:text/css\r\n"
-			"Content-Length:%d\r\n\r\n",fileLen);
+			sprintf(ptop,"%sContent-Type:text/css\r\n"
+					"Content-Length:%d\r\n\r\n",ptop,fileLen);
 			break;
 		   case JS:
-			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
-			"Server LCserver/1.1\r\n"
-			"Connection: keep-alive\r\n"
-			"Content-Type:text/javascript\r\n"
-			"Content-Length:%d\r\n\r\n",fileLen);
+			sprintf(ptop,"%sContent-Type:text/javascript\r\n"
+					"Content-Length:%d\r\n\r\n",ptop,fileLen);
 			break;
 		   case ZIP:
-			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
-			"Server LCserver/1.1\r\n"
-			"Connection: keep-alive\r\n"
-			"Content-Type:application/zip\r\n"
-			"Content-Length:%d\r\n\r\n",fileLen);
+			sprintf(ptop,"%sContent-Type:application/zip\r\n"
+					"Content-Length:%d\r\n\r\n",ptop,fileLen);
 			break;
 		   case JSON:
-			*topLen=sprintf(ptop,"HTTP/1.1 200 OK\r\n"
-			"Server LCserver/1.1\r\n"
-			"Connection: keep-alive\r\n"
-			"Content-Type:application/json\r\n"
-			"Content-Length:%d\r\n\r\n",fileLen);
+			sprintf(ptop,"%sContent-Type:application/json\r\n"
+					"Content-Length:%d\r\n\r\n",ptop,fileLen);
 			break;
 		}
+		*topLen=strlen(ptop);
 	}
 	char* findFileMsg(const char* pname,int* plen,char* buffer,unsigned int bufferLen)
 	{
@@ -1973,6 +1957,13 @@ public:
 				setCookie(buffer,bufferLen,iter->first.c_str(),iter->second.c_str());
 		return customizeAddBody(buffer,bufferLen,(char*)gram.body,gram.fileLen);
 	}
+	void changeSetting(const char* connectStatus,const char* serverName)
+	{
+		if(serverName==NULL||connectStatus==NULL)
+			return;
+		this->serverName=serverName;
+		this->connect=connectStatus;
+	}
 	inline const char* lastError()
 	{
 		return error;
@@ -2307,607 +2298,6 @@ public:
 		return ;
 	}
 };
-class HttpServer:private ServerTcpIp{
-public://main class for http server2.0
-	enum RouteType{//oneway stand for like /hahah,wild if /hahah/*,static is recource static
-		ONEWAY,WILD,STATIC,
-	};
-	enum AskType{//different ask ways in http
-		GET,POST,PUT,DELETE,OPTIONS,ALL,
-	};
-	struct RouteFuntion{//inside struct,pack for handle
-		AskType ask;
-		RouteType type;
-		char route[100];
-		const char* path;
-		void (*pfunc)(DealHttp&,HttpServer&,int num,void* sen,int&);
-	};
-private:
-	RouteFuntion* array;
-	RouteFuntion* pnowRoute;
-	void* getText;
-	unsigned int max;
-	unsigned int now;
-	unsigned int boundPort;
-	int textLen;
-	bool isDebug;
-	bool isLongCon;
-	bool isFork;
-	void (*clientIn)(HttpServer&,int num,void* ip,int port);
-	void (*clientOut)(HttpServer&,int num,void* ip,int port);
-	void (*logFunc)(const void*,int);
-public:
-	HttpServer(unsigned port,bool debug=false):ServerTcpIp(port)
-	{
-		getText=NULL;
-		boundPort=port;
-		array=NULL;
-		array=(RouteFuntion*)malloc(sizeof(RouteFuntion)*20);
-		if(array==NULL)
-			this->error="route wrong";
-		else
-			memset(array,0,sizeof(RouteFuntion)*20);
-		now=0;
-		max=20;
-		isDebug=debug;
-		isLongCon=true;
-		isFork=false;
-		textLen=0;
-		clientIn=NULL;
-		clientOut=NULL;
-		logFunc=NULL;
-		pnowRoute=NULL;
-	}
-	~HttpServer()
-	{
-		if(array!=NULL)
-			free(array);
-	}
-	bool routeHandle(AskType ask,RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&))
-	{
-		if(strlen(route)>100)
-			return false;
-		if(max-now<=2)
-		{
-			array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
-			if(array==NULL)
-				return false;
-			max+=10;
-		}
-		if(type==STATIC)
-		{
-			error="cannot set static route";
-			return false;
-		}
-		array[now].type=type;
-		array[now].ask=ask;
-		strcpy(array[now].route,route);
-		array[now].pfunc=pfunc;
-		now++;
-		return true;
-	}
-	bool loadStatic(const char* route,const char* staticPath)
-	{
-		if(strlen(route)>100)
-			return false;
-		if(max-now<=2)
-		{
-			array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
-			if(array==NULL)
-				return false;
-			max+=10;
-		}
-		array[now].type=STATIC;
-		array[now].ask=GET;
-		strcpy(array[now].route,route);
-		array[now].path=staticPath;
-		array[now].pfunc=loadFile;
-		now++;
-		return true;
-	}
-	bool deletePath(const char* path)
-	{
-		if(strlen(path)>100)
-			return false;
-		if(max-now<=2)
-		{
-			array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
-			if(array==NULL)
-				return false;
-			max+=10;
-		}
-		array[now].type=STATIC;
-		array[now].ask=GET;
-		strcpy(array[now].route,path);
-		array[now].pfunc=deleteFile;
-		now++;
-		return true;
-	}
-	bool get(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&))
-	{
-		if(strlen(route)>100)
-			return false;
-		if(max-now<=2)
-		{
-			array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
-			if(array==NULL)
-				return false;
-			max+=10;
-		}
-		array[now].type=type;
-		array[now].ask=GET;
-		strcpy(array[now].route,route);
-		array[now].pfunc=pfunc;
-		now++;
-		return true;	
-	}
-	bool post(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&))
-	{
-		if(strlen(route)>100)
-			return false;
-		if(max-now<=2)
-		{
-			array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
-			if(array==NULL)
-				return false;
-			max+=10;
-		}
-		array[now].type=type;
-		array[now].ask=POST;
-		strcpy(array[now].route,route);
-		array[now].pfunc=pfunc;
-		now++;
-		return true;	
-	}
-	bool all(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&))
-	{
-		if(strlen(route)>100)
-			return false;
-		if(max-now<=2)
-		{
-			array=(RouteFuntion*)realloc(array,sizeof(RouteFuntion)*(now+10));
-			if(array==NULL)
-				return false;
-			max+=10;
-		}
-		array[now].type=type;
-		array[now].ask=ALL;
-		strcpy(array[now].route,route);
-		array[now].pfunc=pfunc;
-		now++;
-		return true;	
-	}
-	bool clientInHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port))
-	{
-		if(clientIn!=NULL)
-			return false;
-		clientIn=pfunc;
-		return true;
-	}
-	bool clientOutHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port))
-	{
-		if(clientOut!=NULL)
-			return false;
-		clientOut=pfunc;
-		return true;
-	}
-	bool setLog(void (*pfunc)(const void*,int))
-	{
-		if(logFunc!=NULL)
-			return false;
-		logFunc=pfunc;
-		return true;
-	}
-	void run(unsigned int memory,unsigned int recBufLenChar,const char* defaultFile)
-	{
-		char* get=(char*)malloc(sizeof(char)*recBufLenChar);
-		char* sen=(char*)malloc(sizeof(char)*memory*1024*1024);
-		if(sen==NULL||get==NULL)
-		{
-			this->error="malloc get and sen wrong";
-			return;
-		}
-		memset(get,0,sizeof(char)*recBufLenChar);
-		memset(sen,0,sizeof(char)*memory*1024*1024);
-		if(false==this->bondhost())
-		{
-			this->error="bound wrong";
-			return;
-		}
-		if(false==this->setlisten())
-		{
-			this->error="set listen wrong";
-			return;
-		}
-		this->getText=get;
-		if(isDebug)
-			messagePrint();
-		if(isFork==false)
-			while(1)
-				this->epollHttp(get,recBufLenChar,memory,sen,defaultFile);
-		else
-			while(1)
-				this->forkHttp(get,recBufLenChar,memory,sen,defaultFile);
-		free(sen);
-		free(get);
-	}
-	int httpSend(int num,void* buffer,int sendLen)
-	{
-		return this->sendSocket(num,buffer,sendLen);
-	}
-	int httpRecv(int num,void* buffer,int bufferLen)
-	{
-		return this->receiveSocket(num,buffer,bufferLen);
-	}
-	int getCompleteMessage(const void* message,unsigned int messageLen,void* buffer,unsigned int buffLen,int sockCli)
-	{
-		if(message==NULL||buffer==NULL||buffLen<=0||message==0)
-			return -1;
-		unsigned int len=0;
-		char* temp=NULL;
-		if((temp=strstr((char*)message,"Content-Length"))==NULL)
-			return -1;
-		if(sscanf(temp+strlen("Content-Length")+1,"%d",&len)<=0)
-			return -1;
-		if((temp=strstr((char*)message,"\r\n\r\n"))==NULL)
-			return -1;
-		temp+=4;
-		if(strlen(temp)>=len)
-			return 0;
-		if(strlen((char*)message)+len>buffLen)
-			return -2;
-		memcpy(buffer,message,messageLen);
-		unsigned int leftLen=len-strlen(temp),getLen=0,all=0;
-		while(leftLen>5||getLen<=0)
-		{
-			getLen=this->httpRecv(sockCli,(char*)buffer+messageLen+all,buffLen-messageLen-all);
-			all+=getLen;
-			leftLen-=getLen;
-		}
-		return len;
-	}
-	void changeSetting(bool debug,bool isLongCon,bool isForkModel)
-	{
-		this->isDebug=debug;
-		this->isLongCon=isLongCon;
-		this->isFork=isForkModel;
-		if(isFork==true)
-			signal(SIGCHLD,sigCliDeal);
-	}
-	inline void* recText()
-	{
-		return this->getText;
-	}
-	inline int recLen()
-	{
-		return this->textLen;
-	}
-	inline const char* lastError()
-	{
-		return error;
-	}
-	inline bool disconnect(int soc)
-	{
-		return this->disconnectSocket(soc);
-	}
-private:
-	void messagePrint()
-	{
-		printf("server is ok\n");
-		printf("port:\t\t%u",boundPort);
-		for(unsigned i=0;i<now;i++)
-		{
-			switch(array[i].type)
-			{
-			case ONEWAY:
-				printf("%s\t\t->\t",array[i].route);
-				break;
-			case WILD:
-				printf("%s*\t\t->\t",array[i].route);
-				break;
-			case STATIC:
-				if(array[i].pfunc==loadFile)
-					printf("%s\t\t->%s\n",array[i].route,array[i].path);
-				else if(array[i].pfunc==deleteFile)
-					printf("%s\t\t->delete",array[i].route);
-				else
-					printf("undefine funtion please check the server");
-				continue;
-			}
-			switch(array[i].ask)
-			{
-			case GET:
-				printf("GET\n");
-				break;
-			case POST:
-				printf("POST\n");
-				break;
-			case ALL:
-				printf("All\n");
-				break;
-			case PUT:
-				printf("PUT\n");
-				break;
-			case DELETE:
-				printf("DELETE\n");
-				break;
-			case OPTIONS:
-				printf("OPTIONS\n");
-				break;
-			}
-		}
-		if(logFunc!=NULL)
-			printf("log function set\n");
-		if(clientIn!=NULL)
-			printf("client in function set\n");
-		if(clientOut!=NULL)
-			printf("client out function set\n");
-	}
-	int func(int num,void* pget,void* sen,unsigned int senLen,const char* defaultFile,HttpServer& server)
-	{
-		static DealHttp http;
-		AskType type=GET;
-		int len=0,flag=2;
-		char ask[200]={0};
-		sscanf((char*)pget,"%100s",ask);
-		if(strstr(ask,"GET")!=NULL)
-		{
-			http.getAskRoute(pget,"GET",ask,200);
-			if(isDebug)
-				printf("Get url:%s\n",ask);
-			type=GET;
-		}
-		else if(strstr(ask,"POST")!=NULL)
-		{
-			http.getAskRoute(pget,"POST",ask,200);
-			if(isDebug)
-				printf("POST url:%s\n",ask);
-			type=POST;
-		}
-		else if(strstr(ask,"PUT")!=NULL)
-		{
-			http.getAskRoute(pget,"PUT",ask,200);
-			if(isDebug)
-				printf("PUT url:%s\n",ask);
-			type=PUT;
-		}
-		else if(strstr(ask,"DELETE")!=NULL)
-		{
-			http.getAskRoute(pget,"DELETE",ask,200);
-			if(isDebug)
-				printf("DELETE url:%s\n",ask);
-			type=DELETE;
-		}
-		else if(strstr(ask,"OPTIONS")!=NULL)
-		{
-			http.getAskRoute(pget,"OPTIONS",ask,200);
-			if(isDebug)
-				printf("OPTIONS url:%s\n",ask);
-			type=OPTIONS;
-		}
-		else 
-		{
-			memset(ask,0,sizeof(char)*200);
-			if(isDebug)
-				printf("way not support\n");
-			type=GET;
-		}
-		void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&)=NULL;
-		for(unsigned int i=0;i<now;i++)
-		{
-			if(array[i].type==ONEWAY&&(array[i].ask==type||array[i].ask==ALL))
-			{
-				if(strcmp(ask,array[i].route)==0)
-				{
-					pfunc=array[i].pfunc;
-					pnowRoute=&array[i];
-					break;
-				}
-			}
-			else if(array[i].type==WILD&&(array[i].ask==type||array[i].ask==ALL))
-			{
-				if(strstr(ask,array[i].route)!=NULL)
-				{
-					pfunc=array[i].pfunc;
-					pnowRoute=&array[i];
-					break;						
-				}
-			}
-			else if(array[i].type==STATIC&&type==GET)
-			{
-				if(strstr(ask,array[i].route)!=NULL)
-				{
-					pfunc=array[i].pfunc;
-					sprintf((char*)sen,"%s",array[i].path);
-					pnowRoute=&array[i];
-					break;
-				}
-			}
-		}
-		if(pfunc!=NULL)
-		{
-			if(pfunc!=loadFile&&pfunc!=deleteFile)
-				pfunc(http,*this,num,sen,len);
-			else
-				pfunc(http,*this,senLen,sen,len);
-		}
-		else
-		{
-			if(isDebug)
-				printf("http:%s\n",http.analysisHttpAsk(pget));
-			if(http.analysisHttpAsk(pget)!=NULL)
-			{
-				strcpy(ask,http.analysisHttpAsk(pget));
-				flag=http.autoAnalysisGet((char*)pget,(char*)sen,senLen*1024*1024,defaultFile,&len);
-			}
-			if(flag==2)
-			{
-				if(isDebug)
-				{
-					LogSystem::recordFileError(ask);
-					printf("404 get %s wrong\n",ask);
-				}
-			}
-		}
-		if(len==0)
-			http.createSendMsg(DealHttp::NOFOUND,(char*)sen,senLen*1024*1024,NULL,&len);
-		if(false==server.sendSocket(num,sen,len))
-		{
-			if(isDebug)
-				perror("send wrong");
-		}
-		else
-		{
-			if(isDebug)
-				printf("200 ok send success\n\n");
-		}
-		return 0;
-	}
-	void epollHttp(void* pget,int len,unsigned int senLen,void* pneed,const char* defaultFile)
-	{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
-		memset(pget,0,sizeof(char)*len);
-		int eventNum=epoll_wait(epfd,pevent,512,-1);
-		for(int i=0;i<eventNum;i++)
-		{
-			epoll_event temp=pevent[i];
-			if(temp.data.fd==sock)
-			{
-				sockaddr_in newaddr={0,0,{0},{0}};
-				int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
-				this->addFd(newClient);
-				nowEvent.data.fd=newClient;
-				nowEvent.events=EPOLLIN;
-				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
-				if(this->clientIn!=NULL)
-				{
-					strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
-					clientIn(*this,newClient,pget,newaddr.sin_port);
-				}
-			}
-			else
-			{
-				int getNum=recv(temp.data.fd,(char*)pget,len,0);
-				if(getNum>0)
-				{
-					this->textLen=getNum;
-					func(temp.data.fd,pget,pneed,senLen,defaultFile,*this);
-					if(logFunc!=NULL)
-						logFunc(this->recText(),temp.data.fd);
-					if(isLongCon==false)
-					{
-				  		this->deleteFd(temp.data.fd);
-						epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
-						close(temp.data.fd);						
-					}
-				}
-				else
-				{
-					if(this->clientOut!=NULL)
-					{
-						int port=0;
-						strcpy((char*)pget,this->getPeerIp(temp.data.fd,&port));
-						clientOut(*this,temp.data.fd,pget,port);
-					}
-					this->deleteFd(temp.data.fd);
-					epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
-					close(temp.data.fd);
-				}
-			}
-		}
-		return ;
-	}
-	void forkHttp(void* pget,int len,unsigned int senLen,void* pneed,const char* defaultFile)
-	{
-		memset(pget,0,sizeof(char)*len);
-		int eventNum=epoll_wait(epfd,pevent,512,-1);
-		for(int i=0;i<eventNum;i++)
-		{
-			epoll_event temp=pevent[i];
-			if(temp.data.fd==sock)
-			{
-				sockaddr_in newaddr={0,0,{0},{0}};
-				int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
-				this->addFd(newClient);
-				nowEvent.data.fd=newClient;
-				nowEvent.events=EPOLLIN|EPOLLET;
-				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
-				if(this->clientIn!=NULL)
-				{
-					strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
-					clientIn(*this,newClient,pget,newaddr.sin_port);
-				}
-			}
-			else
-			{
-				int getNum=recv(temp.data.fd,(char*)pget,len,0);
-				if(getNum>0)
-				{
-					this->textLen=getNum;
-					if(fork()==0)
-					{
-						close(sock);
-						func(temp.data.fd,pget,pneed,senLen,defaultFile,*this);
-						if(logFunc!=NULL)
-							logFunc(this->recText(),temp.data.fd);
-						close(temp.data.fd);
-						free(pget);
-						free(pneed);
-						exit(0);
-					}
-					else
-					{
-						if(isLongCon==false)
-						{
-					  		this->deleteFd(temp.data.fd);
-							epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
-							close(temp.data.fd);
-						}
-					}
-				}
-				else
-				{
-					if(this->clientOut!=NULL)
-					{
-						int port=0;
-						strcpy((char*)pget,this->getPeerIp(temp.data.fd,&port));
-						clientOut(*this,temp.data.fd,pget,port);
-					}
-					this->deleteFd(temp.data.fd);
-					epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
-					close(temp.data.fd);
-				}
-			}
-		}
-		return ;
-	}
-	inline RouteFuntion* getNowRoute()
-	{
-		return pnowRoute;
-	}
-	static void loadFile(DealHttp& http,HttpServer& server,int senLen,void* sen,int& len)
-	{
-		char ask[200]={0},buf[300]={0},temp[200]={0};
-		http.getAskRoute(server.recText(),"GET",ask,200);
-		HttpServer::RouteFuntion& route=*server.getNowRoute();
-		http.getWildUrl(ask,route.route,temp,200);
-		sprintf(buf,"GET %s%s HTTP/1.1",route.path,temp);
-		if(2==http.autoAnalysisGet(buf,(char*)sen,senLen*1024*1024,NULL,&len))
-		{
-			LogSystem::recordFileError(ask);
-			printf("404 get %s wrong\n",buf);
-		}
-	}
-	static void deleteFile(DealHttp& http,HttpServer&,int senLen,void* sen,int& len)
-	{
-		http.customizeAddTop(sen,senLen*1024*1024,DealHttp::STATUSFORBIDDEN,strlen("403 forbidden"),"text/plain");
-		http.customizeAddBody(sen,senLen*1024*1024,"403 forbidden",strlen("403 forbidden"));
-		len=strlen((char*)sen);
-	}
-	static void sigCliDeal(int )
-	{
-		while(waitpid(-1, NULL, WNOHANG)>0);
-	}
-};
 class ThreadPool{
 public://a struct for you to add task
 	struct Task{
@@ -3054,6 +2444,655 @@ public:
 		pthread_attr_init(&attr);
 		pthread_attr_setdetachstate(&attr,PTHREAD_CREATE_DETACHED);
 		pthread_create(&thread,&attr,pfunc,arg);
+	}
+};
+class HttpServer:private ServerTcpIp{
+public://main class for http server2.0
+	enum RouteType{//oneway stand for like /hahah,wild if /hahah/*,static is recource static
+		ONEWAY,WILD,STATIC,
+	};
+	enum AskType{//different ask ways in http
+		GET,POST,PUT,DELETE,OPTIONS,ALL,
+	};
+	struct RouteFuntion{//inside struct,pack for handle
+		AskType ask;
+		RouteType type;
+		char route[100];
+		const char* path;
+		void (*pfunc)(DealHttp&,HttpServer&,int num,void* sen,int&);
+	};
+private:
+	RouteFuntion* arrRoute;
+	RouteFuntion* pnowRoute;
+	void* getText;
+	unsigned int maxNum;
+	unsigned int now;
+	unsigned int boundPort;
+	int textLen;
+	bool isDebug;
+	bool isLongCon;
+	bool isFork;
+	void (*clientIn)(HttpServer&,int num,void* ip,int port);
+	void (*clientOut)(HttpServer&,int num,void* ip,int port);
+	void (*logFunc)(const void*,int);
+public:
+	HttpServer(unsigned port,bool debug=false):ServerTcpIp(port)
+	{
+		getText=NULL;
+		boundPort=port;
+		arrRoute=NULL;
+		arrRoute=(RouteFuntion*)malloc(sizeof(RouteFuntion)*20);
+		if(arrRoute==NULL)
+			this->error="route wrong";
+		else
+			memset(arrRoute,0,sizeof(RouteFuntion)*20);
+		now=0;
+		maxNum=20;
+		isDebug=debug;
+		isLongCon=true;
+		isFork=false;
+		textLen=0;
+		clientIn=NULL;
+		clientOut=NULL;
+		logFunc=NULL;
+		pnowRoute=NULL;
+	}
+	~HttpServer()
+	{
+		if(arrRoute!=NULL)
+			free(arrRoute);
+	}
+	bool routeHandle(AskType ask,RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&))
+	{
+		if(strlen(route)>100)
+			return false;
+		if(maxNum-now<=2)
+		{
+			arrRoute=(RouteFuntion*)realloc(arrRoute,sizeof(RouteFuntion)*(now+10));
+			if(arrRoute==NULL)
+				return false;
+			maxNum+=10;
+		}
+		if(type==STATIC)
+		{
+			error="cannot set static route";
+			return false;
+		}
+		arrRoute[now].type=type;
+		arrRoute[now].ask=ask;
+		strcpy(arrRoute[now].route,route);
+		arrRoute[now].pfunc=pfunc;
+		now++;
+		return true;
+	}
+	bool loadStatic(const char* route,const char* staticPath)
+	{
+		if(strlen(route)>100)
+			return false;
+		if(maxNum-now<=2)
+		{
+			arrRoute=(RouteFuntion*)realloc(arrRoute,sizeof(RouteFuntion)*(now+10));
+			if(arrRoute==NULL)
+				return false;
+			maxNum+=10;
+		}
+		arrRoute[now].type=STATIC;
+		arrRoute[now].ask=GET;
+		strcpy(arrRoute[now].route,route);
+		arrRoute[now].path=staticPath;
+		arrRoute[now].pfunc=loadFile;
+		now++;
+		return true;
+	}
+	bool deletePath(const char* path)
+	{
+		if(strlen(path)>100)
+			return false;
+		if(maxNum-now<=2)
+		{
+			arrRoute=(RouteFuntion*)realloc(arrRoute,sizeof(RouteFuntion)*(now+10));
+			if(arrRoute==NULL)
+				return false;
+			maxNum+=10;
+		}
+		arrRoute[now].type=STATIC;
+		arrRoute[now].ask=GET;
+		strcpy(arrRoute[now].route,path);
+		arrRoute[now].pfunc=deleteFile;
+		now++;
+		return true;
+	}
+	bool get(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&))
+	{
+		if(strlen(route)>100)
+			return false;
+		if(maxNum-now<=2)
+		{
+			arrRoute=(RouteFuntion*)realloc(arrRoute,sizeof(RouteFuntion)*(now+10));
+			if(arrRoute==NULL)
+				return false;
+			maxNum+=10;
+		}
+		arrRoute[now].type=type;
+		arrRoute[now].ask=GET;
+		strcpy(arrRoute[now].route,route);
+		arrRoute[now].pfunc=pfunc;
+		now++;
+		return true;	
+	}
+	bool post(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&))
+	{
+		if(strlen(route)>100)
+			return false;
+		if(maxNum-now<=2)
+		{
+			arrRoute=(RouteFuntion*)realloc(arrRoute,sizeof(RouteFuntion)*(now+10));
+			if(arrRoute==NULL)
+				return false;
+			maxNum+=10;
+		}
+		arrRoute[now].type=type;
+		arrRoute[now].ask=POST;
+		strcpy(arrRoute[now].route,route);
+		arrRoute[now].pfunc=pfunc;
+		now++;
+		return true;	
+	}
+	bool all(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&))
+	{
+		if(strlen(route)>100)
+			return false;
+		if(maxNum-now<=2)
+		{
+			arrRoute=(RouteFuntion*)realloc(arrRoute,sizeof(RouteFuntion)*(now+10));
+			if(arrRoute==NULL)
+				return false;
+			maxNum+=10;
+		}
+		arrRoute[now].type=type;
+		arrRoute[now].ask=ALL;
+		strcpy(arrRoute[now].route,route);
+		arrRoute[now].pfunc=pfunc;
+		now++;
+		return true;	
+	}
+	bool clientInHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port))
+	{
+		if(clientIn!=NULL)
+			return false;
+		clientIn=pfunc;
+		return true;
+	}
+	bool clientOutHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port))
+	{
+		if(clientOut!=NULL)
+			return false;
+		clientOut=pfunc;
+		return true;
+	}
+	bool setLog(void (*pfunc)(const void*,int))
+	{
+		if(logFunc!=NULL)
+			return false;
+		logFunc=pfunc;
+		return true;
+	}
+	void run(unsigned int memory,unsigned int recBufLenChar,const char* defaultFile)
+	{
+		char* get=(char*)malloc(sizeof(char)*recBufLenChar);
+		char* sen=(char*)malloc(sizeof(char)*memory*1024*1024);
+		if(sen==NULL||get==NULL)
+		{
+			this->error="malloc get and sen wrong";
+			return;
+		}
+		memset(get,0,sizeof(char)*recBufLenChar);
+		memset(sen,0,sizeof(char)*memory*1024*1024);
+		if(false==this->bondhost())
+		{
+			this->error="bound wrong";
+			return;
+		}
+		if(false==this->setlisten())
+		{
+			this->error="set listen wrong";
+			return;
+		}
+		this->getText=get;
+		if(isDebug)
+			messagePrint();
+		if(isFork==false)
+			while(1)
+				this->epollHttp(get,recBufLenChar,memory,sen,defaultFile);
+		else
+			while(1)
+				this->forkHttp(get,recBufLenChar,memory,sen,defaultFile);
+		free(sen);
+		free(get);
+	}
+	int httpSend(int num,void* buffer,int sendLen)
+	{
+		return this->sendSocket(num,buffer,sendLen);
+	}
+	int httpRecv(int num,void* buffer,int bufferLen)
+	{
+		return this->receiveSocket(num,buffer,bufferLen);
+	}
+	int getCompleteMessage(const void* message,unsigned int messageLen,void* buffer,unsigned int buffLen,int sockCli)
+	{
+		if(message==NULL||buffer==NULL||buffLen<=0||message==0)
+			return -1;
+		unsigned int len=0;
+		char* temp=NULL;
+		if((temp=strstr((char*)message,"Content-Length"))==NULL)
+			return -1;
+		if(sscanf(temp+strlen("Content-Length")+1,"%d",&len)<=0)
+			return -1;
+		if((temp=strstr((char*)message,"\r\n\r\n"))==NULL)
+			return -1;
+		temp+=4;
+		if(strlen(temp)>=len)
+			return 0;
+		if(strlen((char*)message)+len>buffLen)
+			return -2;
+		memcpy(buffer,message,messageLen);
+		unsigned int leftLen=len-strlen(temp),getLen=0,all=0;
+		while(leftLen>5||getLen<=0)
+		{
+			getLen=this->httpRecv(sockCli,(char*)buffer+messageLen+all,buffLen-messageLen-all);
+			all+=getLen;
+			leftLen-=getLen;
+		}
+		return len;
+	}
+	void changeSetting(bool debug,bool isLongCon,bool isForkModel)
+	{
+		this->isDebug=debug;
+		this->isLongCon=isLongCon;
+		this->isFork=isForkModel;
+		if(isFork==true)
+			signal(SIGCHLD,sigCliDeal);
+	}
+	inline void* recText()
+	{
+		return this->getText;
+	}
+	inline int recLen()
+	{
+		return this->textLen;
+	}
+	inline const char* lastError()
+	{
+		return error;
+	}
+	inline bool disconnect(int soc)
+	{
+		return this->disconnectSocket(soc);
+	}
+private:
+	void messagePrint()
+	{
+		printf("server is ok\n");
+		printf("port:\t\t%u\n",boundPort);
+		for(unsigned i=0;i<now;i++)
+		{
+			switch(arrRoute[i].type)
+			{
+			case ONEWAY:
+				printf("%s\t\t->\t",arrRoute[i].route);
+				break;
+			case WILD:
+				printf("%s*\t\t->\t",arrRoute[i].route);
+				break;
+			case STATIC:
+				if(arrRoute[i].pfunc==loadFile)
+					printf("%s\t\t->%s\n",arrRoute[i].route,arrRoute[i].path);
+				else if(arrRoute[i].pfunc==deleteFile)
+					printf("%s\t\t->delete",arrRoute[i].route);
+				else
+					printf("undefine funtion please check the server");
+				continue;
+			}
+			switch(arrRoute[i].ask)
+			{
+			case GET:
+				printf("GET\n");
+				break;
+			case POST:
+				printf("POST\n");
+				break;
+			case ALL:
+				printf("All\n");
+				break;
+			case PUT:
+				printf("PUT\n");
+				break;
+			case DELETE:
+				printf("DELETE\n");
+				break;
+			case OPTIONS:
+				printf("OPTIONS\n");
+				break;
+			}
+		}
+		if(logFunc!=NULL)
+			printf("log function set\n");
+		if(clientIn!=NULL)
+			printf("client in function set\n");
+		if(clientOut!=NULL)
+			printf("client out function set\n");
+	}
+	int func(int num,void* pget,void* sen,unsigned int senLen,const char* defaultFile,HttpServer& server)
+	{
+		static DealHttp http;
+		AskType type=GET;
+		int len=0,flag=2;
+		char ask[200]={0};
+		sscanf((char*)pget,"%100s",ask);
+		if(strstr(ask,"GET")!=NULL)
+		{
+			http.getAskRoute(pget,"GET",ask,200);
+			if(isDebug)
+				printf("Get url:%s\n",ask);
+			type=GET;
+		}
+		else if(strstr(ask,"POST")!=NULL)
+		{
+			http.getAskRoute(pget,"POST",ask,200);
+			if(isDebug)
+				printf("POST url:%s\n",ask);
+			type=POST;
+		}
+		else if(strstr(ask,"PUT")!=NULL)
+		{
+			http.getAskRoute(pget,"PUT",ask,200);
+			if(isDebug)
+				printf("PUT url:%s\n",ask);
+			type=PUT;
+		}
+		else if(strstr(ask,"DELETE")!=NULL)
+		{
+			http.getAskRoute(pget,"DELETE",ask,200);
+			if(isDebug)
+				printf("DELETE url:%s\n",ask);
+			type=DELETE;
+		}
+		else if(strstr(ask,"OPTIONS")!=NULL)
+		{
+			http.getAskRoute(pget,"OPTIONS",ask,200);
+			if(isDebug)
+				printf("OPTIONS url:%s\n",ask);
+			type=OPTIONS;
+		}
+		else 
+		{
+			memset(ask,0,sizeof(char)*200);
+			if(isDebug)
+				printf("way not support\n");
+			type=GET;
+		}
+		void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&)=NULL;
+		for(unsigned int i=0;i<now;i++)
+		{
+			if(arrRoute[i].type==ONEWAY&&(arrRoute[i].ask==type||arrRoute[i].ask==ALL))
+			{
+				if(strcmp(ask,arrRoute[i].route)==0)
+				{
+					pfunc=arrRoute[i].pfunc;
+					pnowRoute=&arrRoute[i];
+					break;
+				}
+			}
+			else if(arrRoute[i].type==WILD&&(arrRoute[i].ask==type||arrRoute[i].ask==ALL))
+			{
+				if(strstr(ask,arrRoute[i].route)!=NULL)
+				{
+					pfunc=arrRoute[i].pfunc;
+					pnowRoute=&arrRoute[i];
+					break;						
+				}
+			}
+			else if(arrRoute[i].type==STATIC&&type==GET)
+			{
+				if(strstr(ask,arrRoute[i].route)!=NULL)
+				{
+					pfunc=arrRoute[i].pfunc;
+					sprintf((char*)sen,"%s",arrRoute[i].path);
+					pnowRoute=&arrRoute[i];
+					break;
+				}
+			}
+		}
+		if(pfunc!=NULL)
+		{
+			if(pfunc!=loadFile&&pfunc!=deleteFile)
+				pfunc(http,*this,num,sen,len);
+			else
+				pfunc(http,*this,senLen,sen,len);
+		}
+		else
+		{
+			if(isDebug)
+				printf("http:%s\n",http.analysisHttpAsk(pget));
+			if(http.analysisHttpAsk(pget)!=NULL)
+			{
+				strcpy(ask,http.analysisHttpAsk(pget));
+				flag=http.autoAnalysisGet((char*)pget,(char*)sen,senLen*1024*1024,defaultFile,&len);
+			}
+			if(flag==2)
+			{
+				if(isDebug)
+				{
+					LogSystem::recordFileError(ask);
+					printf("404 get %s wrong\n",ask);
+				}
+			}
+		}
+		if(len==0)
+			http.createSendMsg(DealHttp::NOFOUND,(char*)sen,senLen*1024*1024,NULL,&len);
+		if(0>=server.sendSocket(num,sen,len))
+		{
+			if(isDebug)
+				perror("send wrong");
+		}
+		else
+		{
+			if(isDebug)
+				printf("200 ok send success\n\n");
+		}
+		return 0;
+	}
+	void epollHttp(void* pget,int len,unsigned int senLen,void* pneed,const char* defaultFile)
+	{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
+		memset(pget,0,sizeof(char)*len);
+		int eventNum=epoll_wait(epfd,pevent,512,-1);
+		for(int i=0;i<eventNum;i++)
+		{
+			epoll_event temp=pevent[i];
+			if(temp.data.fd==sock)
+			{
+				sockaddr_in newaddr={0,0,{0},{0}};
+				int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
+				this->addFd(newClient);
+				nowEvent.data.fd=newClient;
+				nowEvent.events=EPOLLIN;
+				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
+				if(this->clientIn!=NULL)
+				{
+					strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
+					clientIn(*this,newClient,pget,newaddr.sin_port);
+				}
+			}
+			else
+			{
+				int getNum=recv(temp.data.fd,(char*)pget,len,0);
+				if(getNum>0)
+				{
+					this->textLen=getNum;
+					func(temp.data.fd,pget,pneed,senLen,defaultFile,*this);
+					if(logFunc!=NULL)
+						logFunc(this->recText(),temp.data.fd);
+					if(isLongCon==false)
+					{
+				  		this->deleteFd(temp.data.fd);
+						epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
+						close(temp.data.fd);						
+					}
+				}
+				else
+				{
+					if(this->clientOut!=NULL)
+					{
+						int port=0;
+						strcpy((char*)pget,this->getPeerIp(temp.data.fd,&port));
+						clientOut(*this,temp.data.fd,pget,port);
+					}
+					this->deleteFd(temp.data.fd);
+					epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
+					close(temp.data.fd);
+				}
+			}
+		}
+		return ;
+	}
+	void forkHttp(void* pget,int len,unsigned int senLen,void* pneed,const char* defaultFile)
+	{
+		memset(pget,0,sizeof(char)*len);
+		int eventNum=epoll_wait(epfd,pevent,512,-1);
+		for(int i=0;i<eventNum;i++)
+		{
+			epoll_event temp=pevent[i];
+			if(temp.data.fd==sock)
+			{
+				sockaddr_in newaddr={0,0,{0},{0}};
+				int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
+				this->addFd(newClient);
+				nowEvent.data.fd=newClient;
+				nowEvent.events=EPOLLIN|EPOLLET;
+				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
+				if(this->clientIn!=NULL)
+				{
+					strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
+					clientIn(*this,newClient,pget,newaddr.sin_port);
+				}
+			}
+			else
+			{
+				int getNum=recv(temp.data.fd,(char*)pget,len,0);
+				if(getNum>0)
+				{
+					this->textLen=getNum;
+					if(fork()==0)
+					{
+						close(sock);
+						func(temp.data.fd,pget,pneed,senLen,defaultFile,*this);
+						if(logFunc!=NULL)
+							logFunc(this->recText(),temp.data.fd);
+						close(temp.data.fd);
+						free(pget);
+						free(pneed);
+						exit(0);
+					}
+					else
+					{
+						if(isLongCon==false)
+						{
+					  		this->deleteFd(temp.data.fd);
+							epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
+							close(temp.data.fd);
+						}
+					}
+				}
+				else
+				{
+					if(this->clientOut!=NULL)
+					{
+						int port=0;
+						strcpy((char*)pget,this->getPeerIp(temp.data.fd,&port));
+						clientOut(*this,temp.data.fd,pget,port);
+					}
+					this->deleteFd(temp.data.fd);
+					epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
+					close(temp.data.fd);
+				}
+			}
+		}
+		return ;
+	}
+	inline RouteFuntion* getNowRoute()
+	{
+		return pnowRoute;
+	}
+	struct ThreadArg{
+		HttpServer* pserver;
+		int soc;
+		unsigned memory;
+		unsigned recBufMax;
+		const char* defaultFile;
+	};
+	static void* threadWorker(void* self)
+	{
+		ThreadArg* argv=(ThreadArg*)self;
+		HttpServer& server=*argv->pserver;
+		int cli=argv->soc;
+		char* sen=(char*)malloc(sizeof(char)*argv->memory*1024*0124);
+		char* rec=(char*)malloc(sizeof(char)*argv->recBufMax);
+		if(sen==NULL||rec==NULL)
+		{
+			close(cli);
+			free(self);
+			return NULL;
+		}
+		memset(sen,0,sizeof(char)*argv->memory);
+		memset(rec,0,sizeof(char)*argv->recBufMax);
+		if(server.clientIn!=NULL)
+		{
+			int port=0;
+			strcpy((char*)sen,server.getPeerIp(cli,&port));
+			server.clientIn(server,cli,sen,port);
+		}
+		int recLen=server.receiveSocket(cli,rec,sizeof(char)*argv->recBufMax);
+		while(recLen>=10)
+		{
+			/* server.pool->mutexLock(); */
+			server.func(cli,rec,sen,sizeof(char)*argv->memory,argv->defaultFile,server);
+			/* server.pool->mutexUnlock(); */
+			memset(rec,0,sizeof(char)*argv->recBufMax);
+			recLen=server.receiveSocket(cli,rec,sizeof(char)*argv->recBufMax);
+		}
+		if(server.clientOut!=NULL)
+		{
+			int port=0;
+			strcpy((char*)sen,server.getPeerIp(cli,&port));
+			server.clientOut(server,cli,sen,port);
+		}
+		free(sen);
+		free(rec);
+		free(self);
+		return NULL;
+	}
+	static void loadFile(DealHttp& http,HttpServer& server,int senLen,void* sen,int& len)
+	{
+		char ask[200]={0},buf[300]={0},temp[200]={0};
+		http.getAskRoute(server.recText(),"GET",ask,200);
+		HttpServer::RouteFuntion& route=*server.getNowRoute();
+		http.getWildUrl(ask,route.route,temp,200);
+		sprintf(buf,"GET %s%s HTTP/1.1",route.path,temp);
+		if(2==http.autoAnalysisGet(buf,(char*)sen,senLen*1024*1024,NULL,&len))
+		{
+			LogSystem::recordFileError(ask);
+			printf("404 get %s wrong\n",buf);
+		}
+	}
+	static void deleteFile(DealHttp& http,HttpServer&,int senLen,void* sen,int& len)
+	{
+		http.customizeAddTop(sen,senLen*1024*1024,DealHttp::STATUSFORBIDDEN,strlen("403 forbidden"),"text/plain");
+		http.customizeAddBody(sen,senLen*1024*1024,"403 forbidden",strlen("403 forbidden"));
+		len=strlen((char*)sen);
+	}
+	static void sigCliDeal(int )
+	{
+		while(waitpid(-1, NULL, WNOHANG)>0);
 	}
 };
 class ServerPool:public ServerTcpIp{
