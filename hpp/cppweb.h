@@ -1292,6 +1292,7 @@ public:
 };
 class DealHttp{
 public:
+	friend class HttpServer;
 	enum FileKind{
 		UNKNOWN=0,HTML=1,TXT=2,IMAGE=3,NOFOUND=4,CSS=5,JS=6,ZIP=7,JSON=8,
 	};
@@ -1307,7 +1308,7 @@ public:
 		std::unordered_map<std::string,std::string> cookie;
 		std::string typeName;
 		const void* body;
-		Datagram():statusCode(STATUSOK),typeFile(TXT),body(NULL){};
+		Datagram():statusCode(STATUSOK),typeFile(TXT),fileLen(0),body(NULL){};
 	};
 	struct Request{
 		std::string method;
@@ -1323,6 +1324,7 @@ private:
 	const char* error;
 	const char* connect;
 	const char* serverName;
+	const Datagram* preData;
 public:
 	DealHttp()
 	{
@@ -1330,6 +1332,7 @@ public:
 			ask[i]=0;
 		pfind=NULL;
 		error=NULL;
+		preData=NULL;
 		connect="keep-alive";
 		serverName="LCserver/1.1";
 	}
@@ -1362,6 +1365,14 @@ private:
 		sprintf(ptop,"HTTP/1.1 200 OK\r\n"
 				"Server %s\r\n"
 				"Connection: %s\r\n",serverName,connect);
+		if(preData!=NULL)
+		{
+			for(auto iter=preData->head.begin();iter!=preData->head.end();iter++)
+				sprintf(ptop,"%s%s: %s\r\n",\
+						ptop,iter->first.c_str(),iter->second.c_str());
+			for(auto iter=preData->cookie.begin();iter!=preData->cookie.end();iter++)
+				setCookie(ptop,bufLen,iter->first.c_str(),iter->second.c_str());
+		}
 		switch (kind)
 		{
 		   case UNKNOWN:
@@ -1577,6 +1588,27 @@ public:
 		}
 		strcat((char*)buffer,"\r\n");
 		return true;
+	}
+	std::string designCookie(const char* value,int liveTime=-1,const char* path=NULL,const char* domain=NULL)
+	{
+		std::string result="";
+		result+=value;
+		result+=";";
+		result+="max-age="+std::to_string(liveTime);
+		result+=";";
+		if(path!=NULL)
+		{
+			result+="Path=";
+			result+=path;
+			result+=";";
+		}
+		if(domain!=NULL)
+		{
+			result+="Domain=";
+			result+=domain;
+			result+=";";
+		}
+		return result;
 	}
 	const char* getCookie(void* recText,const char* key,char* value,unsigned int valueLen)
 	{
@@ -1902,9 +1934,16 @@ public:
 			return -1;
 		}
 		sprintf((char*)buffer,"HTTP/1.1 %d %s\r\n"
-			"Server LCserver/1.1\r\n"
-			"Connection: keep-alive\r\n",
-			gram.statusCode,statusEng);
+			"Server %s\r\n"
+			"Connection: %s\r\n",
+			gram.statusCode,statusEng,serverName,connect);
+		if(gram.statusCode==STATUSNOFOUND)
+		{
+			sprintf((char*)buffer,"%sContent-Type: text/plain\r\n"
+					"Content-Length:%zu\r\n\r\n404 page no found"
+					,(char*)buffer,strlen("404 page no found"));
+			return strlen((char*)buffer);
+		}
 		if(gram.fileLen==0)
 		{
 			sprintf((char*)buffer,"\r\n");
@@ -1957,8 +1996,9 @@ public:
 				setCookie(buffer,bufferLen,iter->first.c_str(),iter->second.c_str());
 		return customizeAddBody(buffer,bufferLen,(char*)gram.body,gram.fileLen);
 	}
-	void changeSetting(const char* connectStatus,const char* serverName)
+	void changeSetting(const char* connectStatus,const char* serverName,const Datagram* head=NULL)
 	{
+		this->preData=head;
 		if(serverName==NULL||connectStatus==NULL)
 			return;
 		this->serverName=serverName;
@@ -2465,6 +2505,10 @@ private:
 	RouteFuntion* arrRoute;
 	RouteFuntion* pnowRoute;
 	void* getText;
+	void* senText;
+	const char* defaultFile;
+	unsigned int senLen;
+	unsigned int recLen;
 	unsigned int maxNum;
 	unsigned int now;
 	unsigned int boundPort;
@@ -2472,6 +2516,7 @@ private:
 	bool isDebug;
 	bool isLongCon;
 	bool isFork;
+	void (*middleware)(HttpServer&,DealHttp&,int num,DealHttp::Datagram&);
 	void (*clientIn)(HttpServer&,int num,void* ip,int port);
 	void (*clientOut)(HttpServer&,int num,void* ip,int port);
 	void (*logFunc)(const void*,int);
@@ -2479,6 +2524,10 @@ public:
 	HttpServer(unsigned port,bool debug=false):ServerTcpIp(port)
 	{
 		getText=NULL;
+		senText=NULL;
+		middleware=NULL;
+		defaultFile=NULL;
+		senLen=0;
 		boundPort=port;
 		arrRoute=NULL;
 		arrRoute=(RouteFuntion*)malloc(sizeof(RouteFuntion)*20);
@@ -2630,6 +2679,22 @@ public:
 		clientOut=pfunc;
 		return true;
 	}
+	bool setMiddleware(void (*pfunc)(HttpServer&,DealHttp&,int,DealHttp::Datagram&))
+	{
+		if(middleware!=NULL)
+			return false;
+		middleware=pfunc;
+		return true;
+	}
+	inline void continueNext(int cliSock)
+	{
+		if(middleware==NULL)
+			return;
+		auto temp=middleware;
+		middleware=NULL;
+		func(cliSock);
+		middleware=temp;
+	}
 	bool setLog(void (*pfunc)(const void*,int))
 	{
 		if(logFunc!=NULL)
@@ -2639,14 +2704,14 @@ public:
 	}
 	void run(unsigned int memory,unsigned int recBufLenChar,const char* defaultFile)
 	{
-		char* get=(char*)malloc(sizeof(char)*recBufLenChar);
+		char* getT=(char*)malloc(sizeof(char)*recBufLenChar);
 		char* sen=(char*)malloc(sizeof(char)*memory*1024*1024);
-		if(sen==NULL||get==NULL)
+		if(sen==NULL||getT==NULL)
 		{
 			this->error="malloc get and sen wrong";
 			return;
 		}
-		memset(get,0,sizeof(char)*recBufLenChar);
+		memset(getT,0,sizeof(char)*recBufLenChar);
 		memset(sen,0,sizeof(char)*memory*1024*1024);
 		if(false==this->bondhost())
 		{
@@ -2658,17 +2723,21 @@ public:
 			this->error="set listen wrong";
 			return;
 		}
-		this->getText=get;
+		this->getText=getT;
+		this->senText=sen;
+		this->senLen=memory;
+		this->recLen=recBufLenChar;
+		this->defaultFile=defaultFile;
 		if(isDebug)
 			messagePrint();
 		if(isFork==false)
 			while(1)
-				this->epollHttp(get,recBufLenChar,memory,sen,defaultFile);
+				this->epollHttp();
 		else
 			while(1)
-				this->forkHttp(get,recBufLenChar,memory,sen,defaultFile);
+				this->forkHttp();
 		free(sen);
-		free(get);
+		free(getT);
 	}
 	int httpSend(int num,void* buffer,int sendLen)
 	{
@@ -2717,7 +2786,7 @@ public:
 	{
 		return this->getText;
 	}
-	inline int recLen()
+	inline int getRecLen()
 	{
 		return this->textLen;
 	}
@@ -2782,12 +2851,24 @@ private:
 		if(clientOut!=NULL)
 			printf("client out function set\n");
 	}
-	int func(int num,void* pget,void* sen,unsigned int senLen,const char* defaultFile,HttpServer& server)
+	int func(int num)
 	{
 		static DealHttp http;
 		AskType type=GET;
 		int len=0,flag=2;
 		char ask[200]={0};
+		if(middleware!=NULL)
+		{
+			DealHttp::Datagram gram;
+			http.changeSetting(NULL,NULL,&gram);
+			middleware(*this,http,num,gram);
+			http.changeSetting(NULL,NULL,NULL);
+			return 0;
+		}
+		if(isLongCon==false)
+			http.changeSetting("Close","LCserver/1.1",NULL);
+		void* pget=this->getText;
+		void* sen=this->senText;
 		sscanf((char*)pget,"%100s",ask);
 		if(strstr(ask,"GET")!=NULL)
 		{
@@ -2845,7 +2926,7 @@ private:
 			}
 			else if(arrRoute[i].type==WILD&&(arrRoute[i].ask==type||arrRoute[i].ask==ALL))
 			{
-				if(strstr(ask,arrRoute[i].route)!=NULL)
+				if(strncmp(ask,arrRoute[i].route,strlen(arrRoute[i].route))==0)
 				{
 					pfunc=arrRoute[i].pfunc;
 					pnowRoute=&arrRoute[i];
@@ -2862,6 +2943,8 @@ private:
 					break;
 				}
 			}
+			else
+				continue;
 		}
 		if(pfunc!=NULL)
 		{
@@ -2890,7 +2973,7 @@ private:
 		}
 		if(len==0)
 			http.createSendMsg(DealHttp::NOFOUND,(char*)sen,senLen*1024*1024,NULL,&len);
-		if(0>=server.sendSocket(num,sen,len))
+		if(0>=this->sendSocket(num,sen,len))
 		{
 			if(isDebug)
 				perror("send wrong");
@@ -2902,8 +2985,10 @@ private:
 		}
 		return 0;
 	}
-	void epollHttp(void* pget,int len,unsigned int senLen,void* pneed,const char* defaultFile)
+	void epollHttp()
 	{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
+		void* pget=this->getText;
+		unsigned len=this->recLen;
 		memset(pget,0,sizeof(char)*len);
 		int eventNum=epoll_wait(epfd,pevent,512,-1);
 		for(int i=0;i<eventNum;i++)
@@ -2929,7 +3014,7 @@ private:
 				if(getNum>0)
 				{
 					this->textLen=getNum;
-					func(temp.data.fd,pget,pneed,senLen,defaultFile,*this);
+					func(temp.data.fd);
 					if(logFunc!=NULL)
 						logFunc(this->recText(),temp.data.fd);
 					if(isLongCon==false)
@@ -2955,8 +3040,10 @@ private:
 		}
 		return ;
 	}
-	void forkHttp(void* pget,int len,unsigned int senLen,void* pneed,const char* defaultFile)
+	void forkHttp()
 	{
+		void* pget=this->getText;
+		unsigned len=this->recLen;
 		memset(pget,0,sizeof(char)*len);
 		int eventNum=epoll_wait(epfd,pevent,512,-1);
 		for(int i=0;i<eventNum;i++)
@@ -2985,12 +3072,12 @@ private:
 					if(fork()==0)
 					{
 						close(sock);
-						func(temp.data.fd,pget,pneed,senLen,defaultFile,*this);
+						func(temp.data.fd);
 						if(logFunc!=NULL)
 							logFunc(this->recText(),temp.data.fd);
 						close(temp.data.fd);
 						free(pget);
-						free(pneed);
+						free(this->senText);
 						exit(0);
 					}
 					else
@@ -3055,7 +3142,7 @@ private:
 		while(recLen>=10)
 		{
 			/* server.pool->mutexLock(); */
-			server.func(cli,rec,sen,sizeof(char)*argv->memory,argv->defaultFile,server);
+			server.func(cli);
 			/* server.pool->mutexUnlock(); */
 			memset(rec,0,sizeof(char)*argv->recBufMax);
 			recLen=server.receiveSocket(cli,rec,sizeof(char)*argv->recBufMax);
