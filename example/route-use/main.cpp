@@ -2,32 +2,36 @@
 #include "../../hpp/cppweb.h"
 using namespace cppweb;
 using namespace std;
-void pfuncTwo(DealHttp & http, HttpServer & , int , void * sen, int & len)
+void pfuncTwo(HttpServer&,DealHttp&,int,DealHttp::Datagram& gram)
 {
 	char temp[]="is a text file";
-	DealHttp::Datagram gram;
 	gram.typeFile=DealHttp::TXT;
 	gram.body=temp;
+	std::cout<<gram.body<<endl;
 	gram.fileLen=strlen(temp);
 	gram.statusCode=DealHttp::STATUSOK;
-	len=http.createDatagram(gram,sen,1024*1024);
 }
-void pfunc(DealHttp & http, HttpServer & server, int , void * sen, int & len)
+void pfunc(HttpServer& server,DealHttp& http,int,DealHttp::Datagram& gram)
 {
-	char url[100]={0},value[30]={0};
+	char url[100]={0};
 	Json json;
 	char* strJson=json.createObject(200);
 	http.getWildUrl(server.recText(),"/root/",url,100);//get url wild
 	/* http.getRouteValue(url,"name",value,30);//get name value */
-	printf("value:%s\n",value);
+	/* printf("value:%s\n",value); */
 	json.addKeyVal(strJson,Json::STRING,"name",url);
 	json.addKeyVal(strJson,Json::STRING,"welcome","you");
-	DealHttp::Datagram gram;
 	gram.typeFile=DealHttp::JSON;
 	gram.body=strJson;
 	gram.statusCode=DealHttp::STATUSOK;
 	gram.fileLen=strlen(strJson);
-	len=http.createDatagram(gram,sen,1024*1024);
+}
+void pfuncThree(HttpServer& server,DealHttp& http,int,DealHttp::Datagram&)
+{
+	char* sen=(char*)server.getSenBuff();
+	http.customizeAddTop(sen,1024*1024,200,strlen("{\"as\":1}"));
+	int len=http.customizeAddBody(sen,1024*1024,"{\"as\":1}",strlen("{\"as\":1}"));
+	server.selfCreate(len);
 }
 int main()  
 {  
@@ -39,6 +43,7 @@ int main()
 	}
 	server.routeHandle(HttpServer::GET,HttpServer::WILD,"/root/",pfunc);
 	server.get(HttpServer::ONEWAY,"/txt",pfuncTwo);
+	server.get(HttpServer::WILD,"/try/",pfuncThree);
 	server.run(1,4000,"index.html");
     return 0; 
 }  
