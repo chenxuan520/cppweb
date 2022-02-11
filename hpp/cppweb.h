@@ -496,7 +496,7 @@ private:
 		free(val);
 		return root;
 	}
-	TypeJson analyseArray(char* begin,char* end,std::vector<Object*>& array)
+	TypeJson analyseArray(char* begin,char* end,std::vector<Object*>& arr)
 	{
 		char* now=begin+1,*next=end,*word=(char*)malloc(sizeof(char)*maxLen);
 		if(word==NULL)
@@ -520,12 +520,12 @@ private:
 				if(nextObj->type==INT)
 				{
 					findNum(now,type,&nextObj->intVal);
-					array.push_back(nextObj);
+					arr.push_back(nextObj);
 				}
 				else
 				{
 					findNum(now,type,&nextObj->floVal);
-					array.push_back(nextObj);
+					arr.push_back(nextObj);
 				}
 				now=strchr(now+1,',');
 				if(now!=NULL)
@@ -542,7 +542,7 @@ private:
 				nextObj->type=STRING;
 				nextObj->isData=true;
 				nextObj->strVal=word;
-				array.push_back(nextObj);
+				arr.push_back(nextObj);
 				now=strchr(now+1,',');
 				if(now==NULL)
 					break;
@@ -557,7 +557,7 @@ private:
 				nextObj->type=BOOL;
 				nextObj->isData=true;
 				nextObj->boolVal=strncmp(now,"true",4)==0;
-				array.push_back(nextObj);
+				arr.push_back(nextObj);
 				now=strchr(now+1,',');
 				if(now==NULL)
 					break;
@@ -572,7 +572,7 @@ private:
 				nextObj=analyseObj(now,next);
 				nextObj->type=OBJ;
 				nextObj->isData=true;
-				array.push_back(nextObj);
+				arr.push_back(nextObj);
 				now=next;
 				now=strchr(now+1,',');
 				if(now==NULL)
@@ -590,7 +590,7 @@ private:
 				nextObj->type=ARRAY;
 				nextObj->arrType=type;
 				nextObj->isData=true;
-				array.push_back(nextObj);
+				arr.push_back(nextObj);
 				now=next;
 				now=strchr(now+1,',');
 				if(now==NULL)
@@ -1355,6 +1355,16 @@ private:
 	{
 		return strstr((char*)message,ptofind);
 	}
+	const char* getAskRoute(const void* message,const char* askWay,char* buffer,unsigned int bufferLen)
+	{
+		char* temp=strstr((char*)message,askWay);
+		if(temp==NULL)
+			return NULL;
+		char format[20]={0};
+		sprintf(format,"%%%us",bufferLen);
+		sscanf(temp+strlen(askWay)+1,format,buffer);
+		return buffer;
+	}
 	void createTop(FileKind kind,char* ptop,unsigned int bufLen,int* topLen,unsigned int fileLen)//1:http 2:down 3:pic
 	{
 		if(bufLen<100)
@@ -1450,25 +1460,6 @@ private:
 		fclose(fp);
 		return len;
 	}
-public:
-	bool createSendMsg(FileKind kind,char* buffer,unsigned int bufferLen,const char* pfile,int* plong)
-	{
-		int temp=0;
-		int len=0,noUse=0;
-		if(kind==NOFOUND)
-		{
-			this->createTop(kind,buffer,bufferLen,&temp,len);
-			*plong=len+temp+1;
-			return true;
-		}
-		len=this->getFileLen(pfile);
-		if(len==0)
-			return false;
-		this->createTop(kind,buffer,bufferLen,&temp,len);
-		this->findFileMsg(pfile,&noUse,buffer+temp,bufferLen);
-		*plong=len+temp+1;
-		return true;
-	}
 	char* findBackString(char* local,int len,char* word,int maxWordLen)
 	{
 		int i=0;
@@ -1489,6 +1480,25 @@ public:
 			word[i++]=*pi;
 		word[i]=0;
 		return word;
+	}
+public:
+	bool createSendMsg(FileKind kind,char* buffer,unsigned int bufferLen,const char* pfile,int* plong)
+	{
+		int temp=0;
+		int len=0,noUse=0;
+		if(kind==NOFOUND)
+		{
+			this->createTop(kind,buffer,bufferLen,&temp,len);
+			*plong=len+temp+1;
+			return true;
+		}
+		len=this->getFileLen(pfile);
+		if(len==0)
+			return false;
+		this->createTop(kind,buffer,bufferLen,&temp,len);
+		this->findFileMsg(pfile,&noUse,buffer+temp,bufferLen);
+		*plong=len+temp+1;
+		return true;
 	}
 	const char* analysisHttpAsk(void* message,const char* pneed="GET")
 	{
@@ -1551,7 +1561,7 @@ public:
 		strcat((char*)buffer,"\r\n");
 		return buffer;
 	}
-	int customizeAddBody(void* buffer,unsigned int bufferLen,const std::string& body,unsigned int bodyLen)
+	int customizeAddBody(void* buffer,unsigned int bufferLen,const char* body,unsigned int bodyLen)
 	{
 		int topLen=0;
 		strcat((char*)buffer,"\r\n");
@@ -1764,16 +1774,6 @@ public:
 			line[i++]=*ptemp;
 		line[i-1]=0;
 		return line;
-	}
-	const char* getAskRoute(const void* message,const char* askWay,char* buffer,unsigned int bufferLen)
-	{
-		char* temp=strstr((char*)message,askWay);
-		if(temp==NULL)
-			return NULL;
-		char format[20]={0};
-		sprintf(format,"%%%us",bufferLen);
-		sscanf(temp+strlen(askWay)+1,format,buffer);
-		return buffer;
 	}
 	const char* getRouteKeyValue(const void* routeMsg,const char* key,char* value,unsigned int valueLen)
 	{
@@ -1994,7 +1994,7 @@ public:
 		if(gram.cookie.size()!=0)
 			for(auto iter=gram.cookie.begin();iter!=gram.cookie.end();iter++)
 				setCookie(buffer,bufferLen,iter->first.c_str(),iter->second.c_str());
-		return customizeAddBody(buffer,bufferLen,gram.body,gram.fileLen);
+		return customizeAddBody(buffer,bufferLen,gram.body.c_str(),gram.fileLen);
 	}
 	void changeSetting(const char* connectStatus,const char* serverName,const Datagram* head=NULL)
 	{
@@ -2808,6 +2808,10 @@ public:
 		selfCtrl=true;
 		selfLen=senLen;
 	}
+	inline void* getSenBuff()
+	{
+		return senText;
+	}
 private:
 	void messagePrint()
 	{
@@ -2827,9 +2831,9 @@ private:
 				if(arrRoute[i].pfunc==loadFile)
 					printf("%s\t\t->%s\n",arrRoute[i].route,arrRoute[i].path);
 				else if(arrRoute[i].pfunc==deleteFile)
-					printf("%s\t\t->delete",arrRoute[i].route);
+					printf("%s\t\t->delete\n",arrRoute[i].route);
 				else
-					printf("undefine funtion please check the server");
+					printf("undefine funtion please check the server\n");
 				continue;
 			}
 			switch(arrRoute[i].ask)
@@ -2860,6 +2864,7 @@ private:
 			printf("client in function set\n");
 		if(clientOut!=NULL)
 			printf("client out function set\n");
+		printf("\n");
 	}
 	int func(int num)
 	{
@@ -2969,8 +2974,11 @@ private:
 					selfLen=0;
 				}
 				else
+				{
+					if(gram.fileLen==0)
+						gram.fileLen=gram.body.size();
 					len=http.createDatagram(gram,this->senText,this->senLen*1024*1024);
-				printf("sen\n%s\n\n",(char*)senText);
+				}
 			}
 			else
 				pfunc(*this,http,senLen,(DealHttp::Datagram&)len);
@@ -3179,10 +3187,6 @@ private:
 		free(rec);
 		free(self);
 		return NULL;
-	}
-	inline void* getSenBuff()
-	{
-		return senText;
 	}
 	static void loadFile(HttpServer& server,DealHttp& http,int senLen,DealHttp::Datagram& gram)
 	{

@@ -26,6 +26,13 @@ void pfunc(HttpServer& server,DealHttp& http,int,DealHttp::Datagram& gram)
 	gram.statusCode=DealHttp::STATUSOK;
 	gram.fileLen=strlen(strJson);
 }
+void pfuncThree(HttpServer& server,DealHttp& http,int,DealHttp::Datagram&)
+{
+	char* sen=(char*)server.getSenBuff();
+	http.customizeAddTop(sen,1024*1024,200,strlen("{\"as\":1}"));
+	int len=http.customizeAddBody(sen,1024*1024,"{\"as\":1}",strlen("{\"as\":1}"));
+	server.selfCreate(len);
+}
 int main()  
 {  
 	HttpServer server(5200,true);//input the port bound
@@ -36,6 +43,7 @@ int main()
 	}
 	server.routeHandle(HttpServer::GET,HttpServer::WILD,"/root/",pfunc);
 	server.get(HttpServer::ONEWAY,"/txt",pfuncTwo);
+	server.get(HttpServer::WILD,"/try/",pfuncThree);
 	server.run(1,4000,"index.html");
     return 0; 
 }  

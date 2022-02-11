@@ -1,21 +1,30 @@
 # cppweb框架介绍
+
 ## 作者
+
 **chenxuan**
 
 ![dog](https://i.loli.net/2021/10/25/7pQUDsB12GE4tgx.png)
-## 创作初衷
-自己在搭建C++服务器的时候发现，boost库太庞大对新手不够友好，libevent应用于专业化对新人不友好，用c++开发http后端十分繁琐而且代码复用率低，在使用go的gin框架的时候 ，就萌发了自己写一个后端轻量库的想法 
-## 官方网站
-[http://cpp.androidftp.top](http://cpp.androidftp.top) 
-## 框架特点
- - 具有Linux和windows跨平台特点
- - 轻量级 ，只有几个静态库，代码不到5000行 
- - 扩展性好，自由订制处理http响应 
- - 安装方便,使用sudo make install就可安装
- - 学习成本低，半个小时就可掌握用法 
- - 文档详细中文 ，代码全部开源 
 
-## 项目结构 
+## 创作初衷
+
+自己在搭建C++服务器的时候发现，boost库太庞大对新手不够友好，libevent应用于专业化对新人不友好，用c++开发http后端十分繁琐而且代码复用率低，在使用go的gin框架的时候 ，就萌发了自己写一个类似后端轻量库的想法 
+
+## 官方网站
+
+[http://cpp.androidftp.top](http://cpp.androidftp.top) 
+
+## 框架特点
+
+- 具有Linux和windows跨平台特点
+- 轻量级 ，只有几个静态库，代码不到5000行,可直接使用头文件操作
+- 扩展性好，自由订制处理http响应 
+- 安装方便,使用sudo make install就可安装
+- 学习成本低，半个小时就可掌握用法 
+- 文档详细中文 ，代码全部开源 
+
+## 项目结构
+
 - hpp中的cppweb.h为所有代码,包含该头文件就可以使用
 - hpp与cpp代码为cppweb.h代码的头文件分离
 - example为使用实例,推荐优先阅读
@@ -27,6 +36,7 @@
 - bin是可执行文件  
 
 ## 项目说明
+
 - 该项目可用于个人搭建小网站后端服务
 - 对高并发的业务处理能力偏弱  
 - 本人只是一名大二的学生，框架的不足之处恳请大家通过issue发给我一定认真改进
@@ -34,14 +44,37 @@
 - 代码不足之处请务必联系我改进
 - 在使用该项目之前请阅读doc下的文档
 
+## 项目特点
+
+1. 使用C++编写,拥有较快的运行速度
+
+2. 支持使用自定义中间件
+
+3. 支持cookie的生成和读取
+
+4. 包含一个json的解析生成格式化库
+
+5. 支持通过路由管理请求
+
+6. 支持日志生成和实现
+
+7. 使用多进程和IO复用
+
+8. 包含线程池和线程池服务器
+
 ## 搭建服务器
+
 - 请见doc下的http服务器搭建.md
 
-## 感谢支持 
+## 感谢支持
+
 ---
+
 [个人官网](http://chenxuanweb.top)
 [个人简历](http://chenxuanweb.top/resume.html)
 [gitee](https://gitee.com/chenxuan520/server-for-static-web)
 [github](https://github.com/chenxuan520/cppweb)
+
 ---
+
 如果你喜欢这个项目,可以给一个⭐
