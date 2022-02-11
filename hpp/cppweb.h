@@ -1307,8 +1307,8 @@ public:
 		std::unordered_map<std::string,std::string> head;
 		std::unordered_map<std::string,std::string> cookie;
 		std::string typeName;
-		const void* body;
-		Datagram():statusCode(STATUSOK),typeFile(TXT),fileLen(0),body(NULL){};
+		std::string body;
+		Datagram():statusCode(STATUSOK),typeFile(TXT),fileLen(0){};
 	};
 	struct Request{
 		std::string method;
@@ -1551,7 +1551,7 @@ public:
 		strcat((char*)buffer,"\r\n");
 		return buffer;
 	}
-	int customizeAddBody(void* buffer,unsigned int bufferLen,const char* body,unsigned int bodyLen)
+	int customizeAddBody(void* buffer,unsigned int bufferLen,const std::string& body,unsigned int bodyLen)
 	{
 		int topLen=0;
 		strcat((char*)buffer,"\r\n");
@@ -1994,7 +1994,7 @@ public:
 		if(gram.cookie.size()!=0)
 			for(auto iter=gram.cookie.begin();iter!=gram.cookie.end();iter++)
 				setCookie(buffer,bufferLen,iter->first.c_str(),iter->second.c_str());
-		return customizeAddBody(buffer,bufferLen,(char*)gram.body,gram.fileLen);
+		return customizeAddBody(buffer,bufferLen,gram.body,gram.fileLen);
 	}
 	void changeSetting(const char* connectStatus,const char* serverName,const Datagram* head=NULL)
 	{
@@ -2499,7 +2499,7 @@ public://main class for http server2.0
 		RouteType type;
 		char route[100];
 		const char* path;
-		void (*pfunc)(DealHttp&,HttpServer&,int num,void* sen,int&);
+		void (*pfunc)(HttpServer&,DealHttp&,int,DealHttp::Datagram&);
 	};
 private:
 	RouteFuntion* arrRoute;
@@ -2512,10 +2512,12 @@ private:
 	unsigned int maxNum;
 	unsigned int now;
 	unsigned int boundPort;
+	unsigned int selfLen;
 	int textLen;
 	bool isDebug;
 	bool isLongCon;
 	bool isFork;
+	bool selfCtrl;
 	void (*middleware)(HttpServer&,DealHttp&,int num,DealHttp::Datagram&);
 	void (*clientIn)(HttpServer&,int num,void* ip,int port);
 	void (*clientOut)(HttpServer&,int num,void* ip,int port);
@@ -2527,9 +2529,12 @@ public:
 		senText=NULL;
 		middleware=NULL;
 		defaultFile=NULL;
-		senLen=0;
-		boundPort=port;
 		arrRoute=NULL;
+		selfCtrl=false;
+		senLen=0;
+		selfLen=0;
+		recLen=0;
+		boundPort=port;
 		arrRoute=(RouteFuntion*)malloc(sizeof(RouteFuntion)*20);
 		if(arrRoute==NULL)
 			this->error="route wrong";
@@ -2551,7 +2556,7 @@ public:
 		if(arrRoute!=NULL)
 			free(arrRoute);
 	}
-	bool routeHandle(AskType ask,RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&))
+	bool routeHandle(AskType ask,RouteType type,const char* route,void (*pfunc)(HttpServer&,DealHttp&,int,DealHttp::Datagram&))
 	{
 		if(strlen(route)>100)
 			return false;
@@ -2611,7 +2616,7 @@ public:
 		now++;
 		return true;
 	}
-	bool get(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&))
+	bool get(RouteType type,const char* route,void (*pfunc)(HttpServer&,DealHttp&,int,DealHttp::Datagram&))
 	{
 		if(strlen(route)>100)
 			return false;
@@ -2629,7 +2634,7 @@ public:
 		now++;
 		return true;	
 	}
-	bool post(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&))
+	bool post(RouteType type,const char* route,void (*pfunc)(HttpServer&,DealHttp&,int,DealHttp::Datagram&))
 	{
 		if(strlen(route)>100)
 			return false;
@@ -2647,7 +2652,7 @@ public:
 		now++;
 		return true;	
 	}
-	bool all(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&))
+	bool all(RouteType type,const char* route,void (*pfunc)(HttpServer&,DealHttp&,int,DealHttp::Datagram&))
 	{
 		if(strlen(route)>100)
 			return false;
@@ -2798,6 +2803,11 @@ public:
 	{
 		return this->disconnectSocket(soc);
 	}
+	inline void selfCreate(unsigned senLen)
+	{
+		selfCtrl=true;
+		selfLen=senLen;
+	}
 private:
 	void messagePrint()
 	{
@@ -2912,7 +2922,7 @@ private:
 				printf("way not support\n");
 			type=GET;
 		}
-		void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&)=NULL;
+		void (*pfunc)(HttpServer&,DealHttp&,int,DealHttp::Datagram&)=NULL;
 		for(unsigned int i=0;i<now;i++)
 		{
 			if(arrRoute[i].type==ONEWAY&&(arrRoute[i].ask==type||arrRoute[i].ask==ALL))
@@ -2949,9 +2959,21 @@ private:
 		if(pfunc!=NULL)
 		{
 			if(pfunc!=loadFile&&pfunc!=deleteFile)
-				pfunc(http,*this,num,sen,len);
+			{
+				DealHttp::Datagram gram;
+				pfunc(*this,http,num,gram);
+				if(selfCtrl)
+				{
+					selfCtrl=false;
+					len=selfLen;
+					selfLen=0;
+				}
+				else
+					len=http.createDatagram(gram,this->senText,this->senLen*1024*1024);
+				printf("sen\n%s\n\n",(char*)senText);
+			}
 			else
-				pfunc(http,*this,senLen,sen,len);
+				pfunc(*this,http,senLen,(DealHttp::Datagram&)len);
 		}
 		else
 		{
@@ -3158,24 +3180,30 @@ private:
 		free(self);
 		return NULL;
 	}
-	static void loadFile(DealHttp& http,HttpServer& server,int senLen,void* sen,int& len)
+	inline void* getSenBuff()
 	{
+		return senText;
+	}
+	static void loadFile(HttpServer& server,DealHttp& http,int senLen,DealHttp::Datagram& gram)
+	{
+		int& len=(int&)gram;
 		char ask[200]={0},buf[300]={0},temp[200]={0};
 		http.getAskRoute(server.recText(),"GET",ask,200);
 		HttpServer::RouteFuntion& route=*server.getNowRoute();
 		http.getWildUrl(ask,route.route,temp,200);
 		sprintf(buf,"GET %s%s HTTP/1.1",route.path,temp);
-		if(2==http.autoAnalysisGet(buf,(char*)sen,senLen*1024*1024,NULL,&len))
+		if(2==http.autoAnalysisGet(buf,(char*)server.getSenBuff(),senLen*1024*1024,NULL,&len))
 		{
 			LogSystem::recordFileError(ask);
 			printf("404 get %s wrong\n",buf);
 		}
 	}
-	static void deleteFile(DealHttp& http,HttpServer&,int senLen,void* sen,int& len)
+	static void deleteFile(HttpServer& server,DealHttp& http,int senLen,DealHttp::Datagram& gram)
 	{
-		http.customizeAddTop(sen,senLen*1024*1024,DealHttp::STATUSFORBIDDEN,strlen("403 forbidden"),"text/plain");
-		http.customizeAddBody(sen,senLen*1024*1024,"403 forbidden",strlen("403 forbidden"));
-		len=strlen((char*)sen);
+		int& len=(int&)gram;
+		http.customizeAddTop(server.getSenBuff(),senLen*1024*1024,DealHttp::STATUSFORBIDDEN,strlen("403 forbidden"),"text/plain");
+		http.customizeAddBody(server.getSenBuff(),senLen*1024*1024,"403 forbidden",strlen("403 forbidden"));
+		len=strlen((char*)server.getSenBuff());
 	}
 	static void sigCliDeal(int )
 	{
