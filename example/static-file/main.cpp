@@ -1,10 +1,9 @@
 #include <iostream>  
-#include "../../lib/server.h"
-#include "../../lib/http.h"
+#include "../../hpp/cppweb.h"
 using namespace cppweb;
 int main()  
 {  
-	HttpServer server(5200);
+	HttpServer server(5200,true);
 	if(server.lastError()!=NULL)
 	{
 		std::cout<<server.lastError()<<std::endl;

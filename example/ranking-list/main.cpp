@@ -1,25 +1,26 @@
 #include <iostream>  
 #include <string>
 #include <map>
-#include "../../lib/server.h"
-#include "../../lib/http.h"
+#include "../../hpp/cppweb.h"
 using namespace std;
 using namespace cppweb;
 multimap<int,string> tree;
-void addCLi(DealHttp & http, HttpServer & server, int , void * sen, int & len)
+void addCLi(HttpServer& server,DealHttp& http,int,DealHttp::Datagram& gram)
 {
-	memset(sen,0,sizeof(char)*10000);
 	char strSco[20]={0},name[50]={0};
+	gram.typeFile=DealHttp::JSON;
 	if(http.getKeyValue(server.recText(),"score",strSco,20,true)==NULL)
 	{
 		printf("get name wrong \n%s\n",(char*)server.recText());
-		http.createSendMsg(DealHttp::NOFOUND,(char*)sen,10000,NULL,&len);
+		gram.statusCode=DealHttp::STATUSNOFOUND;
+		gram.typeFile=DealHttp::NOFOUND;
 		return;
 	}
 	if(http.getKeyValue(server.recText(),"name",name,50,true)==NULL)
 	{
 		printf("get name wrong \n%s\n",(char*)server.recText());
-		http.createSendMsg(DealHttp::NOFOUND,(char*)sen,10000,NULL,&len);
+		gram.statusCode=DealHttp::STATUSNOFOUND;
+		gram.typeFile=DealHttp::NOFOUND;
 		return;
 	}
 	DealHttp::urlDecode(name);
@@ -27,7 +28,8 @@ void addCLi(DealHttp & http, HttpServer & server, int , void * sen, int & len)
 	if(0>=sscanf(strSco,"%d",&score))
 	{
 		printf("get score wrong \n%s\n",(char*)server.recText());
-		http.createSendMsg(DealHttp::NOFOUND,(char*)sen,10000,NULL,&len);
+		gram.statusCode=DealHttp::STATUSNOFOUND;
+		gram.typeFile=DealHttp::NOFOUND;
 		return;
 	}
 	if(tree.size()<5)
@@ -44,56 +46,38 @@ void addCLi(DealHttp & http, HttpServer & server, int , void * sen, int & len)
 		}
 	}
 	Json json;
-	json.init(200);
-	json.addKeyValue("name",name);
-	json.addKeyValInt("sco",score);
-	json.jsonToFile("temp");
-	http.createSendMsg(DealHttp::JSON,(char*)sen,10000,"temp",&len);
+	char* str=json.createObject(200);
+	json.addKeyVal(str,Json::STRING,"name",name);
+	json.addKeyVal(str,Json::INT,"sco",score);
+	json.addKeyVal(str,Json::STRING,"status","ok");
+	gram.body=str;
 }
-void getList(DealHttp & http, HttpServer & , int , void * sen, int & len)
+void getList(HttpServer&,DealHttp&,int,DealHttp::Datagram& gram)
 {
-	memset(sen,0,sizeof(char)*10000);
 	auto begin=tree.begin();
+	gram.typeFile=DealHttp::JSON;
 	char* buf[9]={0};
-	for(unsigned int i=0;i<9;i++)
-	{
-		buf[i]=(char*)malloc(sizeof(char)*100);
-		memset(buf[i],0,sizeof(char)*100);
-	}
 	Json json;
-	json.init(600);
-	Json::Object score,name,array;
-	score.type=Json::INT;
-	name.type=Json::STRING;
-	score.key="score";
-	name.key="name";
-	array.type=Json::ARRAY;
-	array.key="array";
-	array.arrTyp=Json::STRUCT;
-	array.arrLen=tree.size();
-	array.array=(void**)buf;
+	auto str1=json.createObject(400);
+	json.addKeyVal(str1,Json::STRING,"status","ok");
 	unsigned int i=0;
 	while(begin!=tree.end())
 	{
 		printf("%d %s\n",begin->first,begin->second.c_str());
-		score.valInt=begin->first;
-		name.valStr=begin->second.c_str();
-		json.createObject(buf[i],100,score);
-		json.createObject(buf[i],100,name);
+		buf[i]=json.createObject(100);
+		json.addKeyVal(buf[i],Json::STRING,"name",begin->second.c_str());
+		json.addKeyVal(buf[i],Json::INT,"score",begin->first);
 		cout<<buf[i]<<endl;
 		begin++;
 		i++;
 	}
-	json.addOBject(array);
-	json.addKeyValInt("len",tree.size());
-	json.jsonToFile("temp");
-	http.createSendMsg(DealHttp::JSON,(char*)sen,10000,"temp",&len);
-	for(unsigned int i=0;i<9;i++)
-		free(buf[i]);
+	auto arr=json.createArray(200,Json::OBJ,i,buf);
+	json.addKeyVal(str1,Json::ARRAY,"array",arr);
+	gram.body=str1;
 }
 int main()  
 {  
-	HttpServer server(5200);
+	HttpServer server(5200,true);
 	if(server.lastError()!=NULL)
 	{
 		std::cout<<server.lastError()<<std::endl;

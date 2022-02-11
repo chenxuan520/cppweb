@@ -1,7 +1,6 @@
 #include <iostream>  
 #include <string.h>
-#include "../../lib/server.h"
-#include "../../lib/http.h"
+#include "../../hpp/cppweb.h"
 using namespace std;
 using namespace cppweb;
 void root(DealHttp& http,HttpServer& ,int soc,void* sen,int& len)
