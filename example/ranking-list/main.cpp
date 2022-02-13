@@ -85,7 +85,7 @@ int main()
 	}
 	server.post(HttpServer::ONEWAY,"/add",addCLi);
 	server.get(HttpServer::ONEWAY,"/list",getList);
-	server.run(1,4000,"api.html");
+	server.run("api.html");
     return 0; 
 }  
 

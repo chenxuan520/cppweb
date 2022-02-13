@@ -2707,17 +2707,19 @@ public:
 		logFunc=pfunc;
 		return true;
 	}
-	void run(unsigned int memory,unsigned int recBufLenChar,const char* defaultFile)
+	void run(const char* defaultFile)
 	{
-		char* getT=(char*)malloc(sizeof(char)*recBufLenChar);
-		char* sen=(char*)malloc(sizeof(char)*memory*1024*1024);
+		this->senLen=1;
+		this->recLen=2048;
+		char* getT=(char*)malloc(sizeof(char)*recLen);
+		char* sen=(char*)malloc(sizeof(char)*senLen*1024*1024);
 		if(sen==NULL||getT==NULL)
 		{
 			this->error="malloc get and sen wrong";
 			return;
 		}
-		memset(getT,0,sizeof(char)*recBufLenChar);
-		memset(sen,0,sizeof(char)*memory*1024*1024);
+		memset(getT,0,sizeof(char)*recLen);
+		memset(sen,0,sizeof(char)*senLen*1024*1024);
 		if(false==this->bondhost())
 		{
 			this->error="bound wrong";
@@ -2730,8 +2732,6 @@ public:
 		}
 		this->getText=getT;
 		this->senText=sen;
-		this->senLen=memory;
-		this->recLen=recBufLenChar;
 		this->defaultFile=defaultFile;
 		if(isDebug)
 			messagePrint();
@@ -2978,6 +2978,18 @@ private:
 					if(gram.fileLen==0)
 						gram.fileLen=gram.body.size();
 					len=http.createDatagram(gram,this->senText,this->senLen*1024*1024);
+					while(len==-1)
+					{
+						this->senLen*=2;
+						void* tempStr=realloc(this->senText,this->senLen*1024*1024);
+						if(tempStr==NULL)
+						{
+							error="malloc wrong";
+							return 0;
+						}
+						this->senText=tempStr;
+						len=http.createDatagram(gram,this->senText,this->senLen*1024*1024);
+					}
 				}
 			}
 			else
@@ -3016,10 +3028,8 @@ private:
 		return 0;
 	}
 	void epollHttp()
-	{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
-		void* pget=this->getText;
-		unsigned len=this->recLen;
-		memset(pget,0,sizeof(char)*len);
+	{//pthing is 0 out,1 in,2 say pnum is the num of soc,this->getText is rec,len is the max len of this->getText,pneed is others things
+		memset(this->getText,0,sizeof(char)*this->recLen);
 		int eventNum=epoll_wait(epfd,pevent,512,-1);
 		for(int i=0;i<eventNum;i++)
 		{
@@ -3034,16 +3044,32 @@ private:
 				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
 				if(this->clientIn!=NULL)
 				{
-					strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
-					clientIn(*this,newClient,pget,newaddr.sin_port);
+					strcpy((char*)this->getText,inet_ntoa(newaddr.sin_addr));
+					clientIn(*this,newClient,this->getText,newaddr.sin_port);
 				}
 			}
 			else
 			{
-				int getNum=recv(temp.data.fd,(char*)pget,len,0);
-				if(getNum>0)
+				int getNum=recv(temp.data.fd,(char*)this->getText,this->recLen,MSG_DONTWAIT);
+				int all=getNum;
+				while((int)this->recLen==all)
 				{
-					this->textLen=getNum;
+					this->recLen*=2;
+					char* tempStr=(char*)realloc(this->getText,this->recLen*sizeof(char));
+					if(tempStr==NULL)
+					{
+						error="malloc wrong";
+						return;
+					}
+					this->getText=tempStr;
+					getNum=recv(temp.data.fd,(char*)this->getText+all,this->recLen-all,MSG_DONTWAIT);
+					if(getNum<=0)
+						break;
+					all+=getNum;
+				}
+				if(all>0)
+				{
+					this->textLen=all;
 					func(temp.data.fd);
 					if(logFunc!=NULL)
 						logFunc(this->recText(),temp.data.fd);
@@ -3059,8 +3085,8 @@ private:
 					if(this->clientOut!=NULL)
 					{
 						int port=0;
-						strcpy((char*)pget,this->getPeerIp(temp.data.fd,&port));
-						clientOut(*this,temp.data.fd,pget,port);
+						strcpy((char*)this->getText,this->getPeerIp(temp.data.fd,&port));
+						clientOut(*this,temp.data.fd,this->getText,port);
 					}
 					this->deleteFd(temp.data.fd);
 					epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
@@ -3072,9 +3098,7 @@ private:
 	}
 	void forkHttp()
 	{
-		void* pget=this->getText;
-		unsigned len=this->recLen;
-		memset(pget,0,sizeof(char)*len);
+		memset(this->getText,0,sizeof(char)*this->recLen);
 		int eventNum=epoll_wait(epfd,pevent,512,-1);
 		for(int i=0;i<eventNum;i++)
 		{
@@ -3089,16 +3113,32 @@ private:
 				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
 				if(this->clientIn!=NULL)
 				{
-					strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
-					clientIn(*this,newClient,pget,newaddr.sin_port);
+					strcpy((char*)this->getText,inet_ntoa(newaddr.sin_addr));
+					clientIn(*this,newClient,this->getText,newaddr.sin_port);
 				}
 			}
 			else
 			{
-				int getNum=recv(temp.data.fd,(char*)pget,len,0);
-				if(getNum>0)
+				int getNum=recv(temp.data.fd,(char*)this->getText,sizeof(char)*this->recLen,0);
+				int all=getNum;
+				while((int)this->recLen==all)
 				{
-					this->textLen=getNum;
+					this->recLen*=2;
+					char* tempStr=(char*)realloc(this->getText,this->recLen*sizeof(char));
+					if(tempStr==NULL)
+					{
+						error="malloc wrong";
+						return;
+					}
+					this->getText=tempStr;
+					getNum=recv(temp.data.fd,(char*)this->getText+all,this->recLen-all,MSG_DONTWAIT);
+					if(getNum<=0)
+						break;
+					all+=getNum;
+				}
+				if(all>0)
+				{
+					this->textLen=all;
 					if(fork()==0)
 					{
 						close(sock);
@@ -3106,7 +3146,7 @@ private:
 						if(logFunc!=NULL)
 							logFunc(this->recText(),temp.data.fd);
 						close(temp.data.fd);
-						free(pget);
+						free(this->getText);
 						free(this->senText);
 						exit(0);
 					}
@@ -3125,8 +3165,8 @@ private:
 					if(this->clientOut!=NULL)
 					{
 						int port=0;
-						strcpy((char*)pget,this->getPeerIp(temp.data.fd,&port));
-						clientOut(*this,temp.data.fd,pget,port);
+						strcpy((char*)this->getText,this->getPeerIp(temp.data.fd,&port));
+						clientOut(*this,temp.data.fd,this->getText,port);
 					}
 					this->deleteFd(temp.data.fd);
 					epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
