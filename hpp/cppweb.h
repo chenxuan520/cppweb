@@ -65,6 +65,7 @@ private:
 	const char* error;
 	unsigned maxLen;
 	unsigned floNum;
+	unsigned defaultSize;
 	Object* obj;
 	std::unordered_map<char*,unsigned> memory;
 	std::unordered_map<std::string,Object*> hashMap;
@@ -77,13 +78,16 @@ public:
 		text=NULL;
 		maxLen=256;
 		floNum=3;
+		defaultSize=128;
 	}
 	Json(const char* jsonText)
 	{
 		error=NULL;
 		obj=NULL;
+		text=NULL;
 		maxLen=256;
 		floNum=3;
+		defaultSize=128;
 		if(jsonText==NULL||strlen(jsonText)==0)
 		{
 			error="message error";
@@ -124,16 +128,16 @@ public:
 		for(auto iter=memory.begin();iter!=memory.end();iter++)
 			free(iter->first);
 	}
-	const char* formatPrint(const Object* exmaple,unsigned buffLen)
+	const char* formatPrint(const Object* exmaple)
 	{
-		char* buffer=(char*)malloc(sizeof(char)*buffLen);
+		char* buffer=(char*)malloc(sizeof(char)*defaultSize*10);
 		if(buffer==NULL)
 		{
 			error="malloc wrong";
 			return NULL;
 		}
-		memset(buffer,0,sizeof(char)*buffLen);
-		memory.insert(std::pair<char*,unsigned>{buffer,buffLen});
+		memset(buffer,0,sizeof(char)*defaultSize*10);
+		memory.insert(std::pair<char*,unsigned>{buffer,sizeof(char)*defaultSize*10});
 		printObj(buffer,exmaple);
 		return buffer;
 	}
@@ -143,7 +147,7 @@ public:
 			return NULL;
 		return hashMap.find(std::string(key))->second;
 	}
-	bool addKeyVal(char* obj,TypeJson type,const char* key,...)
+	bool addKeyVal(char*& obj,TypeJson type,const char* key,...)
 	{
 		if(obj==NULL)
 		{
@@ -164,11 +168,8 @@ public:
 			error="wrong object";
 			return false;
 		}
-		if(memory[obj]-strlen(obj)<strlen(key)+4)
-		{
-			error="obj too short";
-			return false;
-		}
+		while(memory[obj]-strlen(obj)<strlen(key)+4)
+			obj=enlargeMemory(obj);
 		sprintf(obj,"%s\"%s\":",obj,key);
 		int valInt=0;
 		char* valStr=NULL;
@@ -178,20 +179,14 @@ public:
 		{
 		case INT:
 			valInt=va_arg(args,int);
-			if(memory[obj]-strlen(obj)<15)
-			{
-				error="obj too short";
-				return false;
-			}
+			while(memory[obj]-strlen(obj)<15)
+				obj=enlargeMemory(obj);
 			sprintf(obj,"%s%d",obj,valInt);
 			break;
 		case FLOAT:
 			valFlo=va_arg(args,double);
-			if(memory[obj]-strlen(obj)<15)
-			{
-				error="obj too short";
-				return false;
-			}
+			while(memory[obj]-strlen(obj)<15)
+				obj=enlargeMemory(obj);
 			sprintf(obj,"%s%.*f",obj,floNum,valFlo);
 			break;
 		case STRING:
@@ -201,28 +196,19 @@ public:
 				error="null input";
 				return false;
 			}
-			if(memory[obj]-strlen(obj)<strlen(obj)+5)
-			{
-				error="obj too short";
-				return false;
-			}
+			while(memory[obj]-strlen(obj)<strlen(obj)+5)
+				obj=enlargeMemory(obj);
 			sprintf(obj,"%s\"%s\"",obj,valStr);
 			break;
 		case EMPTY:
-			if(memory[obj]-strlen(obj)<5)
-			{
-				error="obj too short";
-				return false;
-			}
+			while(memory[obj]-strlen(obj)<5)
+				obj=enlargeMemory(obj);
 			strcat(obj,"null");
 			break;
 		case BOOL:
 			valBool=va_arg(args,int);
-			if(memory[obj]-strlen(obj)<5)
-			{
-				error="obj too short";
-				return false;
-			}
+			while(memory[obj]-strlen(obj)<5)
+				obj=enlargeMemory(obj);
 			if(valBool==true)
 				strcat(obj,"true");
 			else
@@ -231,11 +217,8 @@ public:
 		case OBJ:
 		case ARRAY:
 			valStr=va_arg(args,char*);
-			if(memory[obj]-strlen(obj)<strlen(obj)+5)
-			{
-				error="obj too short";
-				return false;
-			}
+			while(memory[obj]-strlen(obj)<strlen(obj)+5)
+				obj=enlargeMemory(obj);
 			if(valStr==NULL)
 			{
 				error="null input";
@@ -251,36 +234,36 @@ public:
 		strcat(obj,"}");
 		return true;
 	}
-	char* createObject(unsigned maxBuffLen)
+	char* createObject()
 	{
-		char* now=(char*)malloc(sizeof(char)*maxBuffLen);
-		if(now==NULL||maxBuffLen<4)
+		char* now=(char*)malloc(sizeof(char)*defaultSize);
+		if(now==NULL)
 		{
 			error="init worng";
 			return NULL;
 		}
 		else
-			memory.insert(std::pair<char*,int>{now,maxBuffLen});
-		memset(now,0,sizeof(char)*maxBuffLen);
+			memory.insert(std::pair<char*,unsigned>{now,defaultSize});
+		memset(now,0,sizeof(char)*defaultSize);
 		strcpy(now,"{}");
 		return now;
 	}
-	char* createArray(unsigned maxBuffLen,TypeJson type,unsigned arrLen,void* arr)
+	char* createArray(TypeJson type,unsigned arrLen,void* arr)
 	{
-		if(arr==NULL||maxBuffLen<4)
+		if(arr==NULL)
 		{
 			error="null input";
 			return NULL;
 		}
-		char* now=(char*)malloc(sizeof(char)*maxBuffLen);
+		char* now=(char*)malloc(sizeof(char)*defaultSize);
 		if(now==NULL)
 		{
 			error="malloc worng";
 			return NULL;
 		}
 		else
-			memory.insert(std::pair<char*,int>{now,maxBuffLen});
-		memset(now,0,sizeof(char)*maxBuffLen);
+			memory.insert(std::pair<char*,unsigned>{now,defaultSize});
+		memset(now,0,sizeof(char)*defaultSize);
 		strcat(now,"[");
 		int* arrInt=(int*)arr;
 		float* arrFlo=(float*)arr;
@@ -292,33 +275,24 @@ public:
 		case INT:
 			for(i=0;i<arrLen;i++)
 			{
-				if(maxBuffLen-strlen(now)<std::to_string(arrInt[i]).size()+3)
-				{
-					error="bufferLen is too small";
-					return NULL;
-				}
+				while(memory[now]-strlen(now)<std::to_string(arrInt[i]).size()+3)
+					now=enlargeMemory(now);
 				sprintf(now,"%s%d,",now,arrInt[i]);
 			}
 			break;
 		case FLOAT:
 			for(i=0;i<arrLen;i++)
 			{
-				if(maxBuffLen-strlen(now)<std::to_string(arrFlo[i]).size()+3)
-				{
-					error="bufferLen is too small";
-					return NULL;
-				}
+				while(memory[now]-strlen(now)<std::to_string(arrInt[i]).size()+3)
+					now=enlargeMemory(now);
 				sprintf(now,"%s%.*f,",now,floNum,arrFlo[i]);
 			}
 			break;
 		case STRING:
 			for(i=0;i<arrLen;i++)
 			{
-				if(maxBuffLen-strlen(now)<strlen(arrStr[i])+5)
-				{
-					error="bufferLen is too small";
-					return NULL;
-				}
+				while(memory[now]-strlen(now)<strlen(arrStr[i])+5)
+					now=enlargeMemory(now);
 				sprintf(now,"%s\"%s\",",now,arrStr[i]);
 			}
 			break;
@@ -326,22 +300,16 @@ public:
 		case ARRAY:
 			for(i=0;i<arrLen;i++)
 			{
-				if(maxBuffLen-strlen(now)<strlen(arrStr[i])+4)
-				{
-					error="bufferLen is too small";
-					return NULL;
-				}
+				while(memory[now]-strlen(now)<strlen(arrStr[i])+4)
+					now=enlargeMemory(now);
 				sprintf(now,"%s%s,",now,arrStr[i]);
 			}
 			break;
 		case BOOL:
 			for(i=0;i<arrLen;i++)
 			{
-				if(maxBuffLen-strlen(now)<6)
-				{
-					error="bufferLen is too small";
-					return NULL;
-				}
+				while(memory[now]-strlen(now)<6)
+					now=enlargeMemory(now);
 				if(arrBool)
 					strcat(now,"true,");
 				else
@@ -367,12 +335,26 @@ public:
 	{
 		return error;
 	}
-	inline void changeSetting(unsigned keyValMaxLen,unsigned floNum)
+	inline void changeSetting(unsigned defaultSize=128,unsigned keyValMaxLen=256,unsigned floNum=3)
 	{
+		this->defaultSize=defaultSize;
 		this->maxLen=keyValMaxLen>maxLen?keyValMaxLen:maxLen;
 		this->floNum=floNum;
 	}
 private:
+	char* enlargeMemory(char* old)
+	{
+		if(memory.find(old)==memory.end())
+			return old;
+		unsigned temp=memory[old];
+		temp*=2;
+		void* strTemp=realloc(old,temp);
+		if(strTemp==NULL)
+			return old;
+		memory.erase(memory.find(old));
+		memory.insert(std::pair<char*,unsigned>{(char*)strTemp,temp});
+		return (char*)strTemp;
+	}
 	Object* analyseObj(char* begin,char* end)
 	{
 		Object * root=new Object,*last=root;
@@ -731,7 +713,7 @@ private:
 			return false;
 		return true;
 	}
-	bool printObj(char* buffer,const Object* obj)
+	bool printObj(char*& buffer,const Object* obj)
 	{
 		unsigned deep=0;
 		char* line=strrchr(buffer,'\n');
@@ -743,6 +725,8 @@ private:
 		Object* now=obj->nextObj;
 		while(now!=NULL)
 		{
+			while(memory[buffer]-strlen(buffer)<now->key.size()+now->strVal.size()+20+deep*5)
+				buffer=enlargeMemory(buffer);
 			for(unsigned i=0;i<deep+4;i++)
 				strcat(buffer," ");
 			switch(now->type)
@@ -802,6 +786,8 @@ private:
 		{
 			for(unsigned i=0;i<deep+4;i++)
 				strcat(buffer," ");
+			while(memory[buffer]-strlen(buffer)<arr[i]->strVal.size()+20+deep*5)
+				buffer=enlargeMemory(buffer);
 			switch(type)
 			{
 			case INT:
@@ -2707,17 +2693,19 @@ public:
 		logFunc=pfunc;
 		return true;
 	}
-	void run(unsigned int memory,unsigned int recBufLenChar,const char* defaultFile)
+	void run(const char* defaultFile)
 	{
-		char* getT=(char*)malloc(sizeof(char)*recBufLenChar);
-		char* sen=(char*)malloc(sizeof(char)*memory*1024*1024);
+		this->senLen=1;
+		this->recLen=2048;
+		char* getT=(char*)malloc(sizeof(char)*recLen);
+		char* sen=(char*)malloc(sizeof(char)*senLen*1024*1024);
 		if(sen==NULL||getT==NULL)
 		{
 			this->error="malloc get and sen wrong";
 			return;
 		}
-		memset(getT,0,sizeof(char)*recBufLenChar);
-		memset(sen,0,sizeof(char)*memory*1024*1024);
+		memset(getT,0,sizeof(char)*recLen);
+		memset(sen,0,sizeof(char)*senLen*1024*1024);
 		if(false==this->bondhost())
 		{
 			this->error="bound wrong";
@@ -2730,8 +2718,6 @@ public:
 		}
 		this->getText=getT;
 		this->senText=sen;
-		this->senLen=memory;
-		this->recLen=recBufLenChar;
 		this->defaultFile=defaultFile;
 		if(isDebug)
 			messagePrint();
@@ -2882,40 +2868,38 @@ private:
 		}
 		if(isLongCon==false)
 			http.changeSetting("Close","LCserver/1.1",NULL);
-		void* pget=this->getText;
-		void* sen=this->senText;
-		sscanf((char*)pget,"%100s",ask);
+		sscanf((char*)this->getText,"%100s",ask);
 		if(strstr(ask,"GET")!=NULL)
 		{
-			http.getAskRoute(pget,"GET",ask,200);
+			http.getAskRoute(this->getText,"GET",ask,200);
 			if(isDebug)
 				printf("Get url:%s\n",ask);
 			type=GET;
 		}
 		else if(strstr(ask,"POST")!=NULL)
 		{
-			http.getAskRoute(pget,"POST",ask,200);
+			http.getAskRoute(this->getText,"POST",ask,200);
 			if(isDebug)
 				printf("POST url:%s\n",ask);
 			type=POST;
 		}
 		else if(strstr(ask,"PUT")!=NULL)
 		{
-			http.getAskRoute(pget,"PUT",ask,200);
+			http.getAskRoute(this->getText,"PUT",ask,200);
 			if(isDebug)
 				printf("PUT url:%s\n",ask);
 			type=PUT;
 		}
 		else if(strstr(ask,"DELETE")!=NULL)
 		{
-			http.getAskRoute(pget,"DELETE",ask,200);
+			http.getAskRoute(this->getText,"DELETE",ask,200);
 			if(isDebug)
 				printf("DELETE url:%s\n",ask);
 			type=DELETE;
 		}
 		else if(strstr(ask,"OPTIONS")!=NULL)
 		{
-			http.getAskRoute(pget,"OPTIONS",ask,200);
+			http.getAskRoute(this->getText,"OPTIONS",ask,200);
 			if(isDebug)
 				printf("OPTIONS url:%s\n",ask);
 			type=OPTIONS;
@@ -2953,7 +2937,7 @@ private:
 				if(strstr(ask,arrRoute[i].route)!=NULL)
 				{
 					pfunc=arrRoute[i].pfunc;
-					sprintf((char*)sen,"%s",arrRoute[i].path);
+					sprintf((char*)this->senText,"%s",arrRoute[i].path);
 					pnowRoute=&arrRoute[i];
 					break;
 				}
@@ -2978,6 +2962,11 @@ private:
 					if(gram.fileLen==0)
 						gram.fileLen=gram.body.size();
 					len=http.createDatagram(gram,this->senText,this->senLen*1024*1024);
+					while(len==-1)
+					{
+						this->senText=enlargeMemory(this->senText,this->senLen);
+						len=http.createDatagram(gram,this->senText,this->senLen*1024*1024);
+					}
 				}
 			}
 			else
@@ -2986,11 +2975,11 @@ private:
 		else
 		{
 			if(isDebug)
-				printf("http:%s\n",http.analysisHttpAsk(pget));
-			if(http.analysisHttpAsk(pget)!=NULL)
+				printf("http:%s\n",http.analysisHttpAsk(this->getText));
+			if(http.analysisHttpAsk(this->getText)!=NULL)
 			{
-				strcpy(ask,http.analysisHttpAsk(pget));
-				flag=http.autoAnalysisGet((char*)pget,(char*)sen,senLen*1024*1024,defaultFile,&len);
+				strcpy(ask,http.analysisHttpAsk(this->getText));
+				flag=http.autoAnalysisGet((char*)this->getText,(char*)this->senText,senLen*1024*1024,defaultFile,&len);
 			}
 			if(flag==2)
 			{
@@ -3002,8 +2991,8 @@ private:
 			}
 		}
 		if(len==0)
-			http.createSendMsg(DealHttp::NOFOUND,(char*)sen,senLen*1024*1024,NULL,&len);
-		if(0>=this->sendSocket(num,sen,len))
+			http.createSendMsg(DealHttp::NOFOUND,(char*)this->senText,senLen*1024*1024,NULL,&len);
+		if(0>=this->sendSocket(num,this->senText,len))
 		{
 			if(isDebug)
 				perror("send wrong");
@@ -3016,10 +3005,8 @@ private:
 		return 0;
 	}
 	void epollHttp()
-	{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
-		void* pget=this->getText;
-		unsigned len=this->recLen;
-		memset(pget,0,sizeof(char)*len);
+	{//pthing is 0 out,1 in,2 say pnum is the num of soc,this->getText is rec,len is the max len of this->getText,pneed is others things
+		memset(this->getText,0,sizeof(char)*this->recLen);
 		int eventNum=epoll_wait(epfd,pevent,512,-1);
 		for(int i=0;i<eventNum;i++)
 		{
@@ -3034,16 +3021,25 @@ private:
 				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
 				if(this->clientIn!=NULL)
 				{
-					strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
-					clientIn(*this,newClient,pget,newaddr.sin_port);
+					strcpy((char*)this->getText,inet_ntoa(newaddr.sin_addr));
+					clientIn(*this,newClient,this->getText,newaddr.sin_port);
 				}
 			}
 			else
 			{
-				int getNum=recv(temp.data.fd,(char*)pget,len,0);
-				if(getNum>0)
+				int getNum=recv(temp.data.fd,(char*)this->getText,this->recLen,MSG_DONTWAIT);
+				int all=getNum;
+				while((int)this->recLen==all)
 				{
-					this->textLen=getNum;
+					this->getText=enlargeMemory(this->getText,this->recLen);
+					getNum=recv(temp.data.fd,(char*)this->getText+all,this->recLen-all,MSG_DONTWAIT);
+					if(getNum<=0)
+						break;
+					all+=getNum;
+				}
+				if(all>0)
+				{
+					this->textLen=all;
 					func(temp.data.fd);
 					if(logFunc!=NULL)
 						logFunc(this->recText(),temp.data.fd);
@@ -3059,8 +3055,8 @@ private:
 					if(this->clientOut!=NULL)
 					{
 						int port=0;
-						strcpy((char*)pget,this->getPeerIp(temp.data.fd,&port));
-						clientOut(*this,temp.data.fd,pget,port);
+						strcpy((char*)this->getText,this->getPeerIp(temp.data.fd,&port));
+						clientOut(*this,temp.data.fd,this->getText,port);
 					}
 					this->deleteFd(temp.data.fd);
 					epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
@@ -3072,9 +3068,7 @@ private:
 	}
 	void forkHttp()
 	{
-		void* pget=this->getText;
-		unsigned len=this->recLen;
-		memset(pget,0,sizeof(char)*len);
+		memset(this->getText,0,sizeof(char)*this->recLen);
 		int eventNum=epoll_wait(epfd,pevent,512,-1);
 		for(int i=0;i<eventNum;i++)
 		{
@@ -3089,16 +3083,25 @@ private:
 				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
 				if(this->clientIn!=NULL)
 				{
-					strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
-					clientIn(*this,newClient,pget,newaddr.sin_port);
+					strcpy((char*)this->getText,inet_ntoa(newaddr.sin_addr));
+					clientIn(*this,newClient,this->getText,newaddr.sin_port);
 				}
 			}
 			else
 			{
-				int getNum=recv(temp.data.fd,(char*)pget,len,0);
-				if(getNum>0)
+				int getNum=recv(temp.data.fd,(char*)this->getText,sizeof(char)*this->recLen,0);
+				int all=getNum;
+				while((int)this->recLen==all)
 				{
-					this->textLen=getNum;
+					this->getText=enlargeMemory(this->getText,this->recLen);
+					getNum=recv(temp.data.fd,(char*)this->getText+all,this->recLen-all,MSG_DONTWAIT);
+					if(getNum<=0)
+						break;
+					all+=getNum;
+				}
+				if(all>0)
+				{
+					this->textLen=all;
 					if(fork()==0)
 					{
 						close(sock);
@@ -3106,7 +3109,7 @@ private:
 						if(logFunc!=NULL)
 							logFunc(this->recText(),temp.data.fd);
 						close(temp.data.fd);
-						free(pget);
+						free(this->getText);
 						free(this->senText);
 						exit(0);
 					}
@@ -3125,8 +3128,8 @@ private:
 					if(this->clientOut!=NULL)
 					{
 						int port=0;
-						strcpy((char*)pget,this->getPeerIp(temp.data.fd,&port));
-						clientOut(*this,temp.data.fd,pget,port);
+						strcpy((char*)this->getText,this->getPeerIp(temp.data.fd,&port));
+						clientOut(*this,temp.data.fd,this->getText,port);
 					}
 					this->deleteFd(temp.data.fd);
 					epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
@@ -3208,6 +3211,19 @@ private:
 		http.customizeAddTop(server.getSenBuff(),senLen*1024*1024,DealHttp::STATUSFORBIDDEN,strlen("403 forbidden"),"text/plain");
 		http.customizeAddBody(server.getSenBuff(),senLen*1024*1024,"403 forbidden",strlen("403 forbidden"));
 		len=strlen((char*)server.getSenBuff());
+	}
+	void* enlargeMemory(void* old,unsigned& oldSize)
+	{
+		oldSize*=2;
+		void* temp=realloc(old,oldSize);
+		if(temp==NULL)
+		{
+			error="malloc wrong";
+			oldSize/=2;
+			return old;
+		}
+		else
+			return temp;
 	}
 	static void sigCliDeal(int )
 	{
@@ -3503,6 +3519,19 @@ public:
 		else
 			return false;
 		return false;
+	}
+	const char* getFileBuff(const char* fileName)
+	{
+		if(pbuffer!=NULL)
+			free(pbuffer);
+		int len=getFileLen(fileName);
+		if(len==-1)
+			return NULL;
+		pbuffer=(char*)malloc(sizeof(char)*getFileLen(fileName)+10);
+		if(pbuffer==NULL)
+			return NULL;
+		getFileMsg(fileName,pbuffer,sizeof(char)*getFileLen(fileName)+10);
+		return pbuffer;
 	}
 	static bool writeToFile(const char* fileName,const char* buffer,unsigned int writeLen)
 	{
