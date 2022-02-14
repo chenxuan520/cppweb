@@ -2882,40 +2882,38 @@ private:
 		}
 		if(isLongCon==false)
 			http.changeSetting("Close","LCserver/1.1",NULL);
-		void* pget=this->getText;
-		void* sen=this->senText;
-		sscanf((char*)pget,"%100s",ask);
+		sscanf((char*)this->getText,"%100s",ask);
 		if(strstr(ask,"GET")!=NULL)
 		{
-			http.getAskRoute(pget,"GET",ask,200);
+			http.getAskRoute(this->getText,"GET",ask,200);
 			if(isDebug)
 				printf("Get url:%s\n",ask);
 			type=GET;
 		}
 		else if(strstr(ask,"POST")!=NULL)
 		{
-			http.getAskRoute(pget,"POST",ask,200);
+			http.getAskRoute(this->getText,"POST",ask,200);
 			if(isDebug)
 				printf("POST url:%s\n",ask);
 			type=POST;
 		}
 		else if(strstr(ask,"PUT")!=NULL)
 		{
-			http.getAskRoute(pget,"PUT",ask,200);
+			http.getAskRoute(this->getText,"PUT",ask,200);
 			if(isDebug)
 				printf("PUT url:%s\n",ask);
 			type=PUT;
 		}
 		else if(strstr(ask,"DELETE")!=NULL)
 		{
-			http.getAskRoute(pget,"DELETE",ask,200);
+			http.getAskRoute(this->getText,"DELETE",ask,200);
 			if(isDebug)
 				printf("DELETE url:%s\n",ask);
 			type=DELETE;
 		}
 		else if(strstr(ask,"OPTIONS")!=NULL)
 		{
-			http.getAskRoute(pget,"OPTIONS",ask,200);
+			http.getAskRoute(this->getText,"OPTIONS",ask,200);
 			if(isDebug)
 				printf("OPTIONS url:%s\n",ask);
 			type=OPTIONS;
@@ -2953,7 +2951,7 @@ private:
 				if(strstr(ask,arrRoute[i].route)!=NULL)
 				{
 					pfunc=arrRoute[i].pfunc;
-					sprintf((char*)sen,"%s",arrRoute[i].path);
+					sprintf((char*)this->senText,"%s",arrRoute[i].path);
 					pnowRoute=&arrRoute[i];
 					break;
 				}
@@ -2980,14 +2978,7 @@ private:
 					len=http.createDatagram(gram,this->senText,this->senLen*1024*1024);
 					while(len==-1)
 					{
-						this->senLen*=2;
-						void* tempStr=realloc(this->senText,this->senLen*1024*1024);
-						if(tempStr==NULL)
-						{
-							error="malloc wrong";
-							return 0;
-						}
-						this->senText=tempStr;
+						this->senText=enlargeMemory(this->senText,this->senLen);
 						len=http.createDatagram(gram,this->senText,this->senLen*1024*1024);
 					}
 				}
@@ -2998,11 +2989,11 @@ private:
 		else
 		{
 			if(isDebug)
-				printf("http:%s\n",http.analysisHttpAsk(pget));
-			if(http.analysisHttpAsk(pget)!=NULL)
+				printf("http:%s\n",http.analysisHttpAsk(this->getText));
+			if(http.analysisHttpAsk(this->getText)!=NULL)
 			{
-				strcpy(ask,http.analysisHttpAsk(pget));
-				flag=http.autoAnalysisGet((char*)pget,(char*)sen,senLen*1024*1024,defaultFile,&len);
+				strcpy(ask,http.analysisHttpAsk(this->getText));
+				flag=http.autoAnalysisGet((char*)this->getText,(char*)this->senText,senLen*1024*1024,defaultFile,&len);
 			}
 			if(flag==2)
 			{
@@ -3014,8 +3005,8 @@ private:
 			}
 		}
 		if(len==0)
-			http.createSendMsg(DealHttp::NOFOUND,(char*)sen,senLen*1024*1024,NULL,&len);
-		if(0>=this->sendSocket(num,sen,len))
+			http.createSendMsg(DealHttp::NOFOUND,(char*)this->senText,senLen*1024*1024,NULL,&len);
+		if(0>=this->sendSocket(num,this->senText,len))
 		{
 			if(isDebug)
 				perror("send wrong");
@@ -3054,14 +3045,7 @@ private:
 				int all=getNum;
 				while((int)this->recLen==all)
 				{
-					this->recLen*=2;
-					char* tempStr=(char*)realloc(this->getText,this->recLen*sizeof(char));
-					if(tempStr==NULL)
-					{
-						error="malloc wrong";
-						return;
-					}
-					this->getText=tempStr;
+					this->getText=enlargeMemory(this->getText,this->recLen);
 					getNum=recv(temp.data.fd,(char*)this->getText+all,this->recLen-all,MSG_DONTWAIT);
 					if(getNum<=0)
 						break;
@@ -3123,14 +3107,7 @@ private:
 				int all=getNum;
 				while((int)this->recLen==all)
 				{
-					this->recLen*=2;
-					char* tempStr=(char*)realloc(this->getText,this->recLen*sizeof(char));
-					if(tempStr==NULL)
-					{
-						error="malloc wrong";
-						return;
-					}
-					this->getText=tempStr;
+					this->getText=enlargeMemory(this->getText,this->recLen);
 					getNum=recv(temp.data.fd,(char*)this->getText+all,this->recLen-all,MSG_DONTWAIT);
 					if(getNum<=0)
 						break;
@@ -3248,6 +3225,19 @@ private:
 		http.customizeAddTop(server.getSenBuff(),senLen*1024*1024,DealHttp::STATUSFORBIDDEN,strlen("403 forbidden"),"text/plain");
 		http.customizeAddBody(server.getSenBuff(),senLen*1024*1024,"403 forbidden",strlen("403 forbidden"));
 		len=strlen((char*)server.getSenBuff());
+	}
+	void* enlargeMemory(void* old,unsigned& oldSize)
+	{
+		oldSize*=2;
+		void* temp=realloc(old,oldSize);
+		if(temp==NULL)
+		{
+			error="malloc wrong";
+			oldSize/=2;
+			return old;
+		}
+		else
+			return temp;
 	}
 	static void sigCliDeal(int )
 	{
