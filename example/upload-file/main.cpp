@@ -1,31 +1,31 @@
 #include <iostream>  
 #include <string.h>
-#include "../../lib/server.h"
-#include "../../lib/http.h"
+#include "../../hpp/cppweb.h"
 using namespace std;
 using namespace cppweb;
-void upload(DealHttp& http,HttpServer& server,int num,void* sen,int& len)
+void upload(HttpServer& server,DealHttp& http,int,DealHttp::Datagram& gram)
 {
-    char name[100]={0},buffer[6000];
-    memset(sen,0,sizeof(char)*1024*1024);
+    char name[100]={0};
+	void* sen=server.getSenBuff();
     printf("%s\n",(char*)server.recText());
-    int flen=server.getCompleteMessage(server.recText(),server.recLen(),sen,1024*1024,num);
-    printf("%s\n",(char*)sen);
-    if(flen>6000)
+	int flen=server.getRecLen();
+    if(flen>1024*1024)
     {
-            http.createSendMsg(DealHttp::NOFOUND,(char*)sen,6000,NULL,&len);
-            return;
+		gram.statusCode=DealHttp::STATUSNOFOUND;
+		return;
     }
-    flen=http.getRecFile(sen,name,100,buffer,6000);
-    FileGet::writeToFile(name,buffer,flen);
-    http.createSendMsg(DealHttp::HTML,(char*)sen,1024*1024,"index.html",&len);
+    flen=http.getRecFile(server.recText(),name,100,(char*)sen,1024*1024);
+	printf("%s\n%d\n",sen,flen);
+    FileGet::writeToFile(name,(char*)sen,flen);
+	gram.typeFile=DealHttp::JSON;
+	gram.body="{\"status\":\"ok\"}";
 }
 
 int main()  
 {  
 	HttpServer server(5200,true);
 	server.routeHandle(HttpServer::POST,HttpServer::WILD,"/upload",upload);
-	server.run(1,6000,"index.html");
+	server.run("index.html");
     return 0; 
 }  
 

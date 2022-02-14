@@ -4,7 +4,7 @@ using namespace cppweb;
 int main()  
 {  
 	HttpServer server(5200,true);
-	server.run(1,3000,"index.html");
+	server.run("index.html");
 	return 0; 
 }  
 
