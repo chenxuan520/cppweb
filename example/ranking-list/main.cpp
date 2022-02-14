@@ -46,7 +46,7 @@ void addCLi(HttpServer& server,DealHttp& http,int,DealHttp::Datagram& gram)
 		}
 	}
 	Json json;
-	char* str=json.createObject(200);
+	char* str=json.createObject();
 	json.addKeyVal(str,Json::STRING,"name",name);
 	json.addKeyVal(str,Json::INT,"sco",score);
 	json.addKeyVal(str,Json::STRING,"status","ok");
@@ -58,20 +58,20 @@ void getList(HttpServer&,DealHttp&,int,DealHttp::Datagram& gram)
 	gram.typeFile=DealHttp::JSON;
 	char* buf[9]={0};
 	Json json;
-	auto str1=json.createObject(400);
+	auto str1=json.createObject();
 	json.addKeyVal(str1,Json::STRING,"status","ok");
 	unsigned int i=0;
 	while(begin!=tree.end())
 	{
 		printf("%d %s\n",begin->first,begin->second.c_str());
-		buf[i]=json.createObject(100);
+		buf[i]=json.createObject();
 		json.addKeyVal(buf[i],Json::STRING,"name",begin->second.c_str());
 		json.addKeyVal(buf[i],Json::INT,"score",begin->first);
 		cout<<buf[i]<<endl;
 		begin++;
 		i++;
 	}
-	auto arr=json.createArray(200,Json::OBJ,i,buf);
+	auto arr=json.createArray(Json::OBJ,i,buf);
 	json.addKeyVal(str1,Json::ARRAY,"array",arr);
 	gram.body=str1;
 }

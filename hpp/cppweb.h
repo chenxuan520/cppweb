@@ -65,6 +65,7 @@ private:
 	const char* error;
 	unsigned maxLen;
 	unsigned floNum;
+	unsigned defaultSize;
 	Object* obj;
 	std::unordered_map<char*,unsigned> memory;
 	std::unordered_map<std::string,Object*> hashMap;
@@ -77,13 +78,16 @@ public:
 		text=NULL;
 		maxLen=256;
 		floNum=3;
+		defaultSize=128;
 	}
 	Json(const char* jsonText)
 	{
 		error=NULL;
 		obj=NULL;
+		text=NULL;
 		maxLen=256;
 		floNum=3;
+		defaultSize=128;
 		if(jsonText==NULL||strlen(jsonText)==0)
 		{
 			error="message error";
@@ -124,16 +128,16 @@ public:
 		for(auto iter=memory.begin();iter!=memory.end();iter++)
 			free(iter->first);
 	}
-	const char* formatPrint(const Object* exmaple,unsigned buffLen)
+	const char* formatPrint(const Object* exmaple)
 	{
-		char* buffer=(char*)malloc(sizeof(char)*buffLen);
+		char* buffer=(char*)malloc(sizeof(char)*defaultSize*10);
 		if(buffer==NULL)
 		{
 			error="malloc wrong";
 			return NULL;
 		}
-		memset(buffer,0,sizeof(char)*buffLen);
-		memory.insert(std::pair<char*,unsigned>{buffer,buffLen});
+		memset(buffer,0,sizeof(char)*defaultSize*10);
+		memory.insert(std::pair<char*,unsigned>{buffer,sizeof(char)*defaultSize*10});
 		printObj(buffer,exmaple);
 		return buffer;
 	}
@@ -143,7 +147,7 @@ public:
 			return NULL;
 		return hashMap.find(std::string(key))->second;
 	}
-	bool addKeyVal(char* obj,TypeJson type,const char* key,...)
+	bool addKeyVal(char*& obj,TypeJson type,const char* key,...)
 	{
 		if(obj==NULL)
 		{
@@ -164,11 +168,8 @@ public:
 			error="wrong object";
 			return false;
 		}
-		if(memory[obj]-strlen(obj)<strlen(key)+4)
-		{
-			error="obj too short";
-			return false;
-		}
+		while(memory[obj]-strlen(obj)<strlen(key)+4)
+			obj=enlargeMemory(obj);
 		sprintf(obj,"%s\"%s\":",obj,key);
 		int valInt=0;
 		char* valStr=NULL;
@@ -178,20 +179,14 @@ public:
 		{
 		case INT:
 			valInt=va_arg(args,int);
-			if(memory[obj]-strlen(obj)<15)
-			{
-				error="obj too short";
-				return false;
-			}
+			while(memory[obj]-strlen(obj)<15)
+				obj=enlargeMemory(obj);
 			sprintf(obj,"%s%d",obj,valInt);
 			break;
 		case FLOAT:
 			valFlo=va_arg(args,double);
-			if(memory[obj]-strlen(obj)<15)
-			{
-				error="obj too short";
-				return false;
-			}
+			while(memory[obj]-strlen(obj)<15)
+				obj=enlargeMemory(obj);
 			sprintf(obj,"%s%.*f",obj,floNum,valFlo);
 			break;
 		case STRING:
@@ -201,28 +196,19 @@ public:
 				error="null input";
 				return false;
 			}
-			if(memory[obj]-strlen(obj)<strlen(obj)+5)
-			{
-				error="obj too short";
-				return false;
-			}
+			while(memory[obj]-strlen(obj)<strlen(obj)+5)
+				obj=enlargeMemory(obj);
 			sprintf(obj,"%s\"%s\"",obj,valStr);
 			break;
 		case EMPTY:
-			if(memory[obj]-strlen(obj)<5)
-			{
-				error="obj too short";
-				return false;
-			}
+			while(memory[obj]-strlen(obj)<5)
+				obj=enlargeMemory(obj);
 			strcat(obj,"null");
 			break;
 		case BOOL:
 			valBool=va_arg(args,int);
-			if(memory[obj]-strlen(obj)<5)
-			{
-				error="obj too short";
-				return false;
-			}
+			while(memory[obj]-strlen(obj)<5)
+				obj=enlargeMemory(obj);
 			if(valBool==true)
 				strcat(obj,"true");
 			else
@@ -231,11 +217,8 @@ public:
 		case OBJ:
 		case ARRAY:
 			valStr=va_arg(args,char*);
-			if(memory[obj]-strlen(obj)<strlen(obj)+5)
-			{
-				error="obj too short";
-				return false;
-			}
+			while(memory[obj]-strlen(obj)<strlen(obj)+5)
+				obj=enlargeMemory(obj);
 			if(valStr==NULL)
 			{
 				error="null input";
@@ -251,36 +234,36 @@ public:
 		strcat(obj,"}");
 		return true;
 	}
-	char* createObject(unsigned maxBuffLen)
+	char* createObject()
 	{
-		char* now=(char*)malloc(sizeof(char)*maxBuffLen);
-		if(now==NULL||maxBuffLen<4)
+		char* now=(char*)malloc(sizeof(char)*defaultSize);
+		if(now==NULL)
 		{
 			error="init worng";
 			return NULL;
 		}
 		else
-			memory.insert(std::pair<char*,int>{now,maxBuffLen});
-		memset(now,0,sizeof(char)*maxBuffLen);
+			memory.insert(std::pair<char*,unsigned>{now,defaultSize});
+		memset(now,0,sizeof(char)*defaultSize);
 		strcpy(now,"{}");
 		return now;
 	}
-	char* createArray(unsigned maxBuffLen,TypeJson type,unsigned arrLen,void* arr)
+	char* createArray(TypeJson type,unsigned arrLen,void* arr)
 	{
-		if(arr==NULL||maxBuffLen<4)
+		if(arr==NULL)
 		{
 			error="null input";
 			return NULL;
 		}
-		char* now=(char*)malloc(sizeof(char)*maxBuffLen);
+		char* now=(char*)malloc(sizeof(char)*defaultSize);
 		if(now==NULL)
 		{
 			error="malloc worng";
 			return NULL;
 		}
 		else
-			memory.insert(std::pair<char*,int>{now,maxBuffLen});
-		memset(now,0,sizeof(char)*maxBuffLen);
+			memory.insert(std::pair<char*,unsigned>{now,defaultSize});
+		memset(now,0,sizeof(char)*defaultSize);
 		strcat(now,"[");
 		int* arrInt=(int*)arr;
 		float* arrFlo=(float*)arr;
@@ -292,33 +275,24 @@ public:
 		case INT:
 			for(i=0;i<arrLen;i++)
 			{
-				if(maxBuffLen-strlen(now)<std::to_string(arrInt[i]).size()+3)
-				{
-					error="bufferLen is too small";
-					return NULL;
-				}
+				while(memory[now]-strlen(now)<std::to_string(arrInt[i]).size()+3)
+					now=enlargeMemory(now);
 				sprintf(now,"%s%d,",now,arrInt[i]);
 			}
 			break;
 		case FLOAT:
 			for(i=0;i<arrLen;i++)
 			{
-				if(maxBuffLen-strlen(now)<std::to_string(arrFlo[i]).size()+3)
-				{
-					error="bufferLen is too small";
-					return NULL;
-				}
+				while(memory[now]-strlen(now)<std::to_string(arrInt[i]).size()+3)
+					now=enlargeMemory(now);
 				sprintf(now,"%s%.*f,",now,floNum,arrFlo[i]);
 			}
 			break;
 		case STRING:
 			for(i=0;i<arrLen;i++)
 			{
-				if(maxBuffLen-strlen(now)<strlen(arrStr[i])+5)
-				{
-					error="bufferLen is too small";
-					return NULL;
-				}
+				while(memory[now]-strlen(now)<strlen(arrStr[i])+5)
+					now=enlargeMemory(now);
 				sprintf(now,"%s\"%s\",",now,arrStr[i]);
 			}
 			break;
@@ -326,22 +300,16 @@ public:
 		case ARRAY:
 			for(i=0;i<arrLen;i++)
 			{
-				if(maxBuffLen-strlen(now)<strlen(arrStr[i])+4)
-				{
-					error="bufferLen is too small";
-					return NULL;
-				}
+				while(memory[now]-strlen(now)<strlen(arrStr[i])+4)
+					now=enlargeMemory(now);
 				sprintf(now,"%s%s,",now,arrStr[i]);
 			}
 			break;
 		case BOOL:
 			for(i=0;i<arrLen;i++)
 			{
-				if(maxBuffLen-strlen(now)<6)
-				{
-					error="bufferLen is too small";
-					return NULL;
-				}
+				while(memory[now]-strlen(now)<6)
+					now=enlargeMemory(now);
 				if(arrBool)
 					strcat(now,"true,");
 				else
@@ -367,12 +335,26 @@ public:
 	{
 		return error;
 	}
-	inline void changeSetting(unsigned keyValMaxLen,unsigned floNum)
+	inline void changeSetting(unsigned defaultSize=128,unsigned keyValMaxLen=256,unsigned floNum=3)
 	{
+		this->defaultSize=defaultSize;
 		this->maxLen=keyValMaxLen>maxLen?keyValMaxLen:maxLen;
 		this->floNum=floNum;
 	}
 private:
+	char* enlargeMemory(char* old)
+	{
+		if(memory.find(old)==memory.end())
+			return old;
+		unsigned temp=memory[old];
+		temp*=2;
+		void* strTemp=realloc(old,temp);
+		if(strTemp==NULL)
+			return old;
+		memory.erase(memory.find(old));
+		memory.insert(std::pair<char*,unsigned>{(char*)strTemp,temp});
+		return (char*)strTemp;
+	}
 	Object* analyseObj(char* begin,char* end)
 	{
 		Object * root=new Object,*last=root;
@@ -731,7 +713,7 @@ private:
 			return false;
 		return true;
 	}
-	bool printObj(char* buffer,const Object* obj)
+	bool printObj(char*& buffer,const Object* obj)
 	{
 		unsigned deep=0;
 		char* line=strrchr(buffer,'\n');
@@ -743,6 +725,8 @@ private:
 		Object* now=obj->nextObj;
 		while(now!=NULL)
 		{
+			while(memory[buffer]-strlen(buffer)<now->key.size()+now->strVal.size()+20+deep*5)
+				buffer=enlargeMemory(buffer);
 			for(unsigned i=0;i<deep+4;i++)
 				strcat(buffer," ");
 			switch(now->type)
@@ -802,6 +786,8 @@ private:
 		{
 			for(unsigned i=0;i<deep+4;i++)
 				strcat(buffer," ");
+			while(memory[buffer]-strlen(buffer)<arr[i]->strVal.size()+20+deep*5)
+				buffer=enlargeMemory(buffer);
 			switch(type)
 			{
 			case INT:
@@ -3533,6 +3519,19 @@ public:
 		else
 			return false;
 		return false;
+	}
+	const char* getFileBuff(const char* fileName)
+	{
+		if(pbuffer!=NULL)
+			free(pbuffer);
+		int len=getFileLen(fileName);
+		if(len==-1)
+			return NULL;
+		pbuffer=(char*)malloc(sizeof(char)*getFileLen(fileName)+10);
+		if(pbuffer==NULL)
+			return NULL;
+		getFileMsg(fileName,pbuffer,sizeof(char)*getFileLen(fileName)+10);
+		return pbuffer;
 	}
 	static bool writeToFile(const char* fileName,const char* buffer,unsigned int writeLen)
 	{
