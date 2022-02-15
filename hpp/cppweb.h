@@ -2742,6 +2742,7 @@ public:
 	{
 		if(message==NULL||buffer==NULL||buffLen<=0||message==0)
 			return -1;
+		memcpy(buffer,message,messageLen);
 		unsigned int len=0;
 		char* temp=NULL;
 		if((temp=strstr((char*)message,"Content-Length"))==NULL)
@@ -2752,18 +2753,19 @@ public:
 			return -1;
 		temp+=4;
 		if(strlen(temp)>=len)
-			return 0;
-		if(strlen((char*)message)+len>buffLen)
+			return messageLen;
+		long int leftLen=len-(messageLen-(temp-(char*)message)),getLen=1,all=0;
+		if(messageLen+leftLen>buffLen)
 			return -2;
-		memcpy(buffer,message,messageLen);
-		unsigned int leftLen=len-strlen(temp),getLen=0,all=0;
-		while(leftLen>5||getLen<=0)
+		unsigned result=messageLen;
+		while(leftLen>5&&getLen>0)
 		{
 			getLen=this->httpRecv(sockCli,(char*)buffer+messageLen+all,buffLen-messageLen-all);
+			result+=getLen;
 			all+=getLen;
 			leftLen-=getLen;
 		}
-		return len;
+		return result;
 	}
 	void changeSetting(bool debug,bool isLongCon,bool isForkModel,unsigned sendLen)
 	{
