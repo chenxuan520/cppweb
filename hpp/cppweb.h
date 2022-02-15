@@ -1784,7 +1784,7 @@ public:
 		sscanf(temp,format,buffer);
 		return buffer;
 	}
-	int getRecFile(const void* message,char* fileName,int nameLen,char* buffer,unsigned int bufferLen)
+	int getRecFile(const void* message,unsigned messageSize,char* fileName,int nameLen,char* buffer,unsigned int bufferLen)
 	{
 		char tempLen[20]={0},*end=NULL,*top=NULL;
 		int result=0;
@@ -1800,7 +1800,9 @@ public:
 			return 0;
 		if((top=strstr(top+strlen(buffer),buffer))==NULL)
 			return 0;
-		if((end=strstr(top+strlen(buffer),buffer))==NULL)
+		if((end=(char*)memmem(top+strlen(buffer)\
+							  ,messageSize-(top+strlen(buffer)-(char*)message)\
+							  ,buffer,strlen(buffer)))==NULL)
 			return 0;
 		if((top=strstr(top,"\r\n\r\n"))==NULL)
 			return 0;
@@ -2517,9 +2519,9 @@ public:
 		defaultFile=NULL;
 		arrRoute=NULL;
 		selfCtrl=false;
-		senLen=0;
+		senLen=1;
+		recLen=2048;
 		selfLen=0;
-		recLen=0;
 		boundPort=port;
 		arrRoute=(RouteFuntion*)malloc(sizeof(RouteFuntion)*20);
 		if(arrRoute==NULL)
@@ -2695,8 +2697,6 @@ public:
 	}
 	void run(const char* defaultFile)
 	{
-		this->senLen=1;
-		this->recLen=2048;
 		char* getT=(char*)malloc(sizeof(char)*recLen);
 		char* sen=(char*)malloc(sizeof(char)*senLen*1024*1024);
 		if(sen==NULL||getT==NULL)
@@ -2765,11 +2765,13 @@ public:
 		}
 		return len;
 	}
-	void changeSetting(bool debug,bool isLongCon,bool isForkModel)
+	void changeSetting(bool debug,bool isLongCon,bool isForkModel,unsigned sendLen)
 	{
 		this->isDebug=debug;
 		this->isLongCon=isLongCon;
 		this->isFork=isForkModel;
+		if(sendLen>0)
+			this->senLen=sendLen;
 		if(isFork==true)
 			signal(SIGCHLD,sigCliDeal);
 	}

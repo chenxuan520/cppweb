@@ -14,7 +14,7 @@ void upload(HttpServer& server,DealHttp& http,int,DealHttp::Datagram& gram)
 		gram.statusCode=DealHttp::STATUSNOFOUND;
 		return;
     }
-    flen=http.getRecFile(server.recText(),name,100,(char*)sen,1024*1024);
+    flen=http.getRecFile(server.recText(),server.getRecLen(),name,100,(char*)sen,1024*1024);
 	printf("%s\n%d\n",sen,flen);
     FileGet::writeToFile(name,(char*)sen,flen);
 	gram.typeFile=DealHttp::JSON;
