@@ -4,13 +4,14 @@ using namespace cppweb;
 int main()  
 {  
 	HttpServer server(5200,true);
+	server.loadStatic("/file/index.html","index.html");
+	server.loadStatic("/file","index.html");
 	if(server.lastError()!=NULL)
 	{
 		std::cout<<server.lastError()<<std::endl;
 		return -1;
 	}
-	server.loadStatic("/file/index.html","index.html");
-	server.run(1,3000,"index.html");
+	server.run("index.html");
     return 0; 
 }  
 
