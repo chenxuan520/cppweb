@@ -11,6 +11,8 @@
 	"background":false,
 	//remove path array
 	"delete path":[],
+	//if use guard
+	"guard": false,
 	//set agent array
 	"path replace":{}
 }

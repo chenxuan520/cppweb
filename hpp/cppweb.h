@@ -792,7 +792,7 @@ private:
 		strcat(buffer,"}");
 		return true;
 	}
-	bool printArr(char* buffer,TypeJson type,const std::vector<Object*>& arr)
+	bool printArr(char*& buffer,TypeJson type,const std::vector<Object*>& arr)
 	{
 		unsigned deep=0;
 		char* line=strrchr(buffer,'\n');
@@ -844,6 +844,20 @@ private:
 			strcat(buffer," ");
 		strcat(buffer,"]");
 		return true;
+	}
+};
+class Guard{
+public:
+	Guard()
+	{
+		while(1)
+		{
+			int pid=fork();
+			if(pid!=0)
+				waitpid(pid, NULL, 0);
+			else
+				break;
+		}
 	}
 };
 template<class T>
@@ -1361,17 +1375,29 @@ public:
 	{
 		const SSL_METHOD* meth=SSLv23_client_method();
 		if(meth==NULL)
+		{
+			error="ssl init wrong";
 			return false;
+		}
 		ctx=SSL_CTX_new(meth);
 		if(ctx==NULL)
+		{
+			error="ssl new wrong";
 			return false;
+		}
 		ssl=SSL_new(ctx);
 		if(NULL==ssl)
+		{
+			error="ssl new wrong";
 			return false;
+		}
 		SSL_set_fd(ssl,sock);
 		int ret=SSL_connect(ssl);
 		if(ret==-1)
+		{
+			error="ssl connect wrong";
 			return false;
+		}
 		return true;
 	}
 	inline int sendHostSSL(const void* psen,int len)
@@ -2608,8 +2634,8 @@ public://main class for http server2.0
 	struct RouteFuntion{//inside struct,pack for handle
 		AskType ask;
 		RouteType type;
-		char route[100];
-		const char* path;
+		char route[128];
+		char path[128];
 		void (*pfunc)(HttpServer&,DealHttp&,int);
 	};
 private:
@@ -2642,26 +2668,26 @@ public:
 		middleware=NULL;
 		defaultFile=NULL;
 		arrRoute=NULL;
+		clientIn=NULL;
+		clientOut=NULL;
+		logFunc=NULL;
+		pnowRoute=NULL;
 		selfCtrl=false;
 		senLen=1;
 		recLen=2048;
 		selfLen=0;
 		boundPort=port;
+		isDebug=debug;
+		isLongCon=true;
+		isFork=false;
+		textLen=0;
+		now=0;
+		maxNum=20;
 		arrRoute=(RouteFuntion*)malloc(sizeof(RouteFuntion)*20);
 		if(arrRoute==NULL)
 			this->error="route wrong";
 		else
 			memset(arrRoute,0,sizeof(RouteFuntion)*20);
-		now=0;
-		maxNum=20;
-		isDebug=debug;
-		isLongCon=true;
-		isFork=false;
-		textLen=0;
-		clientIn=NULL;
-		clientOut=NULL;
-		logFunc=NULL;
-		pnowRoute=NULL;
 	}
 	~HttpServer()
 	{
@@ -2711,7 +2737,7 @@ public:
 		arrRoute[now].type=STATIC;
 		arrRoute[now].ask=GET;
 		strcpy(arrRoute[now].route,route);
-		arrRoute[now].path=staticPath;
+		strcpy(arrRoute[now].path,staticPath);
 		arrRoute[now].pfunc=loadFile;
 		if(false==trie.insert(route,arrRoute+now))
 		{
@@ -3037,8 +3063,7 @@ private:
 		char ask[200]={0};
 		if(middleware!=NULL)
 		{
-			DealHttp::Datagram gram;
-			http.changeSetting(NULL,NULL,&gram);
+			http.changeSetting(NULL,NULL,&http.gram);
 			middleware(*this,http,num);
 			http.changeSetting(NULL,NULL,NULL);
 			return 0;
@@ -3112,6 +3137,7 @@ private:
 			{
 				http.gram.body="";
 				http.gram.cookie.clear();
+				http.gram.head.clear();
 				http.gram.fileLen=0;
 				http.gram.typeFile=DealHttp::TXT;
 				pfunc(*this,http,num);
@@ -3361,7 +3387,7 @@ private:
 	static void loadFile(HttpServer& server,DealHttp& http,int senLen)
 	{
 		int len=0;
-		char ask[200]={0},buf[300]={0},temp[200]={0};
+		char ask[200]={0},buf[500]={0},temp[200]={0};
 		http.getAskRoute(server.recText(),"GET",ask,200);
 		HttpServer::RouteFuntion& route=*server.getNowRoute();
 		http.getWildUrl(ask,route.route,temp,200);

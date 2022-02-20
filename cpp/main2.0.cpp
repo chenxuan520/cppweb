@@ -3,15 +3,14 @@
 	date:2021.7.5
 	funtion:this is main cpp for static web
 *********************************/
-//#include"../hpp/sql.h"
-#include"../hpp/server.h"
-#include"../hpp/http.h"
-#include"../hpp/route.h"
+#include "../hpp/cppweb.h"
+#include "../hpp/route.h"
 #include<stdio.h>
 #include<string.h>
 using namespace cppweb;
 char indexName[100]="index.html";
 int memory=0;
+bool isGuard=false;
 /********************************
 	author:chenxuan
 	date:2021.7.5
@@ -40,11 +39,6 @@ void chooseModel(unsigned int* port,bool* pflag)
 		fclose(fp);
 		return;
 	}
-	fp=fopen("my.ini","w+");
-	if(fp==NULL)
-		return;
-	fprintf(fp,"%u %s %d %s",*port,indexName,memory,temp);
-	fclose(fp);
 }
 /********************************
 	author:chenxuan
@@ -71,6 +65,10 @@ void ifChoose(bool* pb,unsigned int* pport,bool* is_back)
 		*pb=false;
 	if(json["background"]!=NULL)
 		*is_back=json["background"]->boolVal;
+	else
+		*pb=false;
+	if(json["guard"]!=NULL)
+		isGuard=json["guard"]->boolVal;
 	else
 		*pb=false;
 	*pb=true;
@@ -121,9 +119,11 @@ void serverHttp(int argc,char** argv)
 			return;
 		}
 	}
+	if(isGuard)
+		Guard guard;
 	HttpServer server(port,true);
 	addHandle(server);
-	server.run(memory,4000,indexName);
+	server.run(indexName);
 }
 int main(int argc, char** argv) 
 {

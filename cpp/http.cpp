@@ -668,15 +668,20 @@ Json::Json()
 	error=NULL;
 	obj=NULL;
 	text=NULL;
+	word=NULL;
 	maxLen=256;
 	floNum=3;
+	defaultSize=128;
+	word=(char*)malloc(sizeof(char)*maxLen);
+	if(word==NULL)
+	{
+		error="malloc wrong";
+		return;
+	}
+	memset(word,0,sizeof(char)*maxLen);
 }
-Json::Json(const char* jsonText)
+Json::Json(const char* jsonText):Json()
 {
-	error=NULL;
-	obj=NULL;
-	maxLen=256;
-	floNum=3;
 	if(jsonText==NULL||strlen(jsonText)==0)
 	{
 		error="message error";
@@ -712,21 +717,23 @@ Json::Json(const char* jsonText)
 Json::~Json()
 {
 	deleteNode(obj);
+	if(word!=NULL)
+		free(word);
 	if(text!=NULL)
 		free(text);
 	for(auto iter=memory.begin();iter!=memory.end();iter++)
 		free(iter->first);
 }
-const char* Json::formatPrint(const Json::Object* exmaple,unsigned buffLen)
+const char* Json::formatPrint(const Json::Object* exmaple)
 {
-	char* buffer=(char*)malloc(sizeof(char)*buffLen);
+	char* buffer=(char*)malloc(sizeof(char)*defaultSize*10);
 	if(buffer==NULL)
 	{
 		error="malloc wrong";
 		return NULL;
 	}
-	memset(buffer,0,sizeof(char)*buffLen);
-	memory.insert(std::pair<char*,unsigned>{buffer,buffLen});
+	memset(buffer,0,sizeof(char)*defaultSize*10);
+	memory.insert(std::pair<char*,unsigned>{buffer,sizeof(char)*defaultSize*10});
 	printObj(buffer,exmaple);
 	return buffer;
 }
@@ -757,11 +764,8 @@ bool Json::addKeyVal(char* obj,TypeJson type,const char* key,...)
 		error="wrong object";
 		return false;
 	}
-	if(memory[obj]-strlen(obj)<strlen(key)+4)
-	{
-		error="obj too short";
-		return false;
-	}
+	while(memory[obj]-strlen(obj)<strlen(key)+4)
+		obj=enlargeMemory(obj);
 	sprintf(obj,"%s\"%s\":",obj,key);
 	int valInt=0;
 	char* valStr=NULL;
@@ -771,20 +775,14 @@ bool Json::addKeyVal(char* obj,TypeJson type,const char* key,...)
 	{
 	case INT:
 		valInt=va_arg(args,int);
-		if(memory[obj]-strlen(obj)<15)
-		{
-			error="obj too short";
-			return false;
-		}
+		while(memory[obj]-strlen(obj)<15)
+			obj=enlargeMemory(obj);
 		sprintf(obj,"%s%d",obj,valInt);
 		break;
 	case FLOAT:
 		valFlo=va_arg(args,double);
-		if(memory[obj]-strlen(obj)<15)
-		{
-			error="obj too short";
-			return false;
-		}
+		while(memory[obj]-strlen(obj)<15)
+			obj=enlargeMemory(obj);
 		sprintf(obj,"%s%.*f",obj,floNum,valFlo);
 		break;
 	case STRING:
@@ -794,28 +792,19 @@ bool Json::addKeyVal(char* obj,TypeJson type,const char* key,...)
 			error="null input";
 			return false;
 		}
-		if(memory[obj]-strlen(obj)<strlen(obj)+5)
-		{
-			error="obj too short";
-			return false;
-		}
+		while(memory[obj]-strlen(obj)<strlen(obj)+5)
+			obj=enlargeMemory(obj);
 		sprintf(obj,"%s\"%s\"",obj,valStr);
 		break;
 	case EMPTY:
-		if(memory[obj]-strlen(obj)<5)
-		{
-			error="obj too short";
-			return false;
-		}
+		while(memory[obj]-strlen(obj)<5)
+			obj=enlargeMemory(obj);
 		strcat(obj,"null");
 		break;
 	case BOOL:
 		valBool=va_arg(args,int);
-		if(memory[obj]-strlen(obj)<5)
-		{
-			error="obj too short";
-			return false;
-		}
+		while(memory[obj]-strlen(obj)<5)
+			obj=enlargeMemory(obj);
 		if(valBool==true)
 			strcat(obj,"true");
 		else
@@ -824,11 +813,8 @@ bool Json::addKeyVal(char* obj,TypeJson type,const char* key,...)
 	case OBJ:
 	case ARRAY:
 		valStr=va_arg(args,char*);
-		if(memory[obj]-strlen(obj)<strlen(obj)+5)
-		{
-			error="obj too short";
-			return false;
-		}
+		while(memory[obj]-strlen(obj)<strlen(obj)+5)
+			obj=enlargeMemory(obj);
 		if(valStr==NULL)
 		{
 			error="null input";
@@ -844,36 +830,36 @@ bool Json::addKeyVal(char* obj,TypeJson type,const char* key,...)
 	strcat(obj,"}");
 	return true;
 }
-char* Json::createObject(unsigned maxBuffLen)
+char* Json::createObject()
 {
-	char* now=(char*)malloc(sizeof(char)*maxBuffLen);
-	if(now==NULL||maxBuffLen<4)
+	char* now=(char*)malloc(sizeof(char)*defaultSize);
+	if(now==NULL)
 	{
 		error="init worng";
 		return NULL;
 	}
 	else
-		memory.insert(std::pair<char*,int>{now,maxBuffLen});
-	memset(now,0,sizeof(char)*maxBuffLen);
+		memory.insert(std::pair<char*,unsigned>{now,defaultSize});
+	memset(now,0,sizeof(char)*defaultSize);
 	strcpy(now,"{}");
 	return now;
 }
-char* Json::createArray(unsigned maxBuffLen,TypeJson type,unsigned arrLen,void* arr)
+char* Json::createArray(TypeJson type,unsigned arrLen,void* arr)
 {
-	if(arr==NULL||maxBuffLen<4)
+	if(arr==NULL)
 	{
 		error="null input";
 		return NULL;
 	}
-	char* now=(char*)malloc(sizeof(char)*maxBuffLen);
+	char* now=(char*)malloc(sizeof(char)*defaultSize);
 	if(now==NULL)
 	{
 		error="malloc worng";
 		return NULL;
 	}
 	else
-		memory.insert(std::pair<char*,int>{now,maxBuffLen});
-	memset(now,0,sizeof(char)*maxBuffLen);
+		memory.insert(std::pair<char*,unsigned>{now,defaultSize});
+	memset(now,0,sizeof(char)*defaultSize);
 	strcat(now,"[");
 	int* arrInt=(int*)arr;
 	float* arrFlo=(float*)arr;
@@ -885,33 +871,24 @@ char* Json::createArray(unsigned maxBuffLen,TypeJson type,unsigned arrLen,void* 
 	case INT:
 		for(i=0;i<arrLen;i++)
 		{
-			if(maxBuffLen-strlen(now)<std::to_string(arrInt[i]).size()+3)
-			{
-				error="bufferLen is too small";
-				return NULL;
-			}
+			while(memory[now]-strlen(now)<std::to_string(arrInt[i]).size()+3)
+				now=enlargeMemory(now);
 			sprintf(now,"%s%d,",now,arrInt[i]);
 		}
 		break;
 	case FLOAT:
 		for(i=0;i<arrLen;i++)
 		{
-			if(maxBuffLen-strlen(now)<std::to_string(arrFlo[i]).size()+3)
-			{
-				error="bufferLen is too small";
-				return NULL;
-			}
+			while(memory[now]-strlen(now)<std::to_string(arrInt[i]).size()+3)
+				now=enlargeMemory(now);
 			sprintf(now,"%s%.*f,",now,floNum,arrFlo[i]);
 		}
 		break;
 	case STRING:
 		for(i=0;i<arrLen;i++)
 		{
-			if(maxBuffLen-strlen(now)<strlen(arrStr[i])+5)
-			{
-				error="bufferLen is too small";
-				return NULL;
-			}
+			while(memory[now]-strlen(now)<strlen(arrStr[i])+5)
+				now=enlargeMemory(now);
 			sprintf(now,"%s\"%s\",",now,arrStr[i]);
 		}
 		break;
@@ -919,22 +896,16 @@ char* Json::createArray(unsigned maxBuffLen,TypeJson type,unsigned arrLen,void* 
 	case ARRAY:
 		for(i=0;i<arrLen;i++)
 		{
-			if(maxBuffLen-strlen(now)<strlen(arrStr[i])+4)
-			{
-				error="bufferLen is too small";
-				return NULL;
-			}
+			while(memory[now]-strlen(now)<strlen(arrStr[i])+4)
+				now=enlargeMemory(now);
 			sprintf(now,"%s%s,",now,arrStr[i]);
 		}
 		break;
 	case BOOL:
 		for(i=0;i<arrLen;i++)
 		{
-			if(maxBuffLen-strlen(now)<6)
-			{
-				error="bufferLen is too small";
-				return NULL;
-			}
+			while(memory[now]-strlen(now)<6)
+				now=enlargeMemory(now);
 			if(arrBool)
 				strcat(now,"true,");
 			else
@@ -952,19 +923,31 @@ char* Json::createArray(unsigned maxBuffLen,TypeJson type,unsigned arrLen,void* 
 	now[strlen(now)]=0;
 	return now;
 }
+char* Json::enlargeMemory(char* old)
+{
+	if(memory.find(old)==memory.end())
+		return old;
+	unsigned temp=memory[old];
+	temp*=2;
+	void* strTemp=realloc(old,temp);
+	if(strTemp==NULL)
+		return old;
+	memory.erase(memory.find(old));
+	memory.insert(std::pair<char*,unsigned>{(char*)strTemp,temp});
+	return (char*)strTemp;
+}
 Json::Object* Json::analyseObj(char* begin,char* end)
 {
 	Object * root=new Object,*last=root;
 	root->type=STRUCT;
 	char* now=begin+1,*next=now;
-	char* word=(char*)malloc(sizeof(char)*maxLen),*val=(char*)malloc(sizeof(char)*maxLen),temp=*end;
-	if(word==NULL||val==NULL)
+	char temp=*end;
+	if(word==NULL)
 	{
 		error="malloc wrong";
 		return NULL;
 	}
 	memset(word,0,sizeof(char)*maxLen);
-	memset(val,0,sizeof(char)*maxLen);
 	*end=0;
 	while(now<end)
 	{
@@ -974,6 +957,7 @@ Json::Object* Json::analyseObj(char* begin,char* end)
 		nextObj->key=word;
 		hashMap.insert(std::pair<std::string,Object*>{word,nextObj});
 		now+=strlen(word)+3;
+		memset(word,0,sizeof(char)*maxLen);
 		if(*now=='\"')
 		{
 			nextObj->type=STRING;
@@ -985,10 +969,19 @@ Json::Object* Json::analyseObj(char* begin,char* end)
 				error="string wrong";
 				return NULL;
 			}
-			for(unsigned i=0;now+i+1<next;i++)
-				val[i]=*(now+i+1);
-			val[strlen(val)]=0;
-			nextObj->strVal=val;
+			if(next-now+3>maxLen)
+			{
+				char* tempStr=(char*)realloc(word,next-now+3);
+				if(tempStr!=NULL)
+				{
+					word=tempStr;
+					maxLen=next-now+3;
+				}
+			}
+			for(unsigned i=0;now+i+1<next&&i<maxLen;i++)
+				word[i]=*(now+i+1);
+			word[strlen(word)]=0;
+			nextObj->strVal=word;
 			now=next+1;
 			if(*now==',')
 				now++;
@@ -1063,54 +1056,17 @@ Json::Object* Json::analyseObj(char* begin,char* end)
 		else
 		{
 			error="text wrong";
-			free(word);
-			free(val);
 			return root;
 		}
 		last->nextObj=nextObj;
 		last=nextObj;
 	}
 	*end=temp;
-	free(word);
-	free(val);
 	return root;
 }
-void Json::deleteComment()
+Json::TypeJson Json::analyseArray(char* begin,char* end,std::vector<Object*>& arr)
 {
-	unsigned flag=0;
-	for(unsigned i=0;i<strlen(text);i++)
-	{
-		if(text[i]=='\"'&&text[i-1]!='\\')
-			flag++;
-		else if(flag%2==0&&text[i]=='/'&&i+1<strlen(text)&&text[i+1]=='/')
-		{
-			while(text[i]!='\n'&&i<strlen(text))
-			{
-				text[i]=' ';
-				i++;
-			}
-		}
-		else if(flag%2==0&&text[i]=='/'&&i+1<strlen(text)&&text[i+1]=='*')
-		{
-			while(i+1<strlen(text))
-			{
-				if(text[i+1]=='/'&&text[i]=='*')
-				{
-					text[i]=' ';
-					text[i+1]=' ';
-					break;
-				}
-				text[i]=' ';
-				i++;
-			}
-		}
-		else 
-			continue;
-	}
-}
-Json::TypeJson Json::analyseArray(char* begin,char* end,std::vector<Object*>& array)
-{
-	char* now=begin+1,*next=end,*word=(char*)malloc(sizeof(char)*maxLen);
+	char* now=begin+1,*next=end;
 	if(word==NULL)
 	{
 		error="malloc wrong";
@@ -1118,7 +1074,7 @@ Json::TypeJson Json::analyseArray(char* begin,char* end,std::vector<Object*>& ar
 	}
 	memset(word,0,sizeof(char)*maxLen);
 	Object* nextObj=NULL;
-	if(('0'<=*now&&'9'>=*now)||*now=='-')
+	if((*now>='0'&&*now<='9')||*now=='-')
 	{
 		next=now;
 		while(next<end&&*next!=',')
@@ -1132,12 +1088,12 @@ Json::TypeJson Json::analyseArray(char* begin,char* end,std::vector<Object*>& ar
 			if(nextObj->type==INT)
 			{
 				findNum(now,type,&nextObj->intVal);
-				array.push_back(nextObj);
+				arr.push_back(nextObj);
 			}
 			else
 			{
 				findNum(now,type,&nextObj->floVal);
-				array.push_back(nextObj);
+				arr.push_back(nextObj);
 			}
 			now=strchr(now+1,',');
 			if(now!=NULL)
@@ -1154,7 +1110,7 @@ Json::TypeJson Json::analyseArray(char* begin,char* end,std::vector<Object*>& ar
 			nextObj->type=STRING;
 			nextObj->isData=true;
 			nextObj->strVal=word;
-			array.push_back(nextObj);
+			arr.push_back(nextObj);
 			now=strchr(now+1,',');
 			if(now==NULL)
 				break;
@@ -1169,7 +1125,7 @@ Json::TypeJson Json::analyseArray(char* begin,char* end,std::vector<Object*>& ar
 			nextObj->type=BOOL;
 			nextObj->isData=true;
 			nextObj->boolVal=strncmp(now,"true",4)==0;
-			array.push_back(nextObj);
+			arr.push_back(nextObj);
 			now=strchr(now+1,',');
 			if(now==NULL)
 				break;
@@ -1184,7 +1140,7 @@ Json::TypeJson Json::analyseArray(char* begin,char* end,std::vector<Object*>& ar
 			nextObj=analyseObj(now,next);
 			nextObj->type=OBJ;
 			nextObj->isData=true;
-			array.push_back(nextObj);
+			arr.push_back(nextObj);
 			now=next;
 			now=strchr(now+1,',');
 			if(now==NULL)
@@ -1202,7 +1158,7 @@ Json::TypeJson Json::analyseArray(char* begin,char* end,std::vector<Object*>& ar
 			nextObj->type=ARRAY;
 			nextObj->arrType=type;
 			nextObj->isData=true;
-			array.push_back(nextObj);
+			arr.push_back(nextObj);
 			now=next;
 			now=strchr(now+1,',');
 			if(now==NULL)
@@ -1211,26 +1167,35 @@ Json::TypeJson Json::analyseArray(char* begin,char* end,std::vector<Object*>& ar
 		}
 	}
 	else if(*now==']')
-	{
-		free(word);
 		return INT;
-	}
 	else
 	{
 		error="array find wrong";
-		free(word);
 		return INT;
 	}
-	free(word);
 	return nextObj->type;
 }
-void Json::findString(const char* begin,char* buffer,unsigned buffLen)
+void Json::findString(const char* begin,char*& buffer,unsigned& buffLen)
 {
-	const char* now=begin+1,*next=now;
-	next=strchr(now+1,'\"');
-	while(next!=NULL&&*(next-1)=='\\')
-		next=strchr(next+1,'\"');
-	for(unsigned i=0;now+i<next&&i<buffLen;i++)
+	const char* now=begin+1,*nextOne=now;
+	nextOne=strchr(now+1,'\"');
+	while(nextOne!=NULL&&*(nextOne-1)=='\\')
+		nextOne=strchr(nextOne+1,'\"');
+	if(nextOne==NULL)
+	{
+		error="text wrong";
+		return;
+	}
+	if(buffLen<nextOne-now)
+	{
+		char* temp=(char*)realloc(buffer,sizeof(char)*(nextOne-now+10));
+		if(temp!=NULL)
+		{
+			buffer=temp;
+			buffLen=nextOne-now+10;
+		}
+	}
+	for(unsigned i=0;now+i<nextOne&&i<buffLen-1;i++)
 		buffer[i]=*(now+i);
 	buffer[strlen(buffer)]=0;
 }
@@ -1245,6 +1210,35 @@ void Json::findNum(const char* begin,TypeJson type,void* pnum)
 	{
 		if(sscanf(begin,"%f",(float*)pnum)<1)
 			error="num wrong";
+	}
+}
+void Json::deleteComment()
+{
+	unsigned flag=0;
+	for(unsigned i=0;i<strlen(text);i++)
+	{
+		if(text[i]=='\"'&&text[i-1]!='\\')
+			flag++;
+		else if(flag%2==0&&text[i]=='/'&&i+1<strlen(text)&&text[i+1]=='/')
+			while(text[i]!='\n'&&i<strlen(text))
+			{
+				text[i]=' ';
+				i++;
+			}
+		else if(flag%2==0&&text[i]=='/'&&i+1<strlen(text)&&text[i+1]=='*')
+			while(i+1<strlen(text))
+			{
+				if(text[i+1]=='/'&&text[i]=='*')
+				{
+					text[i]=' ';
+					text[i+1]=' ';
+					break;
+				}
+				text[i]=' ';
+				i++;
+			}
+		else 
+			continue;
 	}
 }
 void Json::deleteSpace()
@@ -1282,7 +1276,7 @@ bool Json::pairBracket()
 	{
 		if((text[i]=='['||text[i]=='{')&&flag%2==0)
 			sta.push(text+i);
-		else if(text[i]==']'||text[i]=='}')
+		else if((text[i]==']'||text[i]=='}')&&flag%2==0)
 		{
 			if(sta.empty())
 				return false;
@@ -1302,7 +1296,7 @@ bool Json::pairBracket()
 		return false;
 	return true;
 }
-bool Json::printObj(char* buffer,const Object* obj)
+bool Json::printObj(char*& buffer,const Object* obj)
 {
 	unsigned deep=0;
 	char* line=strrchr(buffer,'\n');
@@ -1314,6 +1308,8 @@ bool Json::printObj(char* buffer,const Object* obj)
 	Object* now=obj->nextObj;
 	while(now!=NULL)
 	{
+		while(memory[buffer]-strlen(buffer)<now->key.size()+now->strVal.size()+20+deep*5)
+			buffer=enlargeMemory(buffer);
 		for(unsigned i=0;i<deep+4;i++)
 			strcat(buffer," ");
 		switch(now->type)
@@ -1360,7 +1356,7 @@ bool Json::printObj(char* buffer,const Object* obj)
 	strcat(buffer,"}");
 	return true;
 }
-bool Json::printArr(char* buffer,TypeJson type,const std::vector<Object*>& arr)
+bool Json::printArr(char*& buffer,TypeJson type,const std::vector<Object*>& arr)
 {
 	unsigned deep=0;
 	char* line=strrchr(buffer,'\n');
@@ -1373,6 +1369,8 @@ bool Json::printArr(char* buffer,TypeJson type,const std::vector<Object*>& arr)
 	{
 		for(unsigned i=0;i<deep+4;i++)
 			strcat(buffer," ");
+		while(memory[buffer]-strlen(buffer)<arr[i]->strVal.size()+20+deep*5)
+			buffer=enlargeMemory(buffer);
 		switch(type)
 		{
 		case INT:

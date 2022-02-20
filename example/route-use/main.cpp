@@ -42,6 +42,9 @@ int main()
 		return -1;
 	}
 	server.routeHandle(HttpServer::GET,"/root/*",pfunc);
+	server.get("/lam*",[](HttpServer&,DealHttp& http,int)->void{
+		http.gram.body="hahaha";
+	});
 	server.get("/txt",pfuncTwo);
 	server.get("/try/*",pfuncThree);
 	server.run("index.html");
