@@ -9,7 +9,6 @@
 #include<string.h>
 using namespace cppweb;
 char indexName[100]="index.html";
-int memory=0;
 bool isGuard=false;
 /********************************
 	author:chenxuan
@@ -26,9 +25,6 @@ void chooseModel(unsigned int* port,bool* pflag)
 	printf("please input if run in background(default no)y/n:");
 	fflush(stdin);
 	scanf("%s",temp);
-	printf("please input memory(M):");
-	fflush(stdin);
-	scanf("%d",&memory);
 	if(strchr(temp,'y')!=NULL)
 		*pflag=true;
 	else 
@@ -59,10 +55,6 @@ void ifChoose(bool* pb,unsigned int* pport,bool* is_back)
 		strcpy(indexName,json["default file"]->strVal.c_str());
 	else
 		*pb=false;
-	if(json["memory"]!=NULL)
-		memory=json["memory"]->intVal;
-	else
-		*pb=false;
 	if(json["background"]!=NULL)
 		*is_back=json["background"]->boolVal;
 	else
@@ -89,12 +81,7 @@ bool ifArgc(int argc,char** argv,bool* pis_back,unsigned int* pport)
 		return false;
 	}
 	sscanf(argv[2],"%s",indexName);
-	if(sscanf(argv[3],"%d",&memory)!=1)
-	{
-		printf("memory wrong\n");
-		return false;
-	}
-	if(strstr(argv[4],"true")!=NULL)
+	if(strstr(argv[3],"true")!=NULL)
 		*pis_back=true;
 	return true;
 }

@@ -4,15 +4,13 @@
 	//set the bound port
 	"port":5200,
 	//default file when ask /
-	"default file":"./index.html",
-	//malloc memory
-	"memory":1,
+	"default file":"index.html",
 	//if run in background
 	"background":false,
 	//remove path array
 	"delete path":[],
 	//if use guard
-	"guard": false,
+	"guard":false,
 	//set agent array
 	"path replace":{}
 }
