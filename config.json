@@ -5,6 +5,10 @@
 	"port":5200,
 	//default file when ask /
 	"default file":"index.html",
+	//if fork model
+	"fork":false,
+	//if long connect
+	"long connect":true,
 	//if run in background
 	"background":false,
 	//remove path array

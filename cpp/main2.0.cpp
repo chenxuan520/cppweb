@@ -10,6 +10,8 @@
 using namespace cppweb;
 char indexName[100]="index.html";
 bool isGuard=false;
+bool isLongConnect=true;
+bool isFork=false;
 /********************************
 	author:chenxuan
 	date:2021.7.5
@@ -63,6 +65,14 @@ void ifChoose(bool* pb,unsigned int* pport,bool* is_back)
 		isGuard=json["guard"]->boolVal;
 	else
 		*pb=false;
+	if(json["fork"]!=NULL)
+		isFork=json["fork"]->boolVal;
+	else
+		*pb=false;
+	if(json["long connect"]!=NULL)
+		isLongConnect=json["long connect"]->boolVal;
+	else
+		*pb=false;
 	*pb=true;
 	return;
 }
@@ -73,7 +83,7 @@ void ifChoose(bool* pb,unsigned int* pport,bool* is_back)
 *********************************/
 bool ifArgc(int argc,char** argv,bool* pis_back,unsigned int* pport)
 {
-	if(argc!=5)
+	if(argc!=4)
 		return false;
 	if(sscanf(argv[1],"%d",pport)!=1)
 	{
