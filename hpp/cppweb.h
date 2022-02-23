@@ -195,6 +195,7 @@ private:
 private:
 	char* text;
 	const char* error;
+	const char* nowKey;
 	char* word;
 	char* result;
 	unsigned maxLen;
@@ -212,11 +213,13 @@ public:
 		text=NULL;
 		word=NULL;
 		result=NULL;
+		nowKey=NULL;
 		maxLen=256;
 		floNum=3;
 		defaultSize=128;
+		result=this->createObject();
 		word=(char*)malloc(sizeof(char)*maxLen);
-		if(word==NULL)
+		if(word==NULL||result==NULL)
 		{
 			error="malloc wrong";
 			return;
@@ -225,7 +228,6 @@ public:
 	}
 	Json(std::initializer_list<std::pair<std::string,InitType>> initList):Json()
 	{
-		result=this->createObject();
 		for(auto iter=initList.begin();iter!=initList.end();iter++)
 		{
 			if(iter->second.pval==NULL&&iter->second.type!=EMPTY)
@@ -321,10 +323,8 @@ public:
 			result=NULL;
 		}
 		for(auto iter=memory.begin();iter!=memory.end();iter++)
-		{
 			if(iter->first!=NULL)
 				free(iter->first);
-		}
 	}
 	const char* formatPrint(const Object* exmaple)
 	{
@@ -339,17 +339,32 @@ public:
 		printObj(buffer,exmaple);
 		return buffer;
 	}
-	Object* operator[](const char* key)
+	template<typename T>
+	bool addKeyVal(char*& obj,const char* key,T value)
 	{
-		if(hashMap.find(std::string(key))==hashMap.end())
-			return NULL;
-		return hashMap.find(std::string(key))->second;
+		if(std::is_same<T,int>::value)
+			return addKeyVal(obj,INT,key,value);
+		else if(std::is_same<T,double>::value)
+			return addKeyVal(obj,FLOAT,key,value);
+		else if(std::is_same<T,char*>::value)
+			return addKeyVal(obj,OBJ,key,value);
+		else if(std::is_same<T,const char*>::value)
+			return addKeyVal(obj,STRING,key,value);
+		else if(std::is_same<T,bool>::value)
+			return addKeyVal(obj,BOOL,key,value);
+		else 
+			return addKeyVal(obj,EMPTY,key,NULL);
 	}
 	bool addKeyVal(char*& obj,TypeJson type,const char* key,...)
 	{
 		if(obj==NULL)
 		{
 			error="null buffer";
+			return false;
+		}
+		if(key==NULL)
+		{
+			error="key null";
 			return false;
 		}
 		va_list args;
@@ -525,9 +540,26 @@ public:
 		now[strlen(now)]=0;
 		return now;
 	}
+	Object* operator[](const char* key)
+	{
+		if(hashMap.find(std::string(key))==hashMap.end())
+			return NULL;
+		return hashMap.find(std::string(key))->second;
+	}
 	char*& operator()()
 	{
 		return result;
+	}
+	Json& operator()(const char* key)
+	{
+		nowKey=key;
+		return *this;
+	}
+	template<typename T>
+	Json& operator=(T value)
+	{
+		this->addKeyVal(this->result,nowKey,value);
+		return *this;
 	}
 	inline Object* getRootObj()
 	{
@@ -1563,9 +1595,14 @@ public:
 		return error;
 	}
 #ifdef CPPHTTPLIB_OPENSSL_SUPPORT
-	bool sslInit()
+	bool tryConnectSSL()
 	{
 		const SSL_METHOD* meth=SSLv23_client_method();
+		if(false==this->tryConnect())
+		{
+			error="connect wrong";
+			return false;
+		}
 		if(meth==NULL)
 		{
 			error="ssl init wrong";
@@ -3129,12 +3166,13 @@ public:
 	{
 		return this->receiveSocket(num,buffer,bufferLen);
 	}
-	int getCompleteMessage(const void* message,unsigned int messageLen,void* buffer,unsigned int buffLen,int sockCli)
+	int getCompleteMessage(int sockCli)
 	{
-		if(message==NULL||buffer==NULL||buffLen<=0||message==0)
+		void*& message=getText;
+		unsigned messageLen=this->getRecLen();
+		if(message==NULL||message==0)
 			return -1;
-		memcpy(buffer,message,messageLen);
-		unsigned int len=0;
+		unsigned int len=0,old=messageLen;
 		char* temp=NULL;
 		if((temp=strstr((char*)message,"Content-Length"))==NULL)
 			return -1;
@@ -3146,12 +3184,15 @@ public:
 		if(strlen(temp)>=len)
 			return messageLen;
 		long int leftLen=len-(messageLen-(temp-(char*)message)),getLen=1,all=0;
-		if(messageLen+leftLen>buffLen)
-			return -2;
+		while(len+messageLen>recLen)
+		{
+			recLen*=2;
+			message=enlargeMemory(message,recLen);
+		}
 		unsigned result=messageLen;
 		while(leftLen>5&&getLen>0)
 		{
-			getLen=this->httpRecv(sockCli,(char*)buffer+messageLen+all,buffLen-messageLen-all);
+			getLen=this->httpRecv(sockCli,(char*)message+old+all,recLen-old-all);
 			result+=getLen;
 			all+=getLen;
 			leftLen-=getLen;
@@ -3196,7 +3237,7 @@ public:
 private:
 	void messagePrint()
 	{
-		printf("server is ok\n");
+		printf("welcome to web server,the server is runing\n");
 		printf("port:\t\t%u\n",boundPort);
 		for(unsigned i=0;i<now;i++)
 		{
