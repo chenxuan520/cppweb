@@ -4,6 +4,7 @@
 #include<string>
 #include<stack>
 #include<vector>
+#include<functional>
 #include<unordered_map>
 namespace cppweb{
 class DealHttp{
@@ -107,8 +108,10 @@ public:
 private:
 	char* text;
 	const char* error;
+	char* word;
 	unsigned maxLen;
 	unsigned floNum;
+	unsigned defaultSize;
 	Object* obj;
 	std::unordered_map<char*,unsigned> memory;
 	std::unordered_map<std::string,Object*> hashMap;
@@ -117,11 +120,11 @@ public:
 	Json();
 	Json(const char* jsonText);
 	~Json();
-	const char* formatPrint(const Object* exmaple,unsigned buffLen);
+	const char* formatPrint(const Object* exmaple);
 	Object* operator[](const char* key);
 	bool addKeyVal(char* obj,TypeJson type,const char* key,...);
-	char* createObject(unsigned maxBuffLen);
-	char* createArray(unsigned maxBuffLen,TypeJson type,unsigned arrLen,void* arr);
+	char* createObject();
+	char* createArray(TypeJson type,unsigned arrLen,void* arr);
 	inline Object* getRootObj()
 	{
 		return obj;
@@ -132,13 +135,15 @@ public:
 	}
 	inline void changeSetting(unsigned keyValMaxLen,unsigned floNum)
 	{
+		this->defaultSize=defaultSize;
 		this->maxLen=keyValMaxLen>maxLen?keyValMaxLen:maxLen;
 		this->floNum=floNum;
 	}
 private:
+	char* enlargeMemory(char* old);
 	Object* analyseObj(char* begin,char* end);
 	TypeJson analyseArray(char* begin,char* end,std::vector<Object*>& array);
-	void findString(const char* begin,char* buffer,unsigned buffLen);
+	void findString(const char* begin,char*& buffer,unsigned& buffLen);
 	void findNum(const char* begin,TypeJson type,void* pnum);
 	inline TypeJson judgeNum(const char* begin,const char* end)
 	{
@@ -151,8 +156,66 @@ private:
 	void deleteNode(Object* root);
 	void deleteComment();
 	bool pairBracket();
-	bool printObj(char* buffer,const Object* obj);
-	bool printArr(char* buffer,TypeJson type,const std::vector<Object*>& arr);
+	bool printObj(char*& buffer,const Object* obj);
+	bool printArr(char*& buffer,TypeJson type,const std::vector<Object*>& arr);
+};
+template<class T>
+class Trie {
+private:
+	struct Node{
+		Node* next[77];
+		bool stop;
+		T* data;
+		Node()
+		{
+			for(unsigned i=0;i<77;i++)
+				next[i]=NULL;
+			stop=false;
+		}
+	};
+	Node* root;
+public:
+    Trie() {
+		root=new Node;
+    }
+    
+    bool insert(const char* word,T* data) {
+		Node* temp=root;
+		for(unsigned i=0;word[i]!=0;i++)
+		{
+			if(word[i]-46<0||word[i]-46>76)
+				return false;
+			if(temp->next[word[i]-46]!=NULL)
+				temp=temp->next[word[i]-46];
+			else
+			{
+				temp->next[word[i]-46]=new Node;
+				temp=temp->next[word[i]-46];
+			}
+		}
+		temp->stop=true;
+		temp->data=data;
+		return true;
+    }
+    
+    T* search(const char* word,std::function<bool(const T*,bool isLast)> func) {
+		Node* temp=root;
+		for(unsigned i=0;word[i]!=0;i++)
+		{
+			if(word[i]-46<0||word[i]-46>76)
+				return NULL;
+			if(temp->next[word[i]-46]==NULL)
+				return NULL;
+			else
+			{
+				temp=temp->next[word[i]-46];
+				if(temp->stop&&func(temp->data,word[i+1]==0))
+					return temp->data;
+			}
+		}
+		return NULL;
+    }
+    
 };
 class WebToken{
 private:

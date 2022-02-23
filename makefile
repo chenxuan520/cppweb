@@ -8,9 +8,9 @@ guard:guard.o
 	g++ guard.o -o guard
 guard.o:./cpp/guardHttp.cpp
 	g++ -c ./cpp/guardHttp.cpp -o guard.o
-main2.0:main2.0.o server.o http.o route.o
-	g++ main2.0.o server.o http.o -o main2.0 
-main2.0.o:./cpp/main2.0.cpp  
+main2.0:main2.0.o ./hpp/cppweb.h
+	g++ main2.0.o -o main2.0 -lpthread 
+main2.0.o:./cpp/main2.0.cpp 
 	g++ -c ./cpp/main2.0.cpp  -o main2.0.o
 libserver.a:server.o
 	ar rcs ./lib/libserver.a server.o

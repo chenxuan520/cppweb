@@ -5,6 +5,7 @@ using namespace cppweb;
 int main()  
 {  
 	HttpServer server(5200,true);//input the port bound
+	server.changeSetting(true,false,false);
 	if(server.lastError()!=NULL)
 	{
 		std::cout<<server.lastError()<<std::endl;

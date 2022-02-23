@@ -5,22 +5,22 @@
 using namespace std;
 using namespace cppweb;
 multimap<int,string> tree;
-void addCLi(HttpServer& server,DealHttp& http,int,DealHttp::Datagram& gram)
+void addCLi(HttpServer& server,DealHttp& http,int)
 {
 	char strSco[20]={0},name[50]={0};
-	gram.typeFile=DealHttp::JSON;
+	http.gram.typeFile=DealHttp::JSON;
 	if(http.getKeyValue(server.recText(),"score",strSco,20,true)==NULL)
 	{
 		printf("get name wrong \n%s\n",(char*)server.recText());
-		gram.statusCode=DealHttp::STATUSNOFOUND;
-		gram.typeFile=DealHttp::NOFOUND;
+		http.gram.statusCode=DealHttp::STATUSNOFOUND;
+		http.gram.typeFile=DealHttp::NOFOUND;
 		return;
 	}
 	if(http.getKeyValue(server.recText(),"name",name,50,true)==NULL)
 	{
 		printf("get name wrong \n%s\n",(char*)server.recText());
-		gram.statusCode=DealHttp::STATUSNOFOUND;
-		gram.typeFile=DealHttp::NOFOUND;
+		http.gram.statusCode=DealHttp::STATUSNOFOUND;
+		http.gram.typeFile=DealHttp::NOFOUND;
 		return;
 	}
 	DealHttp::urlDecode(name);
@@ -28,8 +28,8 @@ void addCLi(HttpServer& server,DealHttp& http,int,DealHttp::Datagram& gram)
 	if(0>=sscanf(strSco,"%d",&score))
 	{
 		printf("get score wrong \n%s\n",(char*)server.recText());
-		gram.statusCode=DealHttp::STATUSNOFOUND;
-		gram.typeFile=DealHttp::NOFOUND;
+		http.gram.statusCode=DealHttp::STATUSNOFOUND;
+		http.gram.typeFile=DealHttp::NOFOUND;
 		return;
 	}
 	if(tree.size()<5)
@@ -50,12 +50,12 @@ void addCLi(HttpServer& server,DealHttp& http,int,DealHttp::Datagram& gram)
 	json.addKeyVal(str,Json::STRING,"name",name);
 	json.addKeyVal(str,Json::INT,"sco",score);
 	json.addKeyVal(str,Json::STRING,"status","ok");
-	gram.body=str;
+	http.gram.body=str;
 }
-void getList(HttpServer&,DealHttp&,int,DealHttp::Datagram& gram)
+void getList(HttpServer&,DealHttp& http,int)
 {
 	auto begin=tree.begin();
-	gram.typeFile=DealHttp::JSON;
+	http.gram.typeFile=DealHttp::JSON;
 	char* buf[9]={0};
 	Json json;
 	auto str1=json.createObject();
@@ -73,7 +73,7 @@ void getList(HttpServer&,DealHttp&,int,DealHttp::Datagram& gram)
 	}
 	auto arr=json.createArray(Json::OBJ,i,buf);
 	json.addKeyVal(str1,Json::ARRAY,"array",arr);
-	gram.body=str1;
+	http.gram.body=str1;
 }
 int main()  
 {  

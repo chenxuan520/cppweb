@@ -20,7 +20,14 @@
 #include<vector>
 #include<stack>
 #include<string>
+#include<functional>
+#include<type_traits>
 #include<unordered_map>
+#include<initializer_list>
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+#include<openssl/ssl.h>
+#include<openssl/err.h>
+#endif
 namespace cppweb{
 class Json{
 public:
@@ -35,7 +42,7 @@ public:
 		std::vector<Object*> arr;
 		Object* objVal;
 		Object* nextObj;
-		float floVal;
+		double floVal;
 		int intVal;
 		bool boolVal;
 		bool isData;
@@ -61,8 +68,136 @@ public:
 		}
 	};
 private:
+	struct InitType{
+		TypeJson type=STRING;
+		void* pval=NULL;
+		const char* error=NULL;
+		unsigned len=0;
+		~InitType()
+		{
+			if(pval)
+			{
+				free(pval);
+				pval=NULL;
+			}
+		}
+		InitType(const InitType& old)
+		{
+			this->type=old.type;
+			this->error=old.error;
+			if(old.pval!=NULL)
+			{
+				pval=malloc(sizeof(char)*old.len);
+				if(pval==NULL)
+				{
+					error="malloc worng";
+					type=EMPTY;
+					return;
+				}
+				memcpy(pval,old.pval,old.len);
+			}
+		}
+		InitType(std::initializer_list<std::pair<std::string,InitType>> listInit)
+		{
+			type=OBJ;
+			std::string result="";
+			Json json(listInit);
+			result+=json();
+			pval=malloc(sizeof(char)*(result.size()+10));
+			len=sizeof(char)*(result.size()+10);
+			memset(pval,0,sizeof(char)*(result.size()+10));
+			if(pval==NULL)
+			{
+				error="malloc wrong";
+				type=EMPTY;
+				return;
+			}
+			strcpy((char*)pval,result.c_str());
+		}
+		template<typename T>
+		InitType(std::initializer_list<T> listInit)
+		{
+			Json json;
+			type=ARRAY;
+			char* now=NULL;
+			T* arr=new T[listInit.size()];
+			int i=0;
+			for(auto iter=listInit.begin();iter!=listInit.end();iter++)
+			{
+				arr[i]=*iter;
+				i++;
+			}
+			int arrlen=listInit.size();
+			if(std::is_same<T,int>::value)
+				now=json.createArray(INT,arrlen,(void*)arr);
+			else if(std::is_same<T,double>::value)
+				now=json.createArray(FLOAT,arrlen,(void*)arr);
+			else if(std::is_same<T,const char*>::value)
+				now=json.createArray(STRING,arrlen,(void*)arr);
+			else if(std::is_same<T,bool>::value)
+				now=json.createArray(BOOL,arrlen,(void*)arr);
+			else
+			{
+				error="type wrong";
+				type=EMPTY;
+			}
+			pval=malloc(sizeof(char)*strlen(now)+10);
+			len=sizeof(char)*strlen(now)+10;
+			strcpy((char*)pval,now);
+			delete [] arr;
+		}
+		template<typename T>
+		InitType(T val)
+		{
+			if(std::is_same<T,int>::value)
+				type=INT;
+			else if(std::is_same<T,double>::value)
+				type=FLOAT;
+			else if(std::is_same<T,bool>::value)
+				type=BOOL;
+			else
+				type=EMPTY;
+			pval=malloc(sizeof(T));
+			if(pval==NULL)
+			{
+				type=EMPTY;
+				error="malloc wrong";
+			}
+			else
+			{
+				len=sizeof(T);
+				memset(pval,0,sizeof(T));
+				*(T*)pval=val;
+			}
+		}
+		InitType(const char* pt)
+		{
+			if(pt==nullptr)
+				type=EMPTY;
+			else
+			{
+				type=STRING;
+				pval=malloc(sizeof(char)*strlen(pt)+10);
+				len=sizeof(sizeof(char)*strlen(pt)+10);
+				if(pval==NULL)
+				{
+					type=EMPTY;
+					error="malloc worng";
+				}
+				else
+				{
+					memset(pval,0,sizeof(char)*strlen(pt)+10);
+					strcpy((char*)pval,pt);
+				}
+			}
+		}
+	};
+private:
 	char* text;
 	const char* error;
+	const char* nowKey;
+	char* word;
+	char* result;
 	unsigned maxLen;
 	unsigned floNum;
 	unsigned defaultSize;
@@ -76,18 +211,72 @@ public:
 		error=NULL;
 		obj=NULL;
 		text=NULL;
+		word=NULL;
+		result=NULL;
+		nowKey=NULL;
 		maxLen=256;
 		floNum=3;
 		defaultSize=128;
+		result=this->createObject();
+		word=(char*)malloc(sizeof(char)*maxLen);
+		if(word==NULL||result==NULL)
+		{
+			error="malloc wrong";
+			return;
+		}
+		memset(word,0,sizeof(char)*maxLen);
 	}
-	Json(const char* jsonText)
+	Json(std::initializer_list<std::pair<std::string,InitType>> initList):Json()
 	{
-		error=NULL;
-		obj=NULL;
-		text=NULL;
-		maxLen=256;
-		floNum=3;
-		defaultSize=128;
+		for(auto iter=initList.begin();iter!=initList.end();iter++)
+		{
+			if(iter->second.pval==NULL&&iter->second.type!=EMPTY)
+			{
+				error="init wrong";
+				return;
+			}
+			if(iter->second.error!=NULL)
+			{
+				error="init wrong";
+				return;
+			}
+			switch(iter->second.type)
+			{
+			case STRING:
+				if(false==addKeyVal(result,STRING,iter->first.c_str(),iter->second.pval))
+					return;
+				break;
+			case INT:
+				if(false==addKeyVal(result,INT,iter->first.c_str(),*(int*)iter->second.pval))
+					return;
+				break;
+			case FLOAT:
+				if(false==addKeyVal(result,FLOAT,iter->first.c_str(),*(double*)iter->second.pval))
+					return;
+				break;
+			case BOOL:
+				if(false==addKeyVal(result,BOOL,iter->first.c_str(),*(bool*)iter->second.pval))
+					return;
+				break;
+			case EMPTY:
+				if(false==addKeyVal(result,EMPTY,iter->first.c_str(),NULL))
+					return;
+				break;
+			case OBJ:
+				if(false==addKeyVal(result,OBJ,iter->first.c_str(),(char*)iter->second.pval))
+					return;
+				break;
+			case ARRAY:
+				if(false==addKeyVal(result,ARRAY,iter->first.c_str(),(char*)iter->second.pval))
+					return;
+				break;
+			default:
+				return;
+			}
+		}
+	}
+	Json(const char* jsonText):Json()
+	{
 		if(jsonText==NULL||strlen(jsonText)==0)
 		{
 			error="message error";
@@ -123,10 +312,19 @@ public:
 	~Json()
 	{
 		deleteNode(obj);
+		if(word!=NULL)
+		{
+			free(word);
+			word=NULL;
+		}
 		if(text!=NULL)
+		{
 			free(text);
+			result=NULL;
+		}
 		for(auto iter=memory.begin();iter!=memory.end();iter++)
-			free(iter->first);
+			if(iter->first!=NULL)
+				free(iter->first);
 	}
 	const char* formatPrint(const Object* exmaple)
 	{
@@ -141,17 +339,32 @@ public:
 		printObj(buffer,exmaple);
 		return buffer;
 	}
-	Object* operator[](const char* key)
+	template<typename T>
+	bool addKeyVal(char*& obj,const char* key,T value)
 	{
-		if(hashMap.find(std::string(key))==hashMap.end())
-			return NULL;
-		return hashMap.find(std::string(key))->second;
+		if(std::is_same<T,int>::value)
+			return addKeyVal(obj,INT,key,value);
+		else if(std::is_same<T,double>::value)
+			return addKeyVal(obj,FLOAT,key,value);
+		else if(std::is_same<T,char*>::value)
+			return addKeyVal(obj,OBJ,key,value);
+		else if(std::is_same<T,const char*>::value)
+			return addKeyVal(obj,STRING,key,value);
+		else if(std::is_same<T,bool>::value)
+			return addKeyVal(obj,BOOL,key,value);
+		else 
+			return addKeyVal(obj,EMPTY,key,NULL);
 	}
 	bool addKeyVal(char*& obj,TypeJson type,const char* key,...)
 	{
 		if(obj==NULL)
 		{
 			error="null buffer";
+			return false;
+		}
+		if(key==NULL)
+		{
+			error="key null";
 			return false;
 		}
 		va_list args;
@@ -173,7 +386,7 @@ public:
 		sprintf(obj,"%s\"%s\":",obj,key);
 		int valInt=0;
 		char* valStr=NULL;
-		float valFlo=9;
+		double valFlo=9;
 		bool valBool=false;
 		switch(type)
 		{
@@ -187,7 +400,7 @@ public:
 			valFlo=va_arg(args,double);
 			while(memory[obj]-strlen(obj)<15)
 				obj=enlargeMemory(obj);
-			sprintf(obj,"%s%.*f",obj,floNum,valFlo);
+			sprintf(obj,"%s%.*lf",obj,floNum,valFlo);
 			break;
 		case STRING:
 			valStr=va_arg(args,char*);
@@ -266,7 +479,7 @@ public:
 		memset(now,0,sizeof(char)*defaultSize);
 		strcat(now,"[");
 		int* arrInt=(int*)arr;
-		float* arrFlo=(float*)arr;
+		double* arrFlo=(double*)arr;
 		char** arrStr=(char**)arr;
 		bool* arrBool=(bool*)arr;
 		unsigned i=0;
@@ -285,7 +498,7 @@ public:
 			{
 				while(memory[now]-strlen(now)<std::to_string(arrInt[i]).size()+3)
 					now=enlargeMemory(now);
-				sprintf(now,"%s%.*f,",now,floNum,arrFlo[i]);
+				sprintf(now,"%s%.*lf,",now,floNum,arrFlo[i]);
 			}
 			break;
 		case STRING:
@@ -310,7 +523,7 @@ public:
 			{
 				while(memory[now]-strlen(now)<6)
 					now=enlargeMemory(now);
-				if(arrBool)
+				if(arrBool[i])
 					strcat(now,"true,");
 				else
 					strcat(now,"false,");
@@ -326,6 +539,27 @@ public:
 			strcat(now,"]");
 		now[strlen(now)]=0;
 		return now;
+	}
+	Object* operator[](const char* key)
+	{
+		if(hashMap.find(std::string(key))==hashMap.end())
+			return NULL;
+		return hashMap.find(std::string(key))->second;
+	}
+	char*& operator()()
+	{
+		return result;
+	}
+	Json& operator()(const char* key)
+	{
+		nowKey=key;
+		return *this;
+	}
+	template<typename T>
+	Json& operator=(T value)
+	{
+		this->addKeyVal(this->result,nowKey,value);
+		return *this;
 	}
 	inline Object* getRootObj()
 	{
@@ -360,14 +594,13 @@ private:
 		Object * root=new Object,*last=root;
 		root->type=STRUCT;
 		char* now=begin+1,*next=now;
-		char* word=(char*)malloc(sizeof(char)*maxLen),*val=(char*)malloc(sizeof(char)*maxLen),temp=*end;
-		if(word==NULL||val==NULL)
+		char temp=*end;
+		if(word==NULL)
 		{
 			error="malloc wrong";
 			return NULL;
 		}
 		memset(word,0,sizeof(char)*maxLen);
-		memset(val,0,sizeof(char)*maxLen);
 		*end=0;
 		while(now<end)
 		{
@@ -377,6 +610,7 @@ private:
 			nextObj->key=word;
 			hashMap.insert(std::pair<std::string,Object*>{word,nextObj});
 			now+=strlen(word)+3;
+			memset(word,0,sizeof(char)*maxLen);
 			if(*now=='\"')
 			{
 				nextObj->type=STRING;
@@ -388,10 +622,19 @@ private:
 					error="string wrong";
 					return NULL;
 				}
-				for(unsigned i=0;now+i+1<next;i++)
-					val[i]=*(now+i+1);
-				val[strlen(val)]=0;
-				nextObj->strVal=val;
+				if(next-now+3>maxLen)
+				{
+					char* tempStr=(char*)realloc(word,next-now+3);
+					if(tempStr!=NULL)
+					{
+						word=tempStr;
+						maxLen=next-now+3;
+					}
+				}
+				for(unsigned i=0;now+i+1<next&&i<maxLen;i++)
+					word[i]=*(now+i+1);
+				word[strlen(word)]=0;
+				nextObj->strVal=word;
 				now=next+1;
 				if(*now==',')
 					now++;
@@ -409,7 +652,7 @@ private:
 				if(nextObj->type==INT)
 					sscanf(now,"%d",&nextObj->intVal);
 				else
-					sscanf(now,"%f",&nextObj->floVal);
+					sscanf(now,"%lf",&nextObj->floVal);
 				now=next+1;
 			}
 			else if(*now=='[')
@@ -466,21 +709,17 @@ private:
 			else
 			{
 				error="text wrong";
-				free(word);
-				free(val);
 				return root;
 			}
 			last->nextObj=nextObj;
 			last=nextObj;
 		}
 		*end=temp;
-		free(word);
-		free(val);
 		return root;
 	}
 	TypeJson analyseArray(char* begin,char* end,std::vector<Object*>& arr)
 	{
-		char* now=begin+1,*next=end,*word=(char*)malloc(sizeof(char)*maxLen);
+		char* now=begin+1,*next=end;
 		if(word==NULL)
 		{
 			error="malloc wrong";
@@ -581,31 +820,35 @@ private:
 			}
 		}
 		else if(*now==']')
-		{
-			free(word);
 			return INT;
-		}
 		else
 		{
 			error="array find wrong";
-			free(word);
 			return INT;
 		}
-		free(word);
 		return nextObj->type;
 	}
-	void findString(const char* begin,char* buffer,unsigned buffLen)
+	void findString(const char* begin,char*& buffer,unsigned& buffLen)
 	{
-		const char* now=begin+1,*next=now;
-		next=strchr(now+1,'\"');
-		while(next!=NULL&&*(next-1)=='\\')
-			next=strchr(next+1,'\"');
-		if(next==NULL)
+		const char* now=begin+1,*nextOne=now;
+		nextOne=strchr(now+1,'\"');
+		while(nextOne!=NULL&&*(nextOne-1)=='\\')
+			nextOne=strchr(nextOne+1,'\"');
+		if(nextOne==NULL)
 		{
 			error="text wrong";
 			return;
 		}
-		for(unsigned i=0;now+i<next&&i<buffLen;i++)
+		if(buffLen<nextOne-now)
+		{
+			char* temp=(char*)realloc(buffer,sizeof(char)*(nextOne-now+10));
+			if(temp!=NULL)
+			{
+				buffer=temp;
+				buffLen=nextOne-now+10;
+			}
+		}
+		for(unsigned i=0;now+i<nextOne&&i<buffLen-1;i++)
 			buffer[i]=*(now+i);
 		buffer[strlen(buffer)]=0;
 	}
@@ -618,7 +861,7 @@ private:
 		}
 		else
 		{
-			if(sscanf(begin,"%f",(float*)pnum)<1)
+			if(sscanf(begin,"%lf",(double*)pnum)<1)
 				error="num wrong";
 		}
 	}
@@ -735,7 +978,7 @@ private:
 				sprintf(buffer,"%s\"%s\":%d,",buffer,now->key.c_str(),now->intVal);
 				break;
 			case FLOAT:
-				sprintf(buffer,"%s\"%s\":%.*f,",buffer,now->key.c_str(),floNum,now->floVal);
+				sprintf(buffer,"%s\"%s\":%.*lf,",buffer,now->key.c_str(),floNum,now->floVal);
 				break;
 			case STRING:
 				sprintf(buffer,"%s\"%s\":\"%s\",",buffer,now->key.c_str(),now->strVal.c_str());
@@ -773,7 +1016,7 @@ private:
 		strcat(buffer,"}");
 		return true;
 	}
-	bool printArr(char* buffer,TypeJson type,const std::vector<Object*>& arr)
+	bool printArr(char*& buffer,TypeJson type,const std::vector<Object*>& arr)
 	{
 		unsigned deep=0;
 		char* line=strrchr(buffer,'\n');
@@ -794,7 +1037,7 @@ private:
 				sprintf(buffer,"%s%d,",buffer,arr[i]->intVal);
 				break;
 			case FLOAT:
-				sprintf(buffer,"%s%.*f,",buffer,floNum,arr[i]->floVal);
+				sprintf(buffer,"%s%.*lf,",buffer,floNum,arr[i]->floVal);
 				break;
 			case STRING:
 				sprintf(buffer,"%s\"%s\",",buffer,arr[i]->strVal.c_str());
@@ -826,6 +1069,78 @@ private:
 		strcat(buffer,"]");
 		return true;
 	}
+};
+class Guard{
+public:
+	Guard()
+	{
+		while(1)
+		{
+			int pid=fork();
+			if(pid!=0)
+				waitpid(pid, NULL, 0);
+			else
+				break;
+		}
+	}
+};
+template<class T>
+class Trie {
+private:
+	struct Node{
+		Node* next[77];
+		bool stop;
+		T* data;
+		Node()
+		{
+			for(unsigned i=0;i<77;i++)
+				next[i]=NULL;
+			stop=false;
+		}
+	};
+	Node* root;
+public:
+    Trie() {
+		root=new Node;
+    }
+    
+    bool insert(const char* word,T* data) {
+		Node* temp=root;
+		for(unsigned i=0;word[i]!=0;i++)
+		{
+			if(word[i]-46<0||word[i]-46>76)
+				return false;
+			if(temp->next[word[i]-46]!=NULL)
+				temp=temp->next[word[i]-46];
+			else
+			{
+				temp->next[word[i]-46]=new Node;
+				temp=temp->next[word[i]-46];
+			}
+		}
+		temp->stop=true;
+		temp->data=data;
+		return true;
+    }
+    
+    T* search(const char* word,std::function<bool(const T*,bool isLast)> func) {
+		Node* temp=root;
+		for(unsigned i=0;word[i]!=0;i++)
+		{
+			if(word[i]-46<0||word[i]-46>76)
+				return NULL;
+			if(temp->next[word[i]-46]==NULL)
+				return NULL;
+			else
+			{
+				temp=temp->next[word[i]-46];
+				if(temp->stop&&func(temp->data,word[i+1]==0))
+					return temp->data;
+			}
+		}
+		return NULL;
+    }
+    
 };
 class ServerTcpIp{
 public:
@@ -1170,6 +1485,10 @@ private:
 	char* hostname;//host name
 	char selfIp[100];
 	const char* error;
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+	SSL* ssl;
+	SSL_CTX* ctx;
+#endif
 public:
 	ClientTcpIp(const char* hostIp,unsigned short port)
 	{
@@ -1197,9 +1516,22 @@ public:
 			addrC.sin_addr.s_addr=inet_addr(hostIp);
 		addrC.sin_family=AF_INET;//af_intt IPv4
 		addrC.sin_port=htons(port);
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+		ssl=NULL;
+		ctx=NULL;
+#endif
 	}
 	~ClientTcpIp()
 	{
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+		if(ssl!=NULL)
+		{
+			SSL_shutdown(ssl);
+			SSL_free(ssl);	
+		}
+		if(ctx!=NULL)
+			SSL_CTX_free(ctx);
+#endif
 		if(hostip!=NULL)
 			free(hostip);
 		if(hostname!=NULL)
@@ -1262,6 +1594,50 @@ public:
 	{
 		return error;
 	}
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+	bool tryConnectSSL()
+	{
+		const SSL_METHOD* meth=SSLv23_client_method();
+		if(false==this->tryConnect())
+		{
+			error="connect wrong";
+			return false;
+		}
+		if(meth==NULL)
+		{
+			error="ssl init wrong";
+			return false;
+		}
+		ctx=SSL_CTX_new(meth);
+		if(ctx==NULL)
+		{
+			error="ssl new wrong";
+			return false;
+		}
+		ssl=SSL_new(ctx);
+		if(NULL==ssl)
+		{
+			error="ssl new wrong";
+			return false;
+		}
+		SSL_set_fd(ssl,sock);
+		int ret=SSL_connect(ssl);
+		if(ret==-1)
+		{
+			error="ssl connect wrong";
+			return false;
+		}
+		return true;
+	}
+	inline int sendHostSSL(const void* psen,int len)
+	{
+		return SSL_write(ssl,psen,len);
+	}
+	inline int receiveHostSSL(void* buffer,int len)
+	{
+		return SSL_read(ssl,buffer,len);
+	}
+#endif
 	static bool getDnsIp(const char* name,char* ip,unsigned int ipMaxLen)
 	{
 		hostent* phost=gethostbyname(name);
@@ -1312,6 +1688,7 @@ private:
 	const char* serverName;
 	const Datagram* preData;
 public:
+	Datagram gram;
 	DealHttp()
 	{
 		for(int i=0;i<256;i++)
@@ -1784,7 +2161,7 @@ public:
 		sscanf(temp,format,buffer);
 		return buffer;
 	}
-	int getRecFile(const void* message,char* fileName,int nameLen,char* buffer,unsigned int bufferLen)
+	int getRecFile(const void* message,unsigned messageSize,char* fileName,int nameLen,char* buffer,unsigned int bufferLen)
 	{
 		char tempLen[20]={0},*end=NULL,*top=NULL;
 		int result=0;
@@ -1800,7 +2177,9 @@ public:
 			return 0;
 		if((top=strstr(top+strlen(buffer),buffer))==NULL)
 			return 0;
-		if((end=strstr(top+strlen(buffer),buffer))==NULL)
+		if((end=(char*)memmem(top+strlen(buffer)\
+							  ,messageSize-(top+strlen(buffer)-(char*)message)\
+							  ,buffer,strlen(buffer)))==NULL)
 			return 0;
 		if((top=strstr(top,"\r\n\r\n"))==NULL)
 			return 0;
@@ -2473,19 +2852,20 @@ public:
 	}
 };
 class HttpServer:private ServerTcpIp{
-public://main class for http server2.0
+private:
 	enum RouteType{//oneway stand for like /hahah,wild if /hahah/*,static is recource static
 		ONEWAY,WILD,STATIC,
 	};
+public://main class for http server2.0
 	enum AskType{//different ask ways in http
 		GET,POST,PUT,DELETE,OPTIONS,ALL,
 	};
 	struct RouteFuntion{//inside struct,pack for handle
 		AskType ask;
 		RouteType type;
-		char route[100];
-		const char* path;
-		void (*pfunc)(HttpServer&,DealHttp&,int,DealHttp::Datagram&);
+		char route[128];
+		char path[128];
+		void (*pfunc)(HttpServer&,DealHttp&,int);
 	};
 private:
 	RouteFuntion* arrRoute;
@@ -2504,10 +2884,11 @@ private:
 	bool isLongCon;
 	bool isFork;
 	bool selfCtrl;
-	void (*middleware)(HttpServer&,DealHttp&,int num,DealHttp::Datagram&);
+	void (*middleware)(HttpServer&,DealHttp&,int num);
 	void (*clientIn)(HttpServer&,int num,void* ip,int port);
 	void (*clientOut)(HttpServer&,int num,void* ip,int port);
 	void (*logFunc)(const void*,int);
+	Trie<RouteFuntion> trie;
 public:
 	HttpServer(unsigned port,bool debug=false):ServerTcpIp(port)
 	{
@@ -2516,33 +2897,33 @@ public:
 		middleware=NULL;
 		defaultFile=NULL;
 		arrRoute=NULL;
+		clientIn=NULL;
+		clientOut=NULL;
+		logFunc=NULL;
+		pnowRoute=NULL;
 		selfCtrl=false;
-		senLen=0;
+		senLen=1;
+		recLen=2048;
 		selfLen=0;
-		recLen=0;
 		boundPort=port;
+		isDebug=debug;
+		isLongCon=true;
+		isFork=false;
+		textLen=0;
+		now=0;
+		maxNum=20;
 		arrRoute=(RouteFuntion*)malloc(sizeof(RouteFuntion)*20);
 		if(arrRoute==NULL)
 			this->error="route wrong";
 		else
 			memset(arrRoute,0,sizeof(RouteFuntion)*20);
-		now=0;
-		maxNum=20;
-		isDebug=debug;
-		isLongCon=true;
-		isFork=false;
-		textLen=0;
-		clientIn=NULL;
-		clientOut=NULL;
-		logFunc=NULL;
-		pnowRoute=NULL;
 	}
 	~HttpServer()
 	{
 		if(arrRoute!=NULL)
 			free(arrRoute);
 	}
-	bool routeHandle(AskType ask,RouteType type,const char* route,void (*pfunc)(HttpServer&,DealHttp&,int,DealHttp::Datagram&))
+	bool routeHandle(AskType ask,const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
 	{
 		if(strlen(route)>100)
 			return false;
@@ -2553,15 +2934,21 @@ public:
 				return false;
 			maxNum+=10;
 		}
-		if(type==STATIC)
-		{
-			error="cannot set static route";
-			return false;
-		}
-		arrRoute[now].type=type;
 		arrRoute[now].ask=ask;
 		strcpy(arrRoute[now].route,route);
 		arrRoute[now].pfunc=pfunc;
+		if(route[strlen(route)-1]=='*')
+		{
+			arrRoute[now].route[strlen(route)-1]=0;
+			arrRoute[now].type=WILD;
+		}
+		else
+			arrRoute[now].type=ONEWAY;
+		if(false==trie.insert(arrRoute[now].route,arrRoute+now))
+		{
+			error="route wrong char";
+			return false;
+		}
 		now++;
 		return true;
 	}
@@ -2579,8 +2966,13 @@ public:
 		arrRoute[now].type=STATIC;
 		arrRoute[now].ask=GET;
 		strcpy(arrRoute[now].route,route);
-		arrRoute[now].path=staticPath;
+		strcpy(arrRoute[now].path,staticPath);
 		arrRoute[now].pfunc=loadFile;
+		if(false==trie.insert(route,arrRoute+now))
+		{
+			error="route wrong char";
+			return false;
+		}
 		now++;
 		return true;
 	}
@@ -2599,10 +2991,15 @@ public:
 		arrRoute[now].ask=GET;
 		strcpy(arrRoute[now].route,path);
 		arrRoute[now].pfunc=deleteFile;
+		if(false==trie.insert(path,arrRoute+now))
+		{
+			error="route wrong char";
+			return false;
+		}
 		now++;
 		return true;
 	}
-	bool get(RouteType type,const char* route,void (*pfunc)(HttpServer&,DealHttp&,int,DealHttp::Datagram&))
+	bool get(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
 	{
 		if(strlen(route)>100)
 			return false;
@@ -2613,14 +3010,25 @@ public:
 				return false;
 			maxNum+=10;
 		}
-		arrRoute[now].type=type;
 		arrRoute[now].ask=GET;
-		strcpy(arrRoute[now].route,route);
 		arrRoute[now].pfunc=pfunc;
+		strcpy(arrRoute[now].route,route);
+		if(route[strlen(route)-1]=='*')
+		{
+			arrRoute[now].route[strlen(route)-1]=0;
+			arrRoute[now].type=WILD;
+		}
+		else
+			arrRoute[now].type=ONEWAY;
+		if(false==trie.insert(arrRoute[now].route,arrRoute+now))
+		{
+			error="route wrong char";
+			return false;
+		}
 		now++;
 		return true;	
 	}
-	bool post(RouteType type,const char* route,void (*pfunc)(HttpServer&,DealHttp&,int,DealHttp::Datagram&))
+	bool post(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
 	{
 		if(strlen(route)>100)
 			return false;
@@ -2631,14 +3039,25 @@ public:
 				return false;
 			maxNum+=10;
 		}
-		arrRoute[now].type=type;
 		arrRoute[now].ask=POST;
 		strcpy(arrRoute[now].route,route);
 		arrRoute[now].pfunc=pfunc;
+		if(route[strlen(route)-1]=='*')
+		{
+			arrRoute[now].route[strlen(route)-1]=0;
+			arrRoute[now].type=WILD;
+		}
+		else
+			arrRoute[now].type=ONEWAY;
+		if(false==trie.insert(arrRoute[now].route,arrRoute+now))
+		{
+			error="route wrong char";
+			return false;
+		}
 		now++;
 		return true;	
 	}
-	bool all(RouteType type,const char* route,void (*pfunc)(HttpServer&,DealHttp&,int,DealHttp::Datagram&))
+	bool all(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
 	{
 		if(strlen(route)>100)
 			return false;
@@ -2649,10 +3068,21 @@ public:
 				return false;
 			maxNum+=10;
 		}
-		arrRoute[now].type=type;
 		arrRoute[now].ask=ALL;
 		strcpy(arrRoute[now].route,route);
 		arrRoute[now].pfunc=pfunc;
+		if(route[strlen(route)-1]=='*')
+		{
+			arrRoute[now].route[strlen(route)-1]=0;
+			arrRoute[now].type=WILD;
+		}
+		else
+			arrRoute[now].type=ONEWAY;
+		if(false==trie.insert(arrRoute[now].route,arrRoute+now))
+		{
+			error="route wrong char";
+			return false;
+		}
 		now++;
 		return true;	
 	}
@@ -2670,7 +3100,7 @@ public:
 		clientOut=pfunc;
 		return true;
 	}
-	bool setMiddleware(void (*pfunc)(HttpServer&,DealHttp&,int,DealHttp::Datagram&))
+	bool setMiddleware(void (*pfunc)(HttpServer&,DealHttp&,int))
 	{
 		if(middleware!=NULL)
 			return false;
@@ -2695,8 +3125,6 @@ public:
 	}
 	void run(const char* defaultFile)
 	{
-		this->senLen=1;
-		this->recLen=2048;
 		char* getT=(char*)malloc(sizeof(char)*recLen);
 		char* sen=(char*)malloc(sizeof(char)*senLen*1024*1024);
 		if(sen==NULL||getT==NULL)
@@ -2738,11 +3166,13 @@ public:
 	{
 		return this->receiveSocket(num,buffer,bufferLen);
 	}
-	int getCompleteMessage(const void* message,unsigned int messageLen,void* buffer,unsigned int buffLen,int sockCli)
+	int getCompleteMessage(int sockCli)
 	{
-		if(message==NULL||buffer==NULL||buffLen<=0||message==0)
+		void*& message=getText;
+		unsigned messageLen=this->getRecLen();
+		if(message==NULL||message==0)
 			return -1;
-		unsigned int len=0;
+		unsigned int len=0,old=messageLen;
 		char* temp=NULL;
 		if((temp=strstr((char*)message,"Content-Length"))==NULL)
 			return -1;
@@ -2752,24 +3182,30 @@ public:
 			return -1;
 		temp+=4;
 		if(strlen(temp)>=len)
-			return 0;
-		if(strlen((char*)message)+len>buffLen)
-			return -2;
-		memcpy(buffer,message,messageLen);
-		unsigned int leftLen=len-strlen(temp),getLen=0,all=0;
-		while(leftLen>5||getLen<=0)
+			return messageLen;
+		long int leftLen=len-(messageLen-(temp-(char*)message)),getLen=1,all=0;
+		while(len+messageLen>recLen)
 		{
-			getLen=this->httpRecv(sockCli,(char*)buffer+messageLen+all,buffLen-messageLen-all);
+			recLen*=2;
+			message=enlargeMemory(message,recLen);
+		}
+		unsigned result=messageLen;
+		while(leftLen>5&&getLen>0)
+		{
+			getLen=this->httpRecv(sockCli,(char*)message+old+all,recLen-old-all);
+			result+=getLen;
 			all+=getLen;
 			leftLen-=getLen;
 		}
-		return len;
+		return result;
 	}
-	void changeSetting(bool debug,bool isLongCon,bool isForkModel)
+	void changeSetting(bool debug,bool isLongCon,bool isForkModel,unsigned sendLen)
 	{
 		this->isDebug=debug;
 		this->isLongCon=isLongCon;
 		this->isFork=isForkModel;
+		if(sendLen>0)
+			this->senLen=sendLen;
 		if(isFork==true)
 			signal(SIGCHLD,sigCliDeal);
 	}
@@ -2801,7 +3237,7 @@ public:
 private:
 	void messagePrint()
 	{
-		printf("server is ok\n");
+		printf("welcome to web server,the server is runing\n");
 		printf("port:\t\t%u\n",boundPort);
 		for(unsigned i=0;i<now;i++)
 		{
@@ -2860,9 +3296,8 @@ private:
 		char ask[200]={0};
 		if(middleware!=NULL)
 		{
-			DealHttp::Datagram gram;
-			http.changeSetting(NULL,NULL,&gram);
-			middleware(*this,http,num,gram);
+			http.changeSetting(NULL,NULL,&http.gram);
+			middleware(*this,http,num);
 			http.changeSetting(NULL,NULL,NULL);
 			return 0;
 		}
@@ -2911,46 +3346,34 @@ private:
 				printf("way not support\n");
 			type=GET;
 		}
-		void (*pfunc)(HttpServer&,DealHttp&,int,DealHttp::Datagram&)=NULL;
-		for(unsigned int i=0;i<now;i++)
+		void (*pfunc)(HttpServer&,DealHttp&,int)=NULL;
+		RouteFuntion* tempRoute=trie.search(ask,[=](const RouteFuntion* now,bool isLast)->bool{
+					if(now->ask==ALL||now->ask==type)
+					{
+						if(isLast&&(now->type==STATIC||now->type==ONEWAY))
+							return true;
+						else if(now->type==WILD)
+							return true;
+						else
+							return false;
+					}
+					return false;
+					});
+		if(tempRoute!=NULL)
 		{
-			if(arrRoute[i].type==ONEWAY&&(arrRoute[i].ask==type||arrRoute[i].ask==ALL))
-			{
-				if(strcmp(ask,arrRoute[i].route)==0)
-				{
-					pfunc=arrRoute[i].pfunc;
-					pnowRoute=&arrRoute[i];
-					break;
-				}
-			}
-			else if(arrRoute[i].type==WILD&&(arrRoute[i].ask==type||arrRoute[i].ask==ALL))
-			{
-				if(strncmp(ask,arrRoute[i].route,strlen(arrRoute[i].route))==0)
-				{
-					pfunc=arrRoute[i].pfunc;
-					pnowRoute=&arrRoute[i];
-					break;						
-				}
-			}
-			else if(arrRoute[i].type==STATIC&&type==GET)
-			{
-				if(strstr(ask,arrRoute[i].route)!=NULL)
-				{
-					pfunc=arrRoute[i].pfunc;
-					sprintf((char*)this->senText,"%s",arrRoute[i].path);
-					pnowRoute=&arrRoute[i];
-					break;
-				}
-			}
-			else
-				continue;
+			pnowRoute=tempRoute;
+			pfunc=tempRoute->pfunc;
 		}
 		if(pfunc!=NULL)
 		{
 			if(pfunc!=loadFile&&pfunc!=deleteFile)
 			{
-				DealHttp::Datagram gram;
-				pfunc(*this,http,num,gram);
+				http.gram.body="";
+				http.gram.cookie.clear();
+				http.gram.head.clear();
+				http.gram.fileLen=0;
+				http.gram.typeFile=DealHttp::TXT;
+				pfunc(*this,http,num);
 				if(selfCtrl)
 				{
 					selfCtrl=false;
@@ -2959,18 +3382,21 @@ private:
 				}
 				else
 				{
-					if(gram.fileLen==0)
-						gram.fileLen=gram.body.size();
-					len=http.createDatagram(gram,this->senText,this->senLen*1024*1024);
+					if(http.gram.fileLen==0)
+						http.gram.fileLen=http.gram.body.size();
+					len=http.createDatagram(http.gram,this->senText,this->senLen*1024*1024);
 					while(len==-1)
 					{
 						this->senText=enlargeMemory(this->senText,this->senLen);
-						len=http.createDatagram(gram,this->senText,this->senLen*1024*1024);
+						len=http.createDatagram(http.gram,this->senText,this->senLen*1024*1024);
 					}
 				}
 			}
 			else
-				pfunc(*this,http,senLen,(DealHttp::Datagram&)len);
+			{
+				pfunc(*this,http,senLen);
+				len=staticLen(-1);
+			}
 		}
 		else
 		{
@@ -3191,10 +3617,10 @@ private:
 		free(self);
 		return NULL;
 	}
-	static void loadFile(HttpServer& server,DealHttp& http,int senLen,DealHttp::Datagram& gram)
+	static void loadFile(HttpServer& server,DealHttp& http,int senLen)
 	{
-		int& len=(int&)gram;
-		char ask[200]={0},buf[300]={0},temp[200]={0};
+		int len=0;
+		char ask[200]={0},buf[500]={0},temp[200]={0};
 		http.getAskRoute(server.recText(),"GET",ask,200);
 		HttpServer::RouteFuntion& route=*server.getNowRoute();
 		http.getWildUrl(ask,route.route,temp,200);
@@ -3204,13 +3630,24 @@ private:
 			LogSystem::recordFileError(ask);
 			printf("404 get %s wrong\n",buf);
 		}
+		staticLen(len);
 	}
-	static void deleteFile(HttpServer& server,DealHttp& http,int senLen,DealHttp::Datagram& gram)
+	static void deleteFile(HttpServer& server,DealHttp& http,int senLen)
 	{
-		int& len=(int&)gram;
+		int len=0;
 		http.customizeAddTop(server.getSenBuff(),senLen*1024*1024,DealHttp::STATUSFORBIDDEN,strlen("403 forbidden"),"text/plain");
 		http.customizeAddBody(server.getSenBuff(),senLen*1024*1024,"403 forbidden",strlen("403 forbidden"));
 		len=strlen((char*)server.getSenBuff());
+		staticLen(len);
+	}
+	static unsigned staticLen(int senLen)
+	{
+		static unsigned len=0;
+		if(senLen<0)
+			return len;
+		else
+			len=senLen;
+		return 0;
 	}
 	void* enlargeMemory(void* old,unsigned& oldSize)
 	{
