@@ -3,7 +3,9 @@
 #include<string.h>
 #include<errno.h>
 #include<stdio.h>
+#include<signal.h>
 #include<sys/types.h>
+#include<sys/wait.h>
 #include<sys/stat.h>
 /********************************
 	author:chenxuan
@@ -132,13 +134,34 @@ public:
 		return false;
 	}
 };
+class Guard{
+public:
+	Guard()
+	{
+		while(1)
+		{
+			int pid=fork();
+			if(pid!=0)
+				waitpid(pid, NULL, 0);
+			else
+				break;
+		}
+	}
+};
 int func(void*)
 {
-	
 	return 0;
 }
 int main()
 {
-	GuardProcess process;
-	process.working(func,NULL);
+	/* GuardProcess process; */
+	/* process.working(func,NULL); */
+	Guard guard;
+	int temp=0;
+	while(temp<30)
+	{
+		printf("temp:%d\n",temp);
+		temp++;
+		sleep(1);
+	}
 }
