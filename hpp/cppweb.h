@@ -3197,6 +3197,7 @@ public:
 			all+=getLen;
 			leftLen-=getLen;
 		}
+		textLen=result;
 		return result;
 	}
 	void changeSetting(bool debug,bool isLongCon,bool isForkModel,unsigned sendLen)
@@ -3239,6 +3240,7 @@ private:
 	{
 		printf("welcome to web server,the server is runing\n");
 		printf("port:\t\t%u\n",boundPort);
+		printf("/\t\t->\t%s\n",defaultFile);
 		for(unsigned i=0;i<now;i++)
 		{
 			switch(arrRoute[i].type)
