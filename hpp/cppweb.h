@@ -1686,16 +1686,16 @@ private:
 	const char* error;
 	const char* connect;
 	const char* serverName;
-	const Datagram* preData;
 public:
 	Datagram gram;
+	std::unordered_map<std::string,std::string> head;
+	std::unordered_map<std::string,std::string> cookie;
 	DealHttp()
 	{
 		for(int i=0;i<256;i++)
 			ask[i]=0;
 		pfind=NULL;
 		error=NULL;
-		preData=NULL;
 		connect="keep-alive";
 		serverName="LCserver/1.1";
 	}
@@ -1738,12 +1738,12 @@ private:
 		sprintf(ptop,"HTTP/1.1 200 OK\r\n"
 				"Server %s\r\n"
 				"Connection: %s\r\n",serverName,connect);
-		if(preData!=NULL)
+		if(!head.empty())
 		{
-			for(auto iter=preData->head.begin();iter!=preData->head.end();iter++)
+			for(auto iter=head.begin();iter!=head.end();iter++)
 				sprintf(ptop,"%s%s: %s\r\n",\
 						ptop,iter->first.c_str(),iter->second.c_str());
-			for(auto iter=preData->cookie.begin();iter!=preData->cookie.end();iter++)
+			for(auto iter=cookie.begin();iter!=cookie.end();iter++)
 				setCookie(ptop,bufLen,iter->first.c_str(),iter->second.c_str());
 		}
 		switch (kind)
@@ -2353,17 +2353,22 @@ public:
 		strcat((char*)buffer,temp);
 		sprintf(temp,"Content-Length:%d\r\n",gram.fileLen);
 		strcat((char*)buffer,temp);
-		if(gram.head.size()!=0)
+		if(!gram.head.empty())
 			for(auto iter=gram.head.begin();iter!=gram.head.end();iter++)
 				customizeAddHead(buffer,bufferLen,iter->first.c_str(),iter->second.c_str());
-		if(gram.cookie.size()!=0)
+		if(!head.empty())
+			for(auto iter=head.begin();iter!=head.end();iter++)
+				customizeAddHead(buffer,bufferLen,iter->first.c_str(),iter->second.c_str());
+		if(!gram.cookie.empty())
 			for(auto iter=gram.cookie.begin();iter!=gram.cookie.end();iter++)
+				setCookie(buffer,bufferLen,iter->first.c_str(),iter->second.c_str());
+		if(!cookie.empty())
+			for(auto iter=cookie.begin();iter!=cookie.end();iter++)
 				setCookie(buffer,bufferLen,iter->first.c_str(),iter->second.c_str());
 		return customizeAddBody(buffer,bufferLen,gram.body.c_str(),gram.fileLen);
 	}
-	void changeSetting(const char* connectStatus,const char* serverName,const Datagram* head=NULL)
+	void changeSetting(const char* connectStatus,const char* serverName)
 	{
-		this->preData=head;
 		if(serverName==NULL||connectStatus==NULL)
 			return;
 		this->serverName=serverName;
@@ -2884,6 +2889,7 @@ private:
 	bool isLongCon;
 	bool isFork;
 	bool selfCtrl;
+	bool isContinue;
 	void (*middleware)(HttpServer&,DealHttp&,int num);
 	void (*clientIn)(HttpServer&,int num,void* ip,int port);
 	void (*clientOut)(HttpServer&,int num,void* ip,int port);
@@ -2909,6 +2915,7 @@ public:
 		isDebug=debug;
 		isLongCon=true;
 		isFork=false;
+		isContinue=true;
 		textLen=0;
 		now=0;
 		maxNum=20;
@@ -3150,10 +3157,10 @@ public:
 		if(isDebug)
 			messagePrint();
 		if(isFork==false)
-			while(1)
+			while(isContinue)
 				this->epollHttp();
 		else
-			while(1)
+			while(isContinue)
 				this->forkHttp();
 		free(sen);
 		free(getT);
@@ -3235,6 +3242,10 @@ public:
 	{
 		return senText;
 	}
+	inline void stopServer()
+	{
+		this->isContinue=false;
+	}
 private:
 	void messagePrint()
 	{
@@ -3298,13 +3309,11 @@ private:
 		char ask[200]={0};
 		if(middleware!=NULL)
 		{
-			http.changeSetting(NULL,NULL,&http.gram);
 			middleware(*this,http,num);
-			http.changeSetting(NULL,NULL,NULL);
 			return 0;
 		}
 		if(isLongCon==false)
-			http.changeSetting("Close","LCserver/1.1",NULL);
+			http.changeSetting("Close","LCserver/1.1");
 		sscanf((char*)this->getText,"%100s",ask);
 		if(strstr(ask,"GET")!=NULL)
 		{
