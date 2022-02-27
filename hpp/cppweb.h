@@ -1099,11 +1099,21 @@ private:
 		}
 	};
 	Node* root;
+	void cleanMemory(Node* root)
+	{
+		for(unsigned i=0;i<77;i++)
+			if(root->next[i]!=NULL)
+				cleanMemory(root->next[i]);
+		delete root;
+	}
 public:
     Trie() {
 		root=new Node;
     }
-    
+	~Trie(){
+		if(root!=NULL)
+			cleanMemory(root);
+	}
     bool insert(const char* word,T* data) {
 		Node* temp=root;
 		for(unsigned i=0;word[i]!=0;i++)
