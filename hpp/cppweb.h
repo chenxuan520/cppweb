@@ -903,15 +903,15 @@ private:
 	}
 	void deleteSpace()
 	{
-	    unsigned j=0,k=0;
-	    unsigned flag=0;
-	    for(j=0,k=0; text[j]!='\0'; j++)
-	    {
-	    	if(text[j]!='\r'&&text[j]!='\n'&&text[j]!='\t'&&(text[j]!=' '||flag%2!=0))
-	    		text[k++]=text[j];
-	    	if(text[j]=='\"'&&j>0&&text[j-1]!='\\')
-	    		flag++;
-	    }
+		unsigned j=0,k=0;
+		unsigned flag=0;
+		for(j=0,k=0; text[j]!='\0'; j++)
+		{
+			if(text[j]!='\r'&&text[j]!='\n'&&text[j]!='\t'&&(text[j]!=' '||flag%2!=0))
+				text[k++]=text[j];
+			if(text[j]=='\"'&&j>0&&text[j-1]!='\\')
+				flag++;
+		}
 		text[k]=0;
 	}
 	void deleteNode(Object* root)
@@ -1107,14 +1107,14 @@ private:
 		delete root;
 	}
 public:
-    Trie() {
+	Trie() {
 		root=new Node;
-    }
+	}
 	~Trie(){
 		if(root!=NULL)
 			cleanMemory(root);
 	}
-    bool insert(const char* word,T* data) {
+	bool insert(const char* word,T* data) {
 		Node* temp=root;
 		for(unsigned i=0;word[i]!=0;i++)
 		{
@@ -1131,9 +1131,9 @@ public:
 		temp->stop=true;
 		temp->data=data;
 		return true;
-    }
-    
-    T* search(const char* word,std::function<bool(const T*,bool isLast)> func) {
+	}
+
+	T* search(const char* word,std::function<bool(const T*,bool isLast)> func) {
 		Node* temp=root;
 		for(unsigned i=0;word[i]!=0;i++)
 		{
@@ -1149,8 +1149,8 @@ public:
 			}
 		}
 		return NULL;
-    }
-    
+	}
+
 };
 class ServerTcpIp{
 public:
@@ -2434,16 +2434,16 @@ public:
 		memset(buffer,0,sizeof(char)*strlen(srcString));
 		for (unsigned int i=0; i<strlen(srcString); i++) 
 		{
-		    if (int(srcString[i])==37) 
+			if (int(srcString[i])==37) 
 			{
-		        sscanf(srcString+i+1, "%x", &temp);
-		        ch=(char)temp;
-		        buffer[strlen(buffer)]=ch;
-		        buffer[strlen(buffer)+1]=0;
-		        i=i+2;
-		    } 
+				sscanf(srcString+i+1, "%x", &temp);
+				ch=(char)temp;
+				buffer[strlen(buffer)]=ch;
+				buffer[strlen(buffer)+1]=0;
+				i=i+2;
+			} 
 			else 
-		        buffer[strlen(buffer)]=srcString[i];
+				buffer[strlen(buffer)]=srcString[i];
 		}
 		if(srcLen<strlen(buffer))
 		{
@@ -2688,36 +2688,6 @@ public:
 		return buffer;
 	}
 };
-class LogSystem{
-public:
-	static bool recordFileError(const char* fileName)
-	{
-		FILE* fp=fopen("wrong.log","r+");
-		if(fp==NULL)
-			fp=fopen("wrong.log","w+");
-		if(fp==NULL)
-			return false;
-		fseek(fp,0,SEEK_END);
-		fprintf(fp,"open file %s wrong\n",fileName);
-		fclose(fp);
-		return true;
-	}
-	static void httpLog(const void * text,int )
-	{
-		DealHttp http;
-		FILE* fp=fopen("ask.log","a+");
-		if(fp==NULL)
-			fp=fopen("ask.log","w+");
-		if(fp==NULL)
-			return ;
-		DealHttp::Request req;
-		http.analysisRequest(req,text);
-		time_t now=time(NULL);
-		fprintf(fp,"%s %s %s\n",ctime(&now),req.method.c_str(),req.askPath.c_str());
-		fclose(fp);
-		return ;
-	}
-};
 class ThreadPool{
 public://a struct for you to add task
 	struct Task{
@@ -2731,7 +2701,6 @@ private:
 	pthread_mutex_t lockTask;//a lock for user to ctrl
 	pthread_mutex_t lockBusy;//a lock for busy thread
 	pthread_t* thread;//an array for thread
-	pthread_t threadManager;//thread for manager user to ctrl
 	unsigned int liveThread;//num for live thread
 	unsigned int busyThread;//num for busy thread
 	bool isContinue;//if the pool is continue
@@ -2765,14 +2734,10 @@ private:
 		}
 		return NULL;
 	}
-	static void* manager(void* )//manager for user
-	{
-		return NULL;
-	}
 public:
 	ThreadPool(unsigned int threadNum=10)//create threads
 	{
-		if(threadNum<=1)
+		if(threadNum<1)
 			threadNum=10;
 		thread=new pthread_t[threadNum];
 		if(thread==NULL)
@@ -2786,7 +2751,6 @@ public:
 		liveThread=threadNum;
 		isContinue=true;
 		busyThread=0;
-		pthread_create(&threadManager,NULL,manager,this);
 		for(unsigned int i=0;i<threadNum;i++)
 			pthread_create(&thread[i],NULL,worker,this);
 	}
@@ -2819,7 +2783,6 @@ public:
 	void stopPool()//user delete the pool
 	{
 		isContinue=false;
-		pthread_join(threadManager,NULL);
 		for(unsigned int i=0;i<liveThread;i++)
 			pthread_cond_signal(&condition);
 		for(unsigned int i=0;i<liveThread;i++)
@@ -2864,6 +2827,132 @@ public:
 		pthread_attr_init(&attr);
 		pthread_attr_setdetachstate(&attr,PTHREAD_CREATE_DETACHED);
 		pthread_create(&thread,&attr,pfunc,arg);
+	}
+};
+class LogSystem{
+private:
+	const char* fileName;
+	char* buffer[4];
+	const char* error;
+	char* now;
+	char* page;
+	size_t nowLen;
+	size_t bufferLen;
+	ThreadPool pool;
+	std::queue<char*> nowFree;
+public:
+	LogSystem(const char* name,size_t bufferLen=1024)\
+										   :fileName(name),now(NULL),pool(1)
+	{
+		page=NULL;
+		if(bufferLen<128)
+			bufferLen=128;
+		this->bufferLen=bufferLen;
+		for(unsigned i=0;i<4;i++)
+			buffer[i]=NULL;
+		for(unsigned i=0;i<4;i++)
+		{
+			buffer[i]=(char*)malloc(sizeof(char)*1024);
+			if(buffer[i]==NULL)
+			{
+				error="malloc wrong";
+				return;
+			}
+			nowFree.push(buffer[i]);
+			memset(buffer[i],0,sizeof(char)*bufferLen);
+		}
+		now=buffer[0];
+		page=now;
+	}
+	~LogSystem()
+	{
+		std::pair<LogSystem*,char*>* argv=new std::pair<LogSystem*,char*>(this,page);
+		ThreadPool::Task task{worker,argv};
+		pool.addTask(task);
+		for(unsigned i=0;i<4;i++)
+			if(buffer[i]!=NULL)
+				free(buffer[i]);
+	}
+	void accessLog(const char* text)
+	{
+		if(text==NULL)
+			return;
+		if(nowLen+strlen(text)>=bufferLen)
+		{
+			pool.mutexLock();
+			if(nowFree.empty())
+			{
+				pool.mutexUnlock();
+				return;
+			}
+			now=nowFree.front();
+			nowFree.pop();
+			pool.mutexUnlock();
+			nowLen=0;
+			page=now;
+			std::pair<LogSystem*,char*>* argv=new std::pair<LogSystem*,char*>(this,page);
+			ThreadPool::Task task{worker,argv};
+			pool.addTask(task);
+		}
+		strcat(now,text);
+		strcat(now,"\n");
+		now+=strlen(text)+1;
+	}
+	static void recordRequest(const void* text,int soc)
+	{
+		static char method[32]={0},askPath[256]={0},buffer[512]={0};
+		static LogSystem loger("access.log");
+		int port=0;
+		sscanf((char*)text,"%32s%256s",method,askPath);
+		time_t now=time(NULL);
+		sprintf(buffer,"%s %s %s %s",ctime(&now),ServerTcpIp::getPeerIp(soc,&port),method,askPath);
+		loger.accessLog(buffer);
+	}
+	static bool recordFileError(const char* fileName)
+	{
+		FILE* fp=fopen("wrong.log","r+");
+		if(fp==NULL)
+			fp=fopen("wrong.log","w+");
+		if(fp==NULL)
+			return false;
+		fseek(fp,0,SEEK_END);
+		fprintf(fp,"open file %s wrong\n",fileName);
+		fclose(fp);
+		return true;
+	}
+	static void httpLog(const void * text,int )
+	{
+		DealHttp http;
+		FILE* fp=fopen("ask.log","a+");
+		if(fp==NULL)
+			fp=fopen("ask.log","w+");
+		if(fp==NULL)
+			return ;
+		DealHttp::Request req;
+		http.analysisRequest(req,text);
+		time_t now=time(NULL);
+		fprintf(fp,"%s %s %s\n",ctime(&now),req.method.c_str(),req.askPath.c_str());
+		fclose(fp);
+		return ;
+	}
+private:
+	static void* worker(void* argv)
+	{
+		std::pair<LogSystem*,char*>& now=*(std::pair<LogSystem*,char*>*)argv;
+		FILE* fp=fopen(now.first->fileName,"a+");
+		if(fp==NULL)
+		{
+			now.first->error="open file wrong";
+			return NULL;
+		}
+		fprintf(fp,"%s",now.second);
+		fclose(fp);
+		memset(now.second,0,now.first->bufferLen);
+		now.first->pool.mutexLock();
+		now.first->nowFree.push(now.second);
+		now.first->pool.mutexUnlock();
+		delete (std::pair<LogSystem*,char*>*)argv;
+		return NULL;
 	}
 };
 class HttpServer:private ServerTcpIp{
