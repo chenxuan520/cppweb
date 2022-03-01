@@ -2852,7 +2852,7 @@ public:
 			buffer[i]=NULL;
 		for(unsigned i=0;i<4;i++)
 		{
-			buffer[i]=(char*)malloc(sizeof(char)*1024);
+			buffer[i]=(char*)malloc(sizeof(char)*bufferLen);
 			if(buffer[i]==NULL)
 			{
 				error="malloc wrong";
@@ -2879,12 +2879,8 @@ public:
 			return;
 		if(nowLen+strlen(text)>=bufferLen)
 		{
+			while(nowFree.empty());
 			pool.mutexLock();
-			if(nowFree.empty())
-			{
-				pool.mutexUnlock();
-				return;
-			}
 			now=nowFree.front();
 			nowFree.pop();
 			pool.mutexUnlock();
@@ -2898,14 +2894,14 @@ public:
 		strcat(now,"\n");
 		nowLen+=strlen(text)+1;
 	}
-	static void recordRequest(const void* text,int soc)
+	static void recordRequest(const void* text,int )
 	{
 		static char method[32]={0},askPath[256]={0},buffer[512]={0};
 		static LogSystem loger("access.log");
-		int port=0;
+		/* int port=0; */
 		sscanf((char*)text,"%32s%256s",method,askPath);
 		time_t now=time(NULL);
-		sprintf(buffer,"%s %s %s %s",ctime(&now),ServerTcpIp::getPeerIp(soc,&port),method,askPath);
+		sprintf(buffer,"%s %s %s %s",ctime(&now),"ok",method,askPath);
 		loger.accessLog(buffer);
 	}
 	static bool recordFileError(const char* fileName)
@@ -2920,18 +2916,18 @@ public:
 		fclose(fp);
 		return true;
 	}
-	static void httpLog(const void * text,int )
+	static void httpLog(const void *,int )
 	{
-		DealHttp http;
+		/* DealHttp http; */
 		FILE* fp=fopen("ask.log","a+");
 		if(fp==NULL)
 			fp=fopen("ask.log","w+");
 		if(fp==NULL)
 			return ;
-		DealHttp::Request req;
-		http.analysisRequest(req,text);
+		/* DealHttp::Request req; */
+		/* http.analysisRequest(req,text); */
 		time_t now=time(NULL);
-		fprintf(fp,"%s %s %s\n",ctime(&now),req.method.c_str(),req.askPath.c_str());
+		fprintf(fp,"%s %s %s\n",ctime(&now),"get","ok");
 		fclose(fp);
 		return ;
 	}
