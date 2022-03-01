@@ -2861,14 +2861,14 @@ public:
 			nowFree.push(buffer[i]);
 			memset(buffer[i],0,sizeof(char)*bufferLen);
 		}
-		now=buffer[0];
+		now=nowFree.front();
+		nowFree.pop();
 		page=now;
 	}
 	~LogSystem()
 	{
 		std::pair<LogSystem*,char*>* argv=new std::pair<LogSystem*,char*>(this,page);
-		ThreadPool::Task task{worker,argv};
-		pool.addTask(task);
+		worker(argv);
 		for(unsigned i=0;i<4;i++)
 			if(buffer[i]!=NULL)
 				free(buffer[i]);
@@ -2889,14 +2889,14 @@ public:
 			nowFree.pop();
 			pool.mutexUnlock();
 			nowLen=0;
-			page=now;
 			std::pair<LogSystem*,char*>* argv=new std::pair<LogSystem*,char*>(this,page);
 			ThreadPool::Task task{worker,argv};
 			pool.addTask(task);
+			page=now;
 		}
 		strcat(now,text);
 		strcat(now,"\n");
-		now+=strlen(text)+1;
+		nowLen+=strlen(text)+1;
 	}
 	static void recordRequest(const void* text,int soc)
 	{
