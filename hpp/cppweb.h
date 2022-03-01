@@ -2845,6 +2845,8 @@ public:
 										   :fileName(name),now(NULL),pool(1)
 	{
 		page=NULL;
+		if(fileName==NULL)
+			fileName="access.log";
 		if(bufferLen<128)
 			bufferLen=128;
 		this->bufferLen=bufferLen;
@@ -2894,14 +2896,14 @@ public:
 		strcat(now,"\n");
 		nowLen+=strlen(text)+1;
 	}
-	static void recordRequest(const void* text,int )
+	static void recordRequest(const void* text,int soc)
 	{
 		static char method[32]={0},askPath[256]={0},buffer[512]={0};
 		static LogSystem loger("access.log");
-		/* int port=0; */
+		int port=0;
 		sscanf((char*)text,"%32s%256s",method,askPath);
 		time_t now=time(NULL);
-		sprintf(buffer,"%s %s %s %s",ctime(&now),"ok",method,askPath);
+		sprintf(buffer,"%s %s %s %s",ctime(&now),ServerTcpIp::getPeerIp(soc,&port),method,askPath);
 		loger.accessLog(buffer);
 	}
 	static bool recordFileError(const char* fileName)
@@ -2916,18 +2918,19 @@ public:
 		fclose(fp);
 		return true;
 	}
-	static void httpLog(const void *,int )
+	static void httpLog(const void * text,int soc)
 	{
-		/* DealHttp http; */
+		DealHttp http;
+		int port=0;
 		FILE* fp=fopen("ask.log","a+");
 		if(fp==NULL)
 			fp=fopen("ask.log","w+");
 		if(fp==NULL)
 			return ;
-		/* DealHttp::Request req; */
-		/* http.analysisRequest(req,text); */
+		DealHttp::Request req;
+		http.analysisRequest(req,text);
 		time_t now=time(NULL);
-		fprintf(fp,"%s %s %s\n",ctime(&now),"get","ok");
+		fprintf(fp,"%s %s %s %s\n",ctime(&now),ServerTcpIp::getPeerIp(soc,&port),req.method.c_str(),req.askPath.c_str());
 		fclose(fp);
 		return ;
 	}
@@ -2989,6 +2992,7 @@ private:
 	void (*clientIn)(HttpServer&,int num,void* ip,int port);
 	void (*clientOut)(HttpServer&,int num,void* ip,int port);
 	void (*logFunc)(const void*,int);
+	void (*logError)(const void*,int);
 	Trie<RouteFuntion> trie;
 public:
 	HttpServer(unsigned port,bool debug=false):ServerTcpIp(port)
@@ -3001,6 +3005,7 @@ public:
 		clientIn=NULL;
 		clientOut=NULL;
 		logFunc=NULL;
+		logError=NULL;
 		pnowRoute=NULL;
 		selfCtrl=false;
 		senLen=1;
@@ -3016,7 +3021,11 @@ public:
 		maxNum=20;
 		arrRoute=(RouteFuntion*)malloc(sizeof(RouteFuntion)*20);
 		if(arrRoute==NULL)
-			this->error="route wrong";
+		{
+			this->error=" server route wrong";
+			if(logError!=NULL)
+				logError(this->error,0);
+		}
 		else
 			memset(arrRoute,0,sizeof(RouteFuntion)*20);
 	}
@@ -3048,7 +3057,9 @@ public:
 			arrRoute[now].type=ONEWAY;
 		if(false==trie.insert(arrRoute[now].route,arrRoute+now))
 		{
-			error="route wrong char";
+			error="server:route wrong char";
+			if(logError!=NULL)
+				logError(this->error,0);
 			return false;
 		}
 		now++;
@@ -3072,7 +3083,9 @@ public:
 		arrRoute[now].pfunc=loadFile;
 		if(false==trie.insert(route,arrRoute+now))
 		{
-			error="route wrong char";
+			error="server:route wrong char";
+			if(logError!=NULL)
+				logError(this->error,0);
 			return false;
 		}
 		now++;
@@ -3095,7 +3108,9 @@ public:
 		arrRoute[now].pfunc=deleteFile;
 		if(false==trie.insert(path,arrRoute+now))
 		{
-			error="route wrong char";
+			error="server:route wrong char";
+			if(logError!=NULL)
+				logError(this->error,0);
 			return false;
 		}
 		now++;
@@ -3124,7 +3139,9 @@ public:
 			arrRoute[now].type=ONEWAY;
 		if(false==trie.insert(arrRoute[now].route,arrRoute+now))
 		{
-			error="route wrong char";
+			error="server:route wrong char";
+			if(logError!=NULL)
+				logError(this->error,0);
 			return false;
 		}
 		now++;
@@ -3153,7 +3170,9 @@ public:
 			arrRoute[now].type=ONEWAY;
 		if(false==trie.insert(arrRoute[now].route,arrRoute+now))
 		{
-			error="route wrong char";
+			error="server:route wrong char";
+			if(logError!=NULL)
+				logError(this->error,0);
 			return false;
 		}
 		now++;
@@ -3182,7 +3201,9 @@ public:
 			arrRoute[now].type=ONEWAY;
 		if(false==trie.insert(arrRoute[now].route,arrRoute+now))
 		{
-			error="route wrong char";
+			error="server:route wrong char";
+			if(logError!=NULL)
+				logError(this->error,0);
 			return false;
 		}
 		now++;
@@ -3218,11 +3239,12 @@ public:
 		func(cliSock);
 		middleware=temp;
 	}
-	bool setLog(void (*pfunc)(const void*,int))
+	bool setLog(void (*pfunc)(const void*,int),void (*errorFunc)(const void*,int))
 	{
-		if(logFunc!=NULL)
+		if(logFunc!=NULL||logError!=NULL)
 			return false;
 		logFunc=pfunc;
+		logError=errorFunc;
 		return true;
 	}
 	void run(const char* defaultFile)
@@ -3231,19 +3253,25 @@ public:
 		char* sen=(char*)malloc(sizeof(char)*senLen*1024*1024);
 		if(sen==NULL||getT==NULL)
 		{
-			this->error="malloc get and sen wrong";
+			this->error="server:malloc get and sen wrong";
+			if(logError!=NULL)
+				logError(error,0);
 			return;
 		}
 		memset(getT,0,sizeof(char)*recLen);
 		memset(sen,0,sizeof(char)*senLen*1024*1024);
 		if(false==this->bondhost())
 		{
-			this->error="bound wrong";
+			this->error="server:bound wrong";
+			if(logError!=NULL)
+				logError(error,0);
 			return;
 		}
 		if(false==this->setlisten())
 		{
-			this->error="set listen wrong";
+			this->error="server:set listen wrong";
+			if(logError!=NULL)
+				logError(error,0);
 			return;
 		}
 		this->getText=getT;
@@ -3516,10 +3544,9 @@ private:
 			if(flag==2)
 			{
 				if(isDebug)
-				{
-					LogSystem::recordFileError(ask);
 					printf("404 get %s wrong\n",ask);
-				}
+				if(logError!=NULL)
+					logError(ask,num);
 			}
 		}
 		if(len==0)
@@ -3733,7 +3760,8 @@ private:
 		sprintf(buf,"GET %s%s HTTP/1.1",route.path,temp);
 		if(2==http.autoAnalysisGet(buf,(char*)server.getSenBuff(),senLen*1024*1024,NULL,&len))
 		{
-			LogSystem::recordFileError(ask);
+			if(server.logError!=NULL)
+				server.logError(server.error,0);
 			printf("404 get %s wrong\n",buf);
 		}
 		staticLen(len);
@@ -3761,7 +3789,9 @@ private:
 		void* temp=realloc(old,oldSize);
 		if(temp==NULL)
 		{
-			error="malloc wrong";
+			error="server:malloc wrong";
+			if(logError!=NULL)
+				logError(error,0);
 			oldSize/=2;
 			return old;
 		}
