@@ -12,6 +12,7 @@
 #include<unistd.h>
 #include<thread>
 #include<mutex>
+#include<semaphore.h>
 #include<atomic>
 #include<condition_variable>
 using namespace std;
@@ -100,126 +101,166 @@ private:
 };
 class LogSystem{
 private:
+	struct BufferList{
+		char* buffer;
+		BufferList* pnext;
+	};
+private:
 	const char* fileName;
-	char* buffer[4];
+	BufferList* buffer;
+	BufferList* nowBuffer;
+	BufferList* saveBuffer;
 	const char* error;
-	char* now;
-	char* page;
 	size_t nowLen;
 	size_t bufferLen;
-	ThreadPool pool;
-	std::queue<char*> nowFree;
+	pthread_t pid;
+	bool isBusy;
+	bool isContinue;
+	sem_t sem;
 public:
-	LogSystem(const char* name,size_t bufferLen=1024)\
-										   :fileName(name),now(NULL),pool(1)
+	LogSystem(const char* name,size_t bufferLen=1024):fileName(name)
 	{
-		page=NULL;
-		if(fileName==NULL)
-			fileName="access.log";
+		nowLen=0;
+		pid=0;
+		nowBuffer=NULL;
+		error=NULL;
+		saveBuffer=NULL;
 		if(bufferLen<128)
 			bufferLen=128;
+		if(fileName==NULL)
+			fileName="access.log";
 		this->bufferLen=bufferLen;
-		for(unsigned i=0;i<4;i++)
-			buffer[i]=NULL;
+		buffer=(BufferList*)malloc(sizeof(BufferList));
+		if(buffer==NULL)
+		{
+			error="malloc wrong";
+			return;
+		}
+		buffer->buffer=(char*)malloc(sizeof(char)*bufferLen);
+		if(buffer->buffer==NULL)
+		{
+			error="malloc wrong";
+			return;
+		}
+		buffer->pnext=NULL;
+		BufferList* last=buffer;
 		for(unsigned i=0;i<4;i++)
 		{
-			buffer[i]=(char*)malloc(sizeof(char)*bufferLen);
-			if(buffer[i]==NULL)
+			last->pnext=(BufferList*)malloc(sizeof(BufferList));
+			if(last->pnext==NULL)
 			{
 				error="malloc wrong";
 				return;
 			}
-			nowFree.push(buffer[i]);
-			memset(buffer[i],0,sizeof(char)*bufferLen);
+			last=last->pnext;
+			last->buffer=(char*)malloc(sizeof(char)*bufferLen);
+			last->pnext=NULL;
+			if(last->buffer==NULL)
+			{
+				error="malloc wrong";
+				return;
+			}
+			memset(last->buffer,0,sizeof(char)*bufferLen);
 		}
-		now=nowFree.front();
-		nowFree.pop();
-		page=now;
+		last->pnext=buffer;
+		nowBuffer=buffer;
+		saveBuffer=nowBuffer;
+		sem_init(&sem,1,0);
+		isBusy=false;
+		isContinue=true;
+		/* pid=ThreadPool::createPthread(this,worker); */
 	}
 	~LogSystem()
 	{
-		std::pair<LogSystem*,char*>* argv=new std::pair<LogSystem*,char*>(this,page);
-		worker(argv);
-		for(unsigned i=0;i<4;i++)
-			if(buffer[i]!=NULL)
-				free(buffer[i]);
+		isContinue=false;
+		sem_post(&sem);
+		/* if(pid!=0) */
+		/* 	ThreadPool::waitPthread(pid); */
+		sem_destroy(&sem);
+		nowBuffer=nowBuffer->pnext;
+		BufferList* last=buffer;
+		while(last!=NULL)
+		{
+			BufferList* temp=last;
+			if(last->buffer!=NULL)
+				free(last->buffer);
+			if(last->pnext!=buffer)
+			{
+				last=last->pnext;
+				free(temp);
+			}
+			else
+			{
+				free(last);
+				break;
+			}
+		}
+	}
+public:
+	inline const char* lastError()
+	{
+		return error;
 	}
 	void accessLog(const char* text)
 	{
-		if(text==NULL)
-			return;
-		if(nowLen+strlen(text)>=bufferLen)
+		if(strlen(text)+nowLen>bufferLen)
 		{
-			while(nowFree.empty());
-			/* pool.mutexLock(); */
-			now=nowFree.front();
-			nowFree.pop();
-			/* pool.mutexUnlock(); */
-			nowLen=0;
-			std::pair<LogSystem*,char*>* argv=new std::pair<LogSystem*,char*>(this,page);
-			ThreadPool::Task task{worker,argv};
-			pool.addTask(task);
-			page=now;
+			if(nowBuffer->pnext==saveBuffer)
+			{
+				if(!isBusy)
+					sem_post(&sem);
+				while(nowBuffer->pnext==saveBuffer);
+				nowBuffer=nowBuffer->pnext;
+				memset(nowBuffer->buffer,0,sizeof(char)*bufferLen);
+				nowLen=0;
+			}
+			else
+			{
+				nowBuffer=nowBuffer->pnext;
+				memset(nowBuffer->buffer,0,sizeof(char)*bufferLen);
+				nowLen=0;
+				if(!isBusy)
+					sem_post(&this->sem);
+			}
 		}
-		strcat(now,text);
-		strcat(now,"\n");
+		strcat(nowBuffer->buffer,text);
+		strcat(nowBuffer->buffer,"\n");
 		nowLen+=strlen(text)+1;
 	}
-	static void recordRequest(const void* text,int )
-	{
-		static char method[32]={0},askPath[256]={0},buffer[512]={0};
-		static LogSystem loger("access.log");
-		/* int port=0; */
-		sscanf((char*)text,"%32s%256s",method,askPath);
-		/* time_t now=time(NULL); */
-		/* sprintf(buffer,"%s %s %s %s",ctime(&now),ServerTcpIp::getPeerIp(soc,&port),method,askPath); */
-		loger.accessLog(buffer);
-	}
-	static bool recordFileError(const char* fileName)
-	{
-		FILE* fp=fopen("wrong.log","r+");
-		if(fp==NULL)
-			fp=fopen("wrong.log","w+");
-		if(fp==NULL)
-			return false;
-		fseek(fp,0,SEEK_END);
-		fprintf(fp,"open file %s wrong\n",fileName);
-		fclose(fp);
-		return true;
-	}
-	/* static void httpLog(const void * text,int soc) */
+	/* static void recordRequest(const void* text,int soc) */
 	/* { */
-	/* 	DealHttp http; */
+	/* 	static char method[32]={0},askPath[256]={0},buffer[512]={0}; */
+	/* 	static LogSystem loger("access.log"); */
 	/* 	int port=0; */
-	/* 	FILE* fp=fopen("ask.log","a+"); */
-	/* 	if(fp==NULL) */
-	/* 		fp=fopen("ask.log","w+"); */
-	/* 	if(fp==NULL) */
-	/* 		return ; */
-	/* 	DealHttp::Request req; */
-	/* 	http.analysisRequest(req,text); */
+	/* 	sscanf((char*)text,"%32s%256s",method,askPath); */
 	/* 	time_t now=time(NULL); */
-	/* 	fprintf(fp,"%s %s %s %s\n",ctime(&now),ServerTcpIp::getPeerIp(soc,&port),req.method.c_str(),req.askPath.c_str()); */
-	/* 	fclose(fp); */
-	/* 	return ; */
+	/* 	sprintf(buffer,"%s %s %s %s",ctime(&now),ServerTcpIp::getPeerIp(soc,&port),method,askPath); */
+	/* 	loger.accessLog(buffer); */
 	/* } */
 private:
 	static void* worker(void* argv)
 	{
-		std::pair<LogSystem*,char*>& now=*(std::pair<LogSystem*,char*>*)argv;
-		FILE* fp=fopen(now.first->fileName,"a+");
+		LogSystem& self=*(LogSystem*)argv;
+		FILE* fp=fopen(self.fileName,"a+");
 		if(fp==NULL)
 		{
-			now.first->error="open file wrong";
+			self.error="open file wrong";
 			return NULL;
 		}
-		fprintf(fp,"%s",now.second);
+		while(self.isContinue)
+		{
+			sem_wait(&self.sem);
+			self.isBusy=true;
+			while(self.saveBuffer!=self.nowBuffer)
+			{
+				fprintf(fp,"%s",self.saveBuffer->buffer);
+				memset(self.saveBuffer->buffer,0,sizeof(char)*self.bufferLen);
+				self.saveBuffer=self.saveBuffer->pnext;
+			}
+			self.isBusy=false;
+		}
+		fprintf(fp,"%s",self.saveBuffer->buffer);
 		fclose(fp);
-		memset(now.second,0,now.first->bufferLen);
-		/* now.first->pool.mutexLock(); */
-		now.first->nowFree.push(now.second);
-		/* now.first->pool.mutexUnlock(); */
-		delete (std::pair<LogSystem*,char*>*)argv;
 		return NULL;
 	}
 };

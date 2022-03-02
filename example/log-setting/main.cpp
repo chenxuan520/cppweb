@@ -5,7 +5,7 @@ using namespace cppweb;
 int main()
 {
 	HttpServer server(5200,true);
-	server.setLog(LogSystem::recordRequest);
+	server.setLog(LogSystem::recordRequest,NULL);
 	server.get("/stop",[](HttpServer& server,DealHttp&,int){
 			   server.stopServer();
 			   });
