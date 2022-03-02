@@ -2,7 +2,7 @@
 #include <iostream>
 #include <string.h>
 #include <ctime>
-class Check{
+class CheckMemory{
 private:
 	struct Node{
 		void* ptr;
@@ -13,15 +13,21 @@ private:
 	const char* error;
 	FILE* fp;
 	unsigned all;
+	unsigned hashNum;
 public:
-	Check()
+	CheckMemory(unsigned hashNums=997)
 	{
+		if(hashNums<13)
+			hashNum=hashNums;
+		else
+			hashNum=997;
 #ifndef FILE_SAVE_NAME
 		printf("recording...\n");
+		fp=NULL;
 #else
 		fp=fopen(FILE_SAVE_NAME,"a+");
 #endif
-		memory=(Node*)malloc(sizeof(Node)*997);
+		memory=(Node*)malloc(sizeof(Node)*hashNum);
 		error=NULL;
 		all=0;
 		if(memory==NULL)
@@ -29,9 +35,9 @@ public:
 			error="malloc wrong";
 			return;
 		}
-		memset(memory,0,sizeof(Node)*997);
+		memset(memory,0,sizeof(Node)*hashNum);
 	}
-	~Check()
+	~CheckMemory()
 	{
 #ifndef FILE_SAVE_NAME
 		printf("checking...\n");
@@ -42,13 +48,13 @@ public:
 			fprintf(fp,"Date:%s\n",ctime(&now));
 		}
 #endif
-		for(unsigned i=0;i<997;i++)
+		for(unsigned i=0;i<hashNum;i++)
 		{
 			Node* now=memory+i;
 			now=now->pnext;
 			while(now!=NULL)
 			{
-				all=+now->len;
+				all+=now->len;
 #ifndef FILE_SAVE_NAME
 				printf("leak %zu memory\n",now->len);
 #else
@@ -74,7 +80,7 @@ public:
 		if(size==0||error!=NULL)
 			return;
 		long int temp=(long int)pmalloc;
-		temp%=997;
+		temp%=hashNum;
 		Node* now=memory+temp;
 		while(now->pnext!=NULL)
 			now=now->pnext;
@@ -95,7 +101,7 @@ public:
 		if(pfree==NULL||error!=NULL)
 			return;
 		long int temp=(long int)pfree;
-		temp%=997;
+		temp%=hashNum;
 		Node* now=memory+temp,*last=now;
 		if(now==NULL)
 			return;
@@ -112,12 +118,12 @@ public:
 			now=now->pnext;
 		}
 	}
-	void eraser(void* pfree)
+	void erase(void* pfree)
 	{
 		if(pfree==NULL||error!=NULL)
 			return;
 		long int temp=(long int)pfree;
-		temp%=997;
+		temp%=hashNum;
 		Node* now=memory+temp,*last=now;
 		if(now==NULL)
 			return;
@@ -150,14 +156,14 @@ void* operator new[](size_t size)
 }
 void operator delete(void* ptr) noexcept
 {
-	checkMemory.eraser(ptr);
+	checkMemory.erase(ptr);
 	free(ptr);
 }
 void operator delete[](void* ptr) noexcept
 {
 	if(ptr==NULL)
 		return;
-	checkMemory.eraser(ptr);
+	checkMemory.erase(ptr);
 	free(ptr);
 }
 void* Malloc_now(size_t size)
@@ -169,7 +175,7 @@ void* Malloc_now(size_t size)
 }
 void Free_now(void* ptr)
 {
-	checkMemory.eraser(ptr);
+	checkMemory.erase(ptr);
 	free(ptr);
 }
 void* Realloc_now(void* ptr,size_t size)
