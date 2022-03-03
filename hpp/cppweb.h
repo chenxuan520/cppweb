@@ -13,7 +13,6 @@
 #include<sys/epoll.h>
 #include<sys/types.h>
 #include<unistd.h>
-#include<semaphore.h>
 #include<string.h>
 #include<netdb.h>
 #include<pthread.h>
@@ -2972,7 +2971,7 @@ private:
 	};
 public://main class for http server2.0
 	enum AskType{//different ask ways in http
-		GET,POST,PUT,DELETE,OPTIONS,ALL,
+		GET,POST,PUT,DELETE,OPTIONS,CONNECT,ALL,
 	};
 	struct RouteFuntion{//inside struct,pack for handle
 		AskType ask;
@@ -3018,12 +3017,12 @@ public:
 		logFunc=NULL;
 		logError=NULL;
 		pnowRoute=NULL;
-		selfCtrl=false;
 		senLen=1;
 		recLen=2048;
 		selfLen=0;
 		boundPort=port;
 		isDebug=debug;
+		selfCtrl=false;
 		isLongCon=true;
 		isFork=false;
 		isContinue=true;
@@ -3425,10 +3424,14 @@ private:
 			case OPTIONS:
 				printf("OPTIONS\n");
 				break;
+			case CONNECT:
+				printf("CONNECT\n");
 			}
 		}
 		if(logFunc!=NULL)
 			printf("log function set\n");
+		if(logError!=NULL)
+			printf("error funtion set\n");
 		if(clientIn!=NULL)
 			printf("client in function set\n");
 		if(clientOut!=NULL)
@@ -3483,6 +3486,13 @@ private:
 			if(isDebug)
 				printf("OPTIONS url:%s\n",ask);
 			type=OPTIONS;
+		}
+		else if(strstr(ask,"CONNECT")!=NULL)
+		{
+			http.getAskRoute(this->getText,"CONNECT",ask,200);
+			if(isDebug)
+				printf("CONNECT url:%s\n",ask);
+			type=CONNECT;
 		}
 		else 
 		{
@@ -3676,8 +3686,6 @@ private:
 					{
 						close(sock);
 						func(temp.data.fd);
-						if(logFunc!=NULL)
-							logFunc(this->recText(),temp.data.fd);
 						close(temp.data.fd);
 						free(this->getText);
 						free(this->senText);
@@ -3692,6 +3700,8 @@ private:
 							close(temp.data.fd);
 						}
 					}
+					if(logFunc!=NULL)
+						logFunc(this->recText(),temp.data.fd);
 				}
 				else
 				{
