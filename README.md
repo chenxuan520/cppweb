@@ -19,7 +19,7 @@
 - 具有Linux和windows跨平台特点
 - 轻量级 ，只有几个静态库，代码不到5000行,可直接使用头文件操作
 - 扩展性好，自由订制处理http响应 
-- 安装方便,使用sudo make install就可安装
+- 安装方便,核心只有hpp/cppweb.h一个头文件
 - 学习成本低，半个小时就可掌握用法 
 - 文档详细中文 ，代码全部开源 
 
@@ -38,7 +38,6 @@
 ## 项目说明
 
 - 该项目可用于个人搭建小网站后端服务
-- 对高并发的业务处理能力偏弱  
 - 本人只是一名大二的学生，框架的不足之处恳请大家通过issue发给我一定认真改进
 - 这个和图形库类似只是给初学者简便的创作
 - 代码不足之处请务必联系我改进
@@ -56,7 +55,7 @@
 
 5. 支持通过路由管理请求
 
-6. 支持日志生成和实现
+6. 支持日志生成和实现,日志系统约为30万条每秒
 
 7. 使用多进程和IO复用
 
@@ -64,7 +63,230 @@
 
 ## 搭建服务器
 
-- 请见doc下的http服务器搭建.md
+- ./install.sh为安装脚本,运行就可以安装
+
+## 框架介绍
+
+#### 搭建服务器
+
+```cpp
+ #include "../../hpp/cppweb.h"//包含头文件
+using namespace cppweb;
+int main()  
+{  
+	HttpServer server(5200,true);//输入运行端口以及是否开启打印的调试模式
+	server.run("index.html");//输入访问路径为 / 时默认文件
+	return 0; //没有错会一直运行,除非出错,可以用lastError获取错取
+}  
+```
+
+#### 路由设置
+
+```cpp
+	server.get("/lam*",[](HttpServer&,DealHttp& http,int)->void{
+		http.gram.body="text";//设置报文内容
+	});
+```
+
+- 支持lam表达式和普通函数
+
+- 支持路由的*扩展
+
+#### 中间件设置
+
+```cpp
+void pfunc(HttpServer& server,DealHttp& http,int soc)
+{
+	http.head["try"]="en";
+	server.continueNext(soc);//继续执行后面默认操作,也可以不执行
+}
+int main()
+{
+	HttpServer server(5200,true);
+	server.setMiddleware(pfunc);//设置中间件
+	server.get("/root",[](HttpServer&,DealHttp& http,int){
+			   http.gram.body="text";
+			   });
+	server.run("./index.html");
+	return 0;
+}
+
+```
+
+-  支持中间件对报文统一处理
+
+#### 日志设置
+
+```cpp
+	server.setLog(LogSystem::recordRequest,NULL);
+	server.get("/stop",[](HttpServer& server,DealHttp&,int){
+			   server.stopServer();
+			   });
+```
+
+- LogSystem有一些模板,也可以自己设置
+
+#### 解析报文
+
+```cpp
+void func(HttpServer& server,DealHttp& http,int)
+{
+	DealHttp::Request req;
+	http.analysisRequest(req,server.recText());
+	printf("old:%s\n",(char*)server.recText());
+	printf("new:%s %s %s\n",req.method.c_str(),req.askPath.c_str(),req.version.c_str());
+	for(auto iter=req.head.begin();iter!=req.head.end();iter++)
+		printf("%s:%s\n",iter->first.c_str(),iter->second.c_str());
+	printf("body:%s\n",req.body);
+	http.gram.statusCode=DealHttp::STATUSOK;
+	http.gram.typeFile=DealHttp::JSON;
+	http.gram.body="{\"ha\":\"ha\"}";
+}
+int main()  
+{  
+	HttpServer server(5200,true);//input the port bound
+	server.all("/root",func);
+	server.run("./index.html");
+	if(server.lastError()!=NULL)
+	{
+		std::cout<<server.lastError()<<std::endl;
+		return -1;
+	}
+    return 0; 
+}  
+
+```
+
+- 通过http内置的结构体来解析
+
+#### 设置cookie
+
+```cpp
+void cookie(HttpServer& server,DealHttp& http,int)
+{
+	char buffer[100]={0};
+	http.getCookie(server.recText(),"key",buffer,100);
+	if(strlen(buffer)==0)
+	{
+		http.gram.body="ready to setting cookie";
+		http.gram.cookie["key"]=http.designCookie("cookie ok",10);
+		return;
+	}
+	Json json={
+		{"key",(const char*)buffer},
+		{"status","ok"}
+	};
+	http.gram.body=json();
+	http.gram.typeFile=DealHttp::JSON;
+}
+int main()  
+{  
+	HttpServer server(5200,true);
+	server.get("/cookie",cookie);
+	server.run("index.html");
+    return 0; 
+}  
+```
+
+#### 客户端创建
+
+```cpp
+#define CPPHTTPLIB_OPENSSL_SUPPORT
+#include "../../hpp/cppweb.h"
+using namespace std;
+using namespace cppweb;
+int main()
+{
+	char ip[30]={0},topUrl[100]={0},endUrl[100]={0};
+	string str="http://chenxuanweb.top/";
+	DealHttp::dealUrl(str.c_str(),topUrl,endUrl,100,100);
+	ClientTcpIp::getDnsIp(topUrl,ip,30);
+	unsigned port=5200;
+	if(strstr(str.c_str(),"https")!=NULL)
+		port=443;
+	ClientTcpIp client(ip,port);
+	cout<<client.lastError();
+	DealHttp http;
+	DealHttp::Request req;
+	req.head.insert(pair<string,string>{"Host",topUrl});
+	req.askPath=endUrl;
+	req.method="GET";
+	req.version="HTTP/1.1";
+	char buffer[500]={0},rec[5000]={0};
+	http.createAskRequest(req,buffer,500);
+	if(port!=443)
+	{
+		if(false==client.tryConnect())
+			return -1;
+		if(0>client.sendHost(buffer,strlen(buffer)))
+			return -1;
+		client.receiveHost(rec,5000);
+		return 0;
+	}
+	if(false==client.tryConnectSSL())
+		return -1;
+	if(0>client.sendHostSSL(buffer,strlen(buffer)))
+		return -1;
+	client.receiveHostSSL(rec,5000);
+	printf("%s\n\n",rec);
+	return 0;
+}
+```
+
+- 支持https的客户端连接
+
+#### 静态和删除路径
+
+```cpp
+	HttpServer server(5200,true);
+	server.loadStatic("/file/index.html","index.html");
+	server.loadStatic("/file","index.html");
+	server.deletePath("test");
+```
+
+## 速度测试
+
+- 使用http_load测试,每秒1000个连接,持续15s
+
+- 开启日志状态下
+
+- 比较对象为nginx,go的gin框架
+
+```shell
+nginx server
+
+1833 fetches, 1000 max parallel, 1.1218e+06 bytes, in 15 seconds
+612 mean bytes/connection
+122.2 fetches/sec, 74786.4 bytes/sec
+msecs/connect: 248.187 mean, 14454.9 max, 21.731 min
+msecs/first-response: 349.369 mean, 13968.4 max, 21.556 min
+HTTP response codes:
+  code 200 -- 1833
+
+gin server
+
+1528 fetches, 1000 max parallel, 921384 bytes, in 15.0002 seconds
+603 mean bytes/connection
+101.865 fetches/sec, 61424.9 bytes/sec
+msecs/connect: 731.15 mean, 11533.5 max, 21.645 min
+msecs/first-response: 319.711 mean, 7317.47 max, 21.518 min
+HTTP response codes:
+  code 200 -- 1528
+
+my server
+
+1792 fetches, 1000 max parallel, 1.1433e+06 bytes, in 15.0001 seconds
+638 mean bytes/connection
+119.466 fetches/sec, 76219.1 bytes/sec
+msecs/connect: 143.062 mean, 7316.08 max, 21.651 min
+msecs/first-response: 334.025 mean, 13735.1 max, 21.481 min
+HTTP response codes:
+  code 200 -- 1792
+```
+
+## 更多文档
+
+- 详情见doc目录
 
 ## 感谢支持
 

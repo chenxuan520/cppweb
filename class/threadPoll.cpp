@@ -4,6 +4,7 @@
 	funtion:this file is a try for thead pool
 *********************************/
 #include<pthread.h>
+#include<string.h>
 #include<stdio.h>
 #include<iostream>
 #include<queue>
@@ -11,6 +12,7 @@
 #include<unistd.h>
 #include<thread>
 #include<mutex>
+#include<semaphore.h>
 #include<atomic>
 #include<condition_variable>
 using namespace std;
@@ -95,6 +97,171 @@ private:
 				task.ptask(task.arg);
 			pool.busyNow--;
 		}
+	}
+};
+class LogSystem{
+private:
+	struct BufferList{
+		char* buffer;
+		BufferList* pnext;
+	};
+private:
+	const char* fileName;
+	BufferList* buffer;
+	BufferList* nowBuffer;
+	BufferList* saveBuffer;
+	const char* error;
+	size_t nowLen;
+	size_t bufferLen;
+	pthread_t pid;
+	bool isBusy;
+	bool isContinue;
+	sem_t sem;
+public:
+	LogSystem(const char* name,size_t bufferLen=1024):fileName(name)
+	{
+		nowLen=0;
+		pid=0;
+		nowBuffer=NULL;
+		error=NULL;
+		saveBuffer=NULL;
+		if(bufferLen<128)
+			bufferLen=128;
+		if(fileName==NULL)
+			fileName="access.log";
+		this->bufferLen=bufferLen;
+		buffer=(BufferList*)malloc(sizeof(BufferList));
+		if(buffer==NULL)
+		{
+			error="malloc wrong";
+			return;
+		}
+		buffer->buffer=(char*)malloc(sizeof(char)*bufferLen);
+		if(buffer->buffer==NULL)
+		{
+			error="malloc wrong";
+			return;
+		}
+		buffer->pnext=NULL;
+		BufferList* last=buffer;
+		for(unsigned i=0;i<4;i++)
+		{
+			last->pnext=(BufferList*)malloc(sizeof(BufferList));
+			if(last->pnext==NULL)
+			{
+				error="malloc wrong";
+				return;
+			}
+			last=last->pnext;
+			last->buffer=(char*)malloc(sizeof(char)*bufferLen);
+			last->pnext=NULL;
+			if(last->buffer==NULL)
+			{
+				error="malloc wrong";
+				return;
+			}
+			memset(last->buffer,0,sizeof(char)*bufferLen);
+		}
+		last->pnext=buffer;
+		nowBuffer=buffer;
+		saveBuffer=nowBuffer;
+		sem_init(&sem,1,0);
+		isBusy=false;
+		isContinue=true;
+		/* pid=ThreadPool::createPthread(this,worker); */
+	}
+	~LogSystem()
+	{
+		isContinue=false;
+		sem_post(&sem);
+		/* if(pid!=0) */
+		/* 	ThreadPool::waitPthread(pid); */
+		sem_destroy(&sem);
+		nowBuffer=nowBuffer->pnext;
+		BufferList* last=buffer;
+		while(last!=NULL)
+		{
+			BufferList* temp=last;
+			if(last->buffer!=NULL)
+				free(last->buffer);
+			if(last->pnext!=buffer)
+			{
+				last=last->pnext;
+				free(temp);
+			}
+			else
+			{
+				free(last);
+				break;
+			}
+		}
+	}
+public:
+	inline const char* lastError()
+	{
+		return error;
+	}
+	void accessLog(const char* text)
+	{
+		if(strlen(text)+nowLen>bufferLen)
+		{
+			if(nowBuffer->pnext==saveBuffer)
+			{
+				if(!isBusy)
+					sem_post(&sem);
+				while(nowBuffer->pnext==saveBuffer);
+				nowBuffer=nowBuffer->pnext;
+				memset(nowBuffer->buffer,0,sizeof(char)*bufferLen);
+				nowLen=0;
+			}
+			else
+			{
+				nowBuffer=nowBuffer->pnext;
+				memset(nowBuffer->buffer,0,sizeof(char)*bufferLen);
+				nowLen=0;
+				if(!isBusy)
+					sem_post(&this->sem);
+			}
+		}
+		strcat(nowBuffer->buffer,text);
+		strcat(nowBuffer->buffer,"\n");
+		nowLen+=strlen(text)+1;
+	}
+	/* static void recordRequest(const void* text,int soc) */
+	/* { */
+	/* 	static char method[32]={0},askPath[256]={0},buffer[512]={0}; */
+	/* 	static LogSystem loger("access.log"); */
+	/* 	int port=0; */
+	/* 	sscanf((char*)text,"%32s%256s",method,askPath); */
+	/* 	time_t now=time(NULL); */
+	/* 	sprintf(buffer,"%s %s %s %s",ctime(&now),ServerTcpIp::getPeerIp(soc,&port),method,askPath); */
+	/* 	loger.accessLog(buffer); */
+	/* } */
+private:
+	static void* worker(void* argv)
+	{
+		LogSystem& self=*(LogSystem*)argv;
+		FILE* fp=fopen(self.fileName,"a+");
+		if(fp==NULL)
+		{
+			self.error="open file wrong";
+			return NULL;
+		}
+		while(self.isContinue)
+		{
+			sem_wait(&self.sem);
+			self.isBusy=true;
+			while(self.saveBuffer!=self.nowBuffer)
+			{
+				fprintf(fp,"%s",self.saveBuffer->buffer);
+				memset(self.saveBuffer->buffer,0,sizeof(char)*self.bufferLen);
+				self.saveBuffer=self.saveBuffer->pnext;
+			}
+			self.isBusy=false;
+		}
+		fprintf(fp,"%s",self.saveBuffer->buffer);
+		fclose(fp);
+		return NULL;
 	}
 };
 int temp=0;
