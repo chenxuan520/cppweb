@@ -23,10 +23,11 @@ void upload(HttpServer& server,DealHttp& http,int soc)
 		http.gram.statusCode=DealHttp::STATUSNOFOUND;
 		return;
 	}
+	memset(temp,0,sizeof(char)*(flen+1000));
 	unsigned len=server.getCompleteMessage(soc);
 	printf("len %d\n",len);
-    flen=http.getRecFile(server.recText(),len,name,100,(char*)sen,sizeof(char)*(flen+1000));
-    FileGet::writeToFile(name,(char*)sen,flen);
+    flen=http.getRecFile(server.recText(),len,name,100,(char*)temp,sizeof(char)*(flen+1000));
+    FileGet::writeToFile(name,(char*)temp,flen);
 	http.gram.typeFile=DealHttp::JSON;
 	http.gram.body="{\"status\":\"ok\"}";
 	free(temp);

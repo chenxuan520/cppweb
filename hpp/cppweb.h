@@ -903,15 +903,15 @@ private:
 	}
 	void deleteSpace()
 	{
-	    unsigned j=0,k=0;
-	    unsigned flag=0;
-	    for(j=0,k=0; text[j]!='\0'; j++)
-	    {
-	    	if(text[j]!='\r'&&text[j]!='\n'&&text[j]!='\t'&&(text[j]!=' '||flag%2!=0))
-	    		text[k++]=text[j];
-	    	if(text[j]=='\"'&&j>0&&text[j-1]!='\\')
-	    		flag++;
-	    }
+		unsigned j=0,k=0;
+		unsigned flag=0;
+		for(j=0,k=0; text[j]!='\0'; j++)
+		{
+			if(text[j]!='\r'&&text[j]!='\n'&&text[j]!='\t'&&(text[j]!=' '||flag%2!=0))
+				text[k++]=text[j];
+			if(text[j]=='\"'&&j>0&&text[j-1]!='\\')
+				flag++;
+		}
 		text[k]=0;
 	}
 	void deleteNode(Object* root)
@@ -1072,8 +1072,17 @@ private:
 };
 class Guard{
 public:
-	Guard()
+	Guard(bool isBackGround=false)
 	{
+		if(isBackGround)
+		{
+			int pid=0;
+			if((pid=fork())!=0)
+			{
+				printf("pid=%d\n",pid);
+				exit(0);
+			}
+		}
 		while(1)
 		{
 			int pid=fork();
@@ -1099,12 +1108,22 @@ private:
 		}
 	};
 	Node* root;
+	void cleanMemory(Node* root)
+	{
+		for(unsigned i=0;i<77;i++)
+			if(root->next[i]!=NULL)
+				cleanMemory(root->next[i]);
+		delete root;
+	}
 public:
-    Trie() {
+	Trie() {
 		root=new Node;
-    }
-    
-    bool insert(const char* word,T* data) {
+	}
+	~Trie(){
+		if(root!=NULL)
+			cleanMemory(root);
+	}
+	bool insert(const char* word,T* data) {
 		Node* temp=root;
 		for(unsigned i=0;word[i]!=0;i++)
 		{
@@ -1121,9 +1140,9 @@ public:
 		temp->stop=true;
 		temp->data=data;
 		return true;
-    }
-    
-    T* search(const char* word,std::function<bool(const T*,bool isLast)> func) {
+	}
+
+	T* search(const char* word,std::function<bool(const T*,bool isLast)> func) {
 		Node* temp=root;
 		for(unsigned i=0;word[i]!=0;i++)
 		{
@@ -1139,8 +1158,8 @@ public:
 			}
 		}
 		return NULL;
-    }
-    
+	}
+
 };
 class ServerTcpIp{
 public:
@@ -1686,16 +1705,16 @@ private:
 	const char* error;
 	const char* connect;
 	const char* serverName;
-	const Datagram* preData;
 public:
 	Datagram gram;
+	std::unordered_map<std::string,std::string> head;
+	std::unordered_map<std::string,std::string> cookie;
 	DealHttp()
 	{
 		for(int i=0;i<256;i++)
 			ask[i]=0;
 		pfind=NULL;
 		error=NULL;
-		preData=NULL;
 		connect="keep-alive";
 		serverName="LCserver/1.1";
 	}
@@ -1738,12 +1757,12 @@ private:
 		sprintf(ptop,"HTTP/1.1 200 OK\r\n"
 				"Server %s\r\n"
 				"Connection: %s\r\n",serverName,connect);
-		if(preData!=NULL)
+		if(!head.empty())
 		{
-			for(auto iter=preData->head.begin();iter!=preData->head.end();iter++)
+			for(auto iter=head.begin();iter!=head.end();iter++)
 				sprintf(ptop,"%s%s: %s\r\n",\
 						ptop,iter->first.c_str(),iter->second.c_str());
-			for(auto iter=preData->cookie.begin();iter!=preData->cookie.end();iter++)
+			for(auto iter=cookie.begin();iter!=cookie.end();iter++)
 				setCookie(ptop,bufLen,iter->first.c_str(),iter->second.c_str());
 		}
 		switch (kind)
@@ -1943,6 +1962,15 @@ public:
 		char temp[1000]={0};
 		if(strlen(key)+strlen(value)>1000)
 			return false;
+		if(strstr(value,"max-age")!=NULL)
+		{
+			sprintf(temp,"Set-Cookie: %s=%s;",key,value);
+			if(strlen((char*)buffer)+strlen(temp)>=bufferLen)
+				return false;
+			strcat((char*)buffer,temp);
+			strcat((char*)buffer,"\r\n");
+			return true;
+		}
 		sprintf(temp,"Set-Cookie: %s=%s;max-age= %d;",key,value,liveTime);
 		if(strlen((char*)buffer)+strlen(temp)>=bufferLen)
 			return false;
@@ -2353,17 +2381,22 @@ public:
 		strcat((char*)buffer,temp);
 		sprintf(temp,"Content-Length:%d\r\n",gram.fileLen);
 		strcat((char*)buffer,temp);
-		if(gram.head.size()!=0)
+		if(!gram.head.empty())
 			for(auto iter=gram.head.begin();iter!=gram.head.end();iter++)
 				customizeAddHead(buffer,bufferLen,iter->first.c_str(),iter->second.c_str());
-		if(gram.cookie.size()!=0)
+		if(!head.empty())
+			for(auto iter=head.begin();iter!=head.end();iter++)
+				customizeAddHead(buffer,bufferLen,iter->first.c_str(),iter->second.c_str());
+		if(!gram.cookie.empty())
 			for(auto iter=gram.cookie.begin();iter!=gram.cookie.end();iter++)
+				setCookie(buffer,bufferLen,iter->first.c_str(),iter->second.c_str());
+		if(!cookie.empty())
+			for(auto iter=cookie.begin();iter!=cookie.end();iter++)
 				setCookie(buffer,bufferLen,iter->first.c_str(),iter->second.c_str());
 		return customizeAddBody(buffer,bufferLen,gram.body.c_str(),gram.fileLen);
 	}
-	void changeSetting(const char* connectStatus,const char* serverName,const Datagram* head=NULL)
+	void changeSetting(const char* connectStatus,const char* serverName)
 	{
-		this->preData=head;
 		if(serverName==NULL||connectStatus==NULL)
 			return;
 		this->serverName=serverName;
@@ -2419,16 +2452,16 @@ public:
 		memset(buffer,0,sizeof(char)*strlen(srcString));
 		for (unsigned int i=0; i<strlen(srcString); i++) 
 		{
-		    if (int(srcString[i])==37) 
+			if (int(srcString[i])==37) 
 			{
-		        sscanf(srcString+i+1, "%x", &temp);
-		        ch=(char)temp;
-		        buffer[strlen(buffer)]=ch;
-		        buffer[strlen(buffer)+1]=0;
-		        i=i+2;
-		    } 
+				sscanf(srcString+i+1, "%x", &temp);
+				ch=(char)temp;
+				buffer[strlen(buffer)]=ch;
+				buffer[strlen(buffer)+1]=0;
+				i=i+2;
+			} 
 			else 
-		        buffer[strlen(buffer)]=srcString[i];
+				buffer[strlen(buffer)]=srcString[i];
 		}
 		if(srcLen<strlen(buffer))
 		{
@@ -2673,36 +2706,6 @@ public:
 		return buffer;
 	}
 };
-class LogSystem{
-public:
-	static bool recordFileError(const char* fileName)
-	{
-		FILE* fp=fopen("wrong.log","r+");
-		if(fp==NULL)
-			fp=fopen("wrong.log","w+");
-		if(fp==NULL)
-			return false;
-		fseek(fp,0,SEEK_END);
-		fprintf(fp,"open file %s wrong\n",fileName);
-		fclose(fp);
-		return true;
-	}
-	static void httpLog(const void * text,int )
-	{
-		DealHttp http;
-		FILE* fp=fopen("ask.log","a+");
-		if(fp==NULL)
-			fp=fopen("ask.log","w+");
-		if(fp==NULL)
-			return ;
-		DealHttp::Request req;
-		http.analysisRequest(req,text);
-		time_t now=time(NULL);
-		fprintf(fp,"%s %s %s\n",ctime(&now),req.method.c_str(),req.askPath.c_str());
-		fclose(fp);
-		return ;
-	}
-};
 class ThreadPool{
 public://a struct for you to add task
 	struct Task{
@@ -2716,7 +2719,6 @@ private:
 	pthread_mutex_t lockTask;//a lock for user to ctrl
 	pthread_mutex_t lockBusy;//a lock for busy thread
 	pthread_t* thread;//an array for thread
-	pthread_t threadManager;//thread for manager user to ctrl
 	unsigned int liveThread;//num for live thread
 	unsigned int busyThread;//num for busy thread
 	bool isContinue;//if the pool is continue
@@ -2750,14 +2752,10 @@ private:
 		}
 		return NULL;
 	}
-	static void* manager(void* )//manager for user
-	{
-		return NULL;
-	}
 public:
 	ThreadPool(unsigned int threadNum=10)//create threads
 	{
-		if(threadNum<=1)
+		if(threadNum<1)
 			threadNum=10;
 		thread=new pthread_t[threadNum];
 		if(thread==NULL)
@@ -2771,7 +2769,6 @@ public:
 		liveThread=threadNum;
 		isContinue=true;
 		busyThread=0;
-		pthread_create(&threadManager,NULL,manager,this);
 		for(unsigned int i=0;i<threadNum;i++)
 			pthread_create(&thread[i],NULL,worker,this);
 	}
@@ -2804,7 +2801,6 @@ public:
 	void stopPool()//user delete the pool
 	{
 		isContinue=false;
-		pthread_join(threadManager,NULL);
 		for(unsigned int i=0;i<liveThread;i++)
 			pthread_cond_signal(&condition);
 		for(unsigned int i=0;i<liveThread;i++)
@@ -2851,6 +2847,132 @@ public:
 		pthread_create(&thread,&attr,pfunc,arg);
 	}
 };
+class LogSystem{
+private:
+	const char* fileName;
+	char* buffer[4];
+	const char* error;
+	char* now;
+	char* page;
+	size_t nowLen;
+	size_t bufferLen;
+	ThreadPool pool;
+	std::queue<char*> nowFree;
+public:
+	LogSystem(const char* name,size_t bufferLen=1024)\
+										   :fileName(name),now(NULL),pool(1)
+	{
+		page=NULL;
+		if(fileName==NULL)
+			fileName="access.log";
+		if(bufferLen<128)
+			bufferLen=128;
+		this->bufferLen=bufferLen;
+		for(unsigned i=0;i<4;i++)
+			buffer[i]=NULL;
+		for(unsigned i=0;i<4;i++)
+		{
+			buffer[i]=(char*)malloc(sizeof(char)*bufferLen);
+			if(buffer[i]==NULL)
+			{
+				error="malloc wrong";
+				return;
+			}
+			nowFree.push(buffer[i]);
+			memset(buffer[i],0,sizeof(char)*bufferLen);
+		}
+		now=nowFree.front();
+		nowFree.pop();
+		page=now;
+	}
+	~LogSystem()
+	{
+		std::pair<LogSystem*,char*>* argv=new std::pair<LogSystem*,char*>(this,page);
+		worker(argv);
+		for(unsigned i=0;i<4;i++)
+			if(buffer[i]!=NULL)
+				free(buffer[i]);
+	}
+	void accessLog(const char* text)
+	{
+		if(text==NULL)
+			return;
+		if(nowLen+strlen(text)>=bufferLen)
+		{
+			while(nowFree.empty());
+			pool.mutexLock();
+			now=nowFree.front();
+			nowFree.pop();
+			pool.mutexUnlock();
+			nowLen=0;
+			std::pair<LogSystem*,char*>* argv=new std::pair<LogSystem*,char*>(this,page);
+			ThreadPool::Task task{worker,argv};
+			pool.addTask(task);
+			page=now;
+		}
+		strcat(now,text);
+		strcat(now,"\n");
+		nowLen+=strlen(text)+1;
+	}
+	static void recordRequest(const void* text,int soc)
+	{
+		static char method[32]={0},askPath[256]={0},buffer[512]={0},nowTime[48]={0};
+		static LogSystem loger("access.log");
+		int port=0;
+		sscanf((char*)text,"%31s%255s",method,askPath);
+		time_t now=time(NULL);
+		strftime(nowTime,48,"%Y-%m-%l %H:%M",localtime(&now));
+		sprintf(buffer,"%s %s %s %s",nowTime,ServerTcpIp::getPeerIp(soc,&port),method,askPath);
+		loger.accessLog(buffer);
+	}
+	static bool recordFileError(const char* fileName)
+	{
+		FILE* fp=fopen("wrong.log","r+");
+		if(fp==NULL)
+			fp=fopen("wrong.log","w+");
+		if(fp==NULL)
+			return false;
+		fseek(fp,0,SEEK_END);
+		fprintf(fp,"open file %s wrong\n",fileName);
+		fclose(fp);
+		return true;
+	}
+	static void httpLog(const void * text,int soc)
+	{
+		DealHttp http;
+		int port=0;
+		FILE* fp=fopen("ask.log","a+");
+		if(fp==NULL)
+			fp=fopen("ask.log","w+");
+		if(fp==NULL)
+			return ;
+		DealHttp::Request req;
+		http.analysisRequest(req,text);
+		time_t now=time(NULL);
+		fprintf(fp,"%s %s %s %s\n",ctime(&now),ServerTcpIp::getPeerIp(soc,&port),req.method.c_str(),req.askPath.c_str());
+		fclose(fp);
+		return ;
+	}
+private:
+	static void* worker(void* argv)
+	{
+		std::pair<LogSystem*,char*>& now=*(std::pair<LogSystem*,char*>*)argv;
+		FILE* fp=fopen(now.first->fileName,"a+");
+		if(fp==NULL)
+		{
+			now.first->error="open file wrong";
+			return NULL;
+		}
+		fprintf(fp,"%s",now.second);
+		fclose(fp);
+		memset(now.second,0,now.first->bufferLen);
+		now.first->pool.mutexLock();
+		now.first->nowFree.push(now.second);
+		now.first->pool.mutexUnlock();
+		delete (std::pair<LogSystem*,char*>*)argv;
+		return NULL;
+	}
+};
 class HttpServer:private ServerTcpIp{
 private:
 	enum RouteType{//oneway stand for like /hahah,wild if /hahah/*,static is recource static
@@ -2858,7 +2980,7 @@ private:
 	};
 public://main class for http server2.0
 	enum AskType{//different ask ways in http
-		GET,POST,PUT,DELETE,OPTIONS,ALL,
+		GET,POST,PUT,DELETE,OPTIONS,CONNECT,ALL,
 	};
 	struct RouteFuntion{//inside struct,pack for handle
 		AskType ask;
@@ -2884,10 +3006,12 @@ private:
 	bool isLongCon;
 	bool isFork;
 	bool selfCtrl;
+	bool isContinue;
 	void (*middleware)(HttpServer&,DealHttp&,int num);
 	void (*clientIn)(HttpServer&,int num,void* ip,int port);
 	void (*clientOut)(HttpServer&,int num,void* ip,int port);
 	void (*logFunc)(const void*,int);
+	void (*logError)(const void*,int);
 	Trie<RouteFuntion> trie;
 public:
 	HttpServer(unsigned port,bool debug=false):ServerTcpIp(port)
@@ -2900,21 +3024,27 @@ public:
 		clientIn=NULL;
 		clientOut=NULL;
 		logFunc=NULL;
+		logError=NULL;
 		pnowRoute=NULL;
-		selfCtrl=false;
 		senLen=1;
 		recLen=2048;
 		selfLen=0;
 		boundPort=port;
 		isDebug=debug;
+		selfCtrl=false;
 		isLongCon=true;
 		isFork=false;
+		isContinue=true;
 		textLen=0;
 		now=0;
 		maxNum=20;
 		arrRoute=(RouteFuntion*)malloc(sizeof(RouteFuntion)*20);
 		if(arrRoute==NULL)
-			this->error="route wrong";
+		{
+			this->error=" server route wrong";
+			if(logError!=NULL)
+				logError(this->error,0);
+		}
 		else
 			memset(arrRoute,0,sizeof(RouteFuntion)*20);
 	}
@@ -2946,7 +3076,9 @@ public:
 			arrRoute[now].type=ONEWAY;
 		if(false==trie.insert(arrRoute[now].route,arrRoute+now))
 		{
-			error="route wrong char";
+			error="server:route wrong char";
+			if(logError!=NULL)
+				logError(this->error,0);
 			return false;
 		}
 		now++;
@@ -2970,7 +3102,9 @@ public:
 		arrRoute[now].pfunc=loadFile;
 		if(false==trie.insert(route,arrRoute+now))
 		{
-			error="route wrong char";
+			error="server:route wrong char";
+			if(logError!=NULL)
+				logError(this->error,0);
 			return false;
 		}
 		now++;
@@ -2993,7 +3127,9 @@ public:
 		arrRoute[now].pfunc=deleteFile;
 		if(false==trie.insert(path,arrRoute+now))
 		{
-			error="route wrong char";
+			error="server:route wrong char";
+			if(logError!=NULL)
+				logError(this->error,0);
 			return false;
 		}
 		now++;
@@ -3022,7 +3158,9 @@ public:
 			arrRoute[now].type=ONEWAY;
 		if(false==trie.insert(arrRoute[now].route,arrRoute+now))
 		{
-			error="route wrong char";
+			error="server:route wrong char";
+			if(logError!=NULL)
+				logError(this->error,0);
 			return false;
 		}
 		now++;
@@ -3051,7 +3189,9 @@ public:
 			arrRoute[now].type=ONEWAY;
 		if(false==trie.insert(arrRoute[now].route,arrRoute+now))
 		{
-			error="route wrong char";
+			error="server:route wrong char";
+			if(logError!=NULL)
+				logError(this->error,0);
 			return false;
 		}
 		now++;
@@ -3080,7 +3220,9 @@ public:
 			arrRoute[now].type=ONEWAY;
 		if(false==trie.insert(arrRoute[now].route,arrRoute+now))
 		{
-			error="route wrong char";
+			error="server:route wrong char";
+			if(logError!=NULL)
+				logError(this->error,0);
 			return false;
 		}
 		now++;
@@ -3116,11 +3258,12 @@ public:
 		func(cliSock);
 		middleware=temp;
 	}
-	bool setLog(void (*pfunc)(const void*,int))
+	bool setLog(void (*pfunc)(const void*,int),void (*errorFunc)(const void*,int))
 	{
-		if(logFunc!=NULL)
+		if(logFunc!=NULL||logError!=NULL)
 			return false;
 		logFunc=pfunc;
+		logError=errorFunc;
 		return true;
 	}
 	void run(const char* defaultFile)
@@ -3129,19 +3272,25 @@ public:
 		char* sen=(char*)malloc(sizeof(char)*senLen*1024*1024);
 		if(sen==NULL||getT==NULL)
 		{
-			this->error="malloc get and sen wrong";
+			this->error="server:malloc get and sen wrong";
+			if(logError!=NULL)
+				logError(error,0);
 			return;
 		}
 		memset(getT,0,sizeof(char)*recLen);
 		memset(sen,0,sizeof(char)*senLen*1024*1024);
 		if(false==this->bondhost())
 		{
-			this->error="bound wrong";
+			this->error="server:bound wrong";
+			if(logError!=NULL)
+				logError(error,0);
 			return;
 		}
 		if(false==this->setlisten())
 		{
-			this->error="set listen wrong";
+			this->error="server:set listen wrong";
+			if(logError!=NULL)
+				logError(error,0);
 			return;
 		}
 		this->getText=getT;
@@ -3150,10 +3299,10 @@ public:
 		if(isDebug)
 			messagePrint();
 		if(isFork==false)
-			while(1)
+			while(isContinue)
 				this->epollHttp();
 		else
-			while(1)
+			while(isContinue)
 				this->forkHttp();
 		free(sen);
 		free(getT);
@@ -3197,6 +3346,7 @@ public:
 			all+=getLen;
 			leftLen-=getLen;
 		}
+		textLen=result;
 		return result;
 	}
 	void changeSetting(bool debug,bool isLongCon,bool isForkModel,unsigned sendLen)
@@ -3234,11 +3384,16 @@ public:
 	{
 		return senText;
 	}
+	inline void stopServer()
+	{
+		this->isContinue=false;
+	}
 private:
 	void messagePrint()
 	{
 		printf("welcome to web server,the server is runing\n");
 		printf("port:\t\t%u\n",boundPort);
+		printf("/\t\t->\t%s\n",defaultFile);
 		for(unsigned i=0;i<now;i++)
 		{
 			switch(arrRoute[i].type)
@@ -3278,10 +3433,14 @@ private:
 			case OPTIONS:
 				printf("OPTIONS\n");
 				break;
+			case CONNECT:
+				printf("CONNECT\n");
 			}
 		}
 		if(logFunc!=NULL)
 			printf("log function set\n");
+		if(logError!=NULL)
+			printf("error funtion set\n");
 		if(clientIn!=NULL)
 			printf("client in function set\n");
 		if(clientOut!=NULL)
@@ -3296,13 +3455,11 @@ private:
 		char ask[200]={0};
 		if(middleware!=NULL)
 		{
-			http.changeSetting(NULL,NULL,&http.gram);
 			middleware(*this,http,num);
-			http.changeSetting(NULL,NULL,NULL);
 			return 0;
 		}
 		if(isLongCon==false)
-			http.changeSetting("Close","LCserver/1.1",NULL);
+			http.changeSetting("Close","LCserver/1.1");
 		sscanf((char*)this->getText,"%100s",ask);
 		if(strstr(ask,"GET")!=NULL)
 		{
@@ -3338,6 +3495,13 @@ private:
 			if(isDebug)
 				printf("OPTIONS url:%s\n",ask);
 			type=OPTIONS;
+		}
+		else if(strstr(ask,"CONNECT")!=NULL)
+		{
+			http.getAskRoute(this->getText,"CONNECT",ask,200);
+			if(isDebug)
+				printf("CONNECT url:%s\n",ask);
+			type=CONNECT;
 		}
 		else 
 		{
@@ -3410,10 +3574,9 @@ private:
 			if(flag==2)
 			{
 				if(isDebug)
-				{
-					LogSystem::recordFileError(ask);
 					printf("404 get %s wrong\n",ask);
-				}
+				if(logError!=NULL)
+					logError(ask,num);
 			}
 		}
 		if(len==0)
@@ -3532,8 +3695,6 @@ private:
 					{
 						close(sock);
 						func(temp.data.fd);
-						if(logFunc!=NULL)
-							logFunc(this->recText(),temp.data.fd);
 						close(temp.data.fd);
 						free(this->getText);
 						free(this->senText);
@@ -3548,6 +3709,8 @@ private:
 							close(temp.data.fd);
 						}
 					}
+					if(logFunc!=NULL)
+						logFunc(this->recText(),temp.data.fd);
 				}
 				else
 				{
@@ -3627,7 +3790,8 @@ private:
 		sprintf(buf,"GET %s%s HTTP/1.1",route.path,temp);
 		if(2==http.autoAnalysisGet(buf,(char*)server.getSenBuff(),senLen*1024*1024,NULL,&len))
 		{
-			LogSystem::recordFileError(ask);
+			if(server.logError!=NULL)
+				server.logError(server.error,0);
 			printf("404 get %s wrong\n",buf);
 		}
 		staticLen(len);
@@ -3655,7 +3819,9 @@ private:
 		void* temp=realloc(old,oldSize);
 		if(temp==NULL)
 		{
-			error="malloc wrong";
+			error="server:malloc wrong";
+			if(logError!=NULL)
+				logError(error,0);
 			oldSize/=2;
 			return old;
 		}
