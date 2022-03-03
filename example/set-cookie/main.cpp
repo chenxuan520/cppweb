@@ -1,26 +1,28 @@
 #include <iostream>  
-#include "../../lib/server.h"
-#include "../../lib/http.h"
+#include "../../hpp/cppweb.h"
 using namespace cppweb;
-void cookie(DealHttp & http, HttpServer & server, int , void * sen, int & len)
+void cookie(HttpServer& server,DealHttp& http,int)
 {
 	char buffer[100]={0};
-	Json json;
-	json.init(200);
-	http.getKeyValue(server.recText(),"key",buffer,100);
-	json.addKeyValue("key",buffer);
-	http.customizeAddTop(sen,1000000,DealHttp::STATUSOK,strlen(json.resultText()));
-	if(NULL==http.getCookie(server.recText(),"key",buffer,100))
+	http.getCookie(server.recText(),"key",buffer,100);
+	if(strlen(buffer)==0)
 	{
-		http.setCookie(sen,1000000,"key","wew",10);
+		http.gram.body="ready to setting cookie";
+		http.gram.cookie["key"]=http.designCookie("cookie ok",10);
+		return;
 	}
-	len=http.customizeAddBody(sen,1000000,json.resultText(),strlen(json.resultText()));
+	Json json={
+		{"key",(const char*)buffer},
+		{"status","ok"}
+	};
+	http.gram.body=json();
+	http.gram.typeFile=DealHttp::JSON;
 }
 int main()  
 {  
-	HttpServer server(5200);
-	server.get(HttpServer::ONEWAY,"/cookie",cookie);
-	server.run(1,3000,"index.html");
+	HttpServer server(5200,true);
+	server.get("/cookie",cookie);
+	server.run("index.html");
     return 0; 
 }  
 

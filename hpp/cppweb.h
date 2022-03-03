@@ -1962,6 +1962,15 @@ public:
 		char temp[1000]={0};
 		if(strlen(key)+strlen(value)>1000)
 			return false;
+		if(strstr(value,"max-age")!=NULL)
+		{
+			sprintf(temp,"Set-Cookie: %s=%s;",key,value);
+			if(strlen((char*)buffer)+strlen(temp)>=bufferLen)
+				return false;
+			strcat((char*)buffer,temp);
+			strcat((char*)buffer,"\r\n");
+			return true;
+		}
 		sprintf(temp,"Set-Cookie: %s=%s;max-age= %d;",key,value,liveTime);
 		if(strlen((char*)buffer)+strlen(temp)>=bufferLen)
 			return false;
