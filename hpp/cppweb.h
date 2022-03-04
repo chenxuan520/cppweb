@@ -2981,6 +2981,9 @@ private:
 		ONEWAY,WILD,STATIC,STAWILD
 	};
 public://main class for http server2.0
+	enum RunModel{//the server model of run
+		FORK,MULTIPLEXING,THREAD
+	};
 	enum AskType{//different ask ways in http
 		GET,POST,PUT,DELETE,OPTIONS,CONNECT,ALL,
 	};
@@ -3006,7 +3009,6 @@ private:
 	int textLen;
 	bool isDebug;
 	bool isLongCon;
-	bool isFork;
 	bool selfCtrl;
 	bool isContinue;
 	void (*middleware)(HttpServer&,DealHttp&,int num);
@@ -3015,9 +3017,13 @@ private:
 	void (*logFunc)(const void*,int);
 	void (*logError)(const void*,int);
 	Trie<RouteFuntion> trie;
+	ThreadPool* pool;
+	RunModel model;
 public:
-	HttpServer(unsigned port,bool debug=false):ServerTcpIp(port)
+	HttpServer(unsigned port,bool debug=false,RunModel serverModel=MULTIPLEXING,unsigned threadNum=5)
+		:ServerTcpIp(port),model(serverModel)
 	{
+		pool=NULL;
 		getText=NULL;
 		senText=NULL;
 		middleware=NULL;
@@ -3035,7 +3041,6 @@ public:
 		isDebug=debug;
 		selfCtrl=false;
 		isLongCon=true;
-		isFork=false;
 		isContinue=true;
 		textLen=0;
 		now=0;
@@ -3049,6 +3054,15 @@ public:
 		}
 		else
 			memset(arrRoute,0,sizeof(RouteFuntion)*20);
+		if(model==THREAD)
+		{
+			pool=new ThreadPool(threadNum);
+			if(pool==NULL)
+			{
+				error="pool new wrong";
+				return;
+			}
+		}
 	}
 	~HttpServer()
 	{
@@ -3299,12 +3313,20 @@ public:
 		this->defaultFile=defaultFile;
 		if(isDebug)
 			messagePrint();
-		if(isFork==false)
+		switch(model)
+		{
+		case MULTIPLEXING:
 			while(isContinue)
 				this->epollHttp();
-		else
+			break;
+		case FORK:
 			while(isContinue)
 				this->forkHttp();
+			break;
+		case THREAD:
+			while(isContinue);
+				this->threadModel();
+		}
 		free(sen);
 		free(getT);
 	}
@@ -3350,14 +3372,15 @@ public:
 		textLen=result;
 		return result;
 	}
-	void changeSetting(bool debug,bool isLongCon,bool isForkModel,unsigned sendLen)
+	void changeSetting(bool debug,bool isLongCon,bool isForkModel,unsigned sendLen=1)
 	{
 		this->isDebug=debug;
 		this->isLongCon=isLongCon;
-		this->isFork=isForkModel;
+		if(isForkModel)
+			this->model=FORK;
 		if(sendLen>0)
 			this->senLen=sendLen;
-		if(isFork==true)
+		if(this->model==FORK)
 			signal(SIGCHLD,sigCliDeal);
 	}
 	inline void* recText()
@@ -3755,45 +3778,75 @@ private:
 		HttpServer* pserver;
 		int soc;
 	};
+	void threadModel()
+	{
+		while(this->isContinue)
+		{
+			sockaddr_in newaddr={0,0,{0},{0}};
+			int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
+			if(newClient==-1)
+				continue;
+			this->addFd(newClient);
+			ThreadArg* temp=new ThreadArg;
+			temp->pserver=this;
+			temp->soc=newClient;
+			ThreadPool::Task task={threadWorker,temp};
+			pool->addTask(task);
+		}
+	}
 	static void* threadWorker(void* self)
 	{
 		ThreadArg* argv=(ThreadArg*)self;
 		HttpServer& server=*argv->pserver;
 		int cli=argv->soc;
-		char* sen=(char*)malloc(sizeof(char)*server.senLen*1024*0124);
 		char* rec=(char*)malloc(sizeof(char)*server.recLen);
-		if(sen==NULL||rec==NULL)
+		unsigned int size=sizeof(char)*server.recLen;
+		if(rec==NULL)
 		{
 			close(cli);
 			free(self);
 			return NULL;
 		}
-		memset(sen,0,sizeof(char)*server.senLen*1024*0124);
 		memset(rec,0,sizeof(char)*server.recLen);
 		if(server.clientIn!=NULL)
 		{
 			int port=0;
-			strcpy((char*)sen,server.getPeerIp(cli,&port));
-			server.clientIn(server,cli,sen,port);
+			server.getPeerIp(cli,&port);
+			server.clientIn(server,cli,server.senText,port);
 		}
-		int recLen=server.receiveSocket(cli,rec,sizeof(char)*server.recLen);
-		while(recLen>=10)
+		int recLen=server.receiveSocket(cli,rec,size);
+		int all=recLen;
+		while((int)size==all)
 		{
-			/* server.pool->mutexLock(); */
+			rec=(char*)server.enlargeMemory(rec,size);
+			recLen=server.receiveSocket(cli,rec,size);
+			if(recLen<=0)
+				break;
+			all+=recLen;
+		}
+		if(all>=10)
+		{
+			server.pool->mutexLock();
+			server.textLen=all;
+			server.getText=rec;
 			server.func(cli);
-			/* server.pool->mutexUnlock(); */
+			if(server.logFunc!=NULL)
+				server.logFunc(rec,cli);
+			server.getText=NULL;
+			server.pool->mutexUnlock();
 			memset(rec,0,sizeof(char)*server.recLen);
-			recLen=server.receiveSocket(cli,rec,sizeof(char)*server.recLen);
+			all=server.receiveSocket(cli,rec,size);
 		}
 		if(server.clientOut!=NULL)
 		{
 			int port=0;
-			strcpy((char*)sen,server.getPeerIp(cli,&port));
-			server.clientOut(server,cli,sen,port);
+			strcpy((char*)server.senText,server.getPeerIp(cli,&port));
+			server.clientOut(server,cli,server.senText,port);
 		}
-		free(sen);
 		free(rec);
 		free(self);
+		close(cli);
+		server.deleteFd(cli);
 		return NULL;
 	}
 	static void loadFile(HttpServer& server,DealHttp& http,int senLen)
