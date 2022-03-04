@@ -1833,6 +1833,8 @@ private:
 	}
 	int getFileLen(const char* pname)
 	{
+		if(pname==NULL)
+			return 0;
 		FILE* fp=fopen(pname,"r+");
 		int len=0;
 		if(fp==NULL)
@@ -2976,7 +2978,7 @@ private:
 class HttpServer:private ServerTcpIp{
 private:
 	enum RouteType{//oneway stand for like /hahah,wild if /hahah/*,static is recource static
-		ONEWAY,WILD,STATIC,
+		ONEWAY,WILD,STATIC,STAWILD
 	};
 public://main class for http server2.0
 	enum AskType{//different ask ways in http
@@ -3057,175 +3059,166 @@ public:
 	{
 		if(strlen(route)>100)
 			return false;
-		if(maxNum-now<=2)
-		{
-			arrRoute=(RouteFuntion*)realloc(arrRoute,sizeof(RouteFuntion)*(now+10));
-			if(arrRoute==NULL)
-				return false;
-			maxNum+=10;
-		}
-		arrRoute[now].ask=ask;
-		strcpy(arrRoute[now].route,route);
-		arrRoute[now].pfunc=pfunc;
+		RouteFuntion* nowRoute=addRoute();
+		if(nowRoute==NULL)
+			return false;
+		nowRoute->ask=ask;
+		strcpy(nowRoute->route,route);
+		nowRoute->pfunc=pfunc;
 		if(route[strlen(route)-1]=='*')
 		{
-			arrRoute[now].route[strlen(route)-1]=0;
-			arrRoute[now].type=WILD;
+			nowRoute->route[strlen(route)-1]=0;
+			nowRoute->type=WILD;
 		}
 		else
-			arrRoute[now].type=ONEWAY;
-		if(false==trie.insert(arrRoute[now].route,arrRoute+now))
+			nowRoute->type=ONEWAY;
+		if(false==trie.insert(nowRoute->route,nowRoute))
 		{
 			error="server:route wrong char";
 			if(logError!=NULL)
 				logError(this->error,0);
 			return false;
 		}
-		now++;
 		return true;
 	}
-	bool loadStatic(const char* route,const char* staticPath)
+	bool loadStatic(const char* route,const char* staticFile)
 	{
 		if(strlen(route)>100)
 			return false;
-		if(maxNum-now<=2)
-		{
-			arrRoute=(RouteFuntion*)realloc(arrRoute,sizeof(RouteFuntion)*(now+10));
-			if(arrRoute==NULL)
-				return false;
-			maxNum+=10;
-		}
-		arrRoute[now].type=STATIC;
-		arrRoute[now].ask=GET;
-		strcpy(arrRoute[now].route,route);
-		strcpy(arrRoute[now].path,staticPath);
-		arrRoute[now].pfunc=loadFile;
-		if(false==trie.insert(route,arrRoute+now))
+		RouteFuntion* nowRoute=addRoute();
+		if(nowRoute==NULL)
+			return false;
+		nowRoute->type=STATIC;
+		nowRoute->ask=GET;
+		strcpy(nowRoute->route,route);
+		strcpy(nowRoute->path,staticFile);
+		nowRoute->pfunc=loadFile;
+		if(false==trie.insert(route,nowRoute))
 		{
 			error="server:route wrong char";
 			if(logError!=NULL)
 				logError(this->error,0);
 			return false;
 		}
-		now++;
+		return true;
+	}
+	bool loadStaticFS(const char* route,const char* staticPath)
+	{
+		if(strlen(route)>100)
+			return false;
+		RouteFuntion* nowRoute=addRoute();
+		if(nowRoute==NULL)
+			return false;
+		nowRoute->type=STAWILD;
+		nowRoute->ask=GET;
+		strcpy(nowRoute->route,route);
+		strcpy(nowRoute->path,staticPath);
+		nowRoute->pfunc=loadFile;
+		if(false==trie.insert(route,nowRoute))
+		{
+			error="server:route wrong char";
+			if(logError!=NULL)
+				logError(this->error,0);
+			return false;
+		}
 		return true;
 	}
 	bool deletePath(const char* path)
 	{
 		if(strlen(path)>100)
 			return false;
-		if(maxNum-now<=2)
-		{
-			arrRoute=(RouteFuntion*)realloc(arrRoute,sizeof(RouteFuntion)*(now+10));
-			if(arrRoute==NULL)
-				return false;
-			maxNum+=10;
-		}
-		arrRoute[now].type=STATIC;
-		arrRoute[now].ask=GET;
-		strcpy(arrRoute[now].route,path);
-		arrRoute[now].pfunc=deleteFile;
-		if(false==trie.insert(path,arrRoute+now))
+		RouteFuntion* nowRoute=addRoute();
+		if(nowRoute==NULL)
+			return false;
+		nowRoute->type=STATIC;
+		nowRoute->ask=GET;
+		strcpy(nowRoute->route,path);
+		nowRoute->pfunc=deleteFile;
+		if(false==trie.insert(path,nowRoute))
 		{
 			error="server:route wrong char";
 			if(logError!=NULL)
 				logError(this->error,0);
 			return false;
 		}
-		now++;
 		return true;
 	}
 	bool get(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
 	{
 		if(strlen(route)>100)
 			return false;
-		if(maxNum-now<=2)
-		{
-			arrRoute=(RouteFuntion*)realloc(arrRoute,sizeof(RouteFuntion)*(now+10));
-			if(arrRoute==NULL)
-				return false;
-			maxNum+=10;
-		}
-		arrRoute[now].ask=GET;
-		arrRoute[now].pfunc=pfunc;
-		strcpy(arrRoute[now].route,route);
+		RouteFuntion* nowRoute=addRoute();
+		if(nowRoute==NULL)
+			return false;
+		nowRoute->ask=GET;
+		nowRoute->pfunc=pfunc;
+		strcpy(nowRoute->route,route);
 		if(route[strlen(route)-1]=='*')
 		{
-			arrRoute[now].route[strlen(route)-1]=0;
-			arrRoute[now].type=WILD;
+			nowRoute->route[strlen(route)-1]=0;
+			nowRoute->type=WILD;
 		}
 		else
-			arrRoute[now].type=ONEWAY;
-		if(false==trie.insert(arrRoute[now].route,arrRoute+now))
+			nowRoute->type=ONEWAY;
+		if(false==trie.insert(nowRoute->route,nowRoute))
 		{
 			error="server:route wrong char";
 			if(logError!=NULL)
 				logError(this->error,0);
 			return false;
 		}
-		now++;
 		return true;	
 	}
 	bool post(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
 	{
 		if(strlen(route)>100)
 			return false;
-		if(maxNum-now<=2)
-		{
-			arrRoute=(RouteFuntion*)realloc(arrRoute,sizeof(RouteFuntion)*(now+10));
-			if(arrRoute==NULL)
-				return false;
-			maxNum+=10;
-		}
-		arrRoute[now].ask=POST;
-		strcpy(arrRoute[now].route,route);
-		arrRoute[now].pfunc=pfunc;
+		RouteFuntion* nowRoute=addRoute();
+		if(nowRoute==NULL)
+			return false;
+		nowRoute->ask=POST;
+		strcpy(nowRoute->route,route);
+		nowRoute->pfunc=pfunc;
 		if(route[strlen(route)-1]=='*')
 		{
-			arrRoute[now].route[strlen(route)-1]=0;
-			arrRoute[now].type=WILD;
+			nowRoute->route[strlen(route)-1]=0;
+			nowRoute->type=WILD;
 		}
 		else
-			arrRoute[now].type=ONEWAY;
-		if(false==trie.insert(arrRoute[now].route,arrRoute+now))
+			nowRoute->type=ONEWAY;
+		if(false==trie.insert(nowRoute->route,nowRoute))
 		{
 			error="server:route wrong char";
 			if(logError!=NULL)
 				logError(this->error,0);
 			return false;
 		}
-		now++;
 		return true;	
 	}
 	bool all(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
 	{
 		if(strlen(route)>100)
 			return false;
-		if(maxNum-now<=2)
-		{
-			arrRoute=(RouteFuntion*)realloc(arrRoute,sizeof(RouteFuntion)*(now+10));
-			if(arrRoute==NULL)
-				return false;
-			maxNum+=10;
-		}
-		arrRoute[now].ask=ALL;
-		strcpy(arrRoute[now].route,route);
-		arrRoute[now].pfunc=pfunc;
+		RouteFuntion* nowRoute=addRoute();
+		if(nowRoute==NULL)
+			return false;
+		nowRoute->ask=ALL;
+		strcpy(nowRoute->route,route);
+		nowRoute->pfunc=pfunc;
 		if(route[strlen(route)-1]=='*')
 		{
-			arrRoute[now].route[strlen(route)-1]=0;
-			arrRoute[now].type=WILD;
+			nowRoute->route[strlen(route)-1]=0;
+			nowRoute->type=WILD;
 		}
 		else
-			arrRoute[now].type=ONEWAY;
-		if(false==trie.insert(arrRoute[now].route,arrRoute+now))
+			nowRoute->type=ONEWAY;
+		if(false==trie.insert(nowRoute->route,nowRoute))
 		{
 			error="server:route wrong char";
 			if(logError!=NULL)
 				logError(this->error,0);
 			return false;
 		}
-		now++;
 		return true;	
 	}
 	bool clientInHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port))
@@ -3405,6 +3398,7 @@ private:
 				printf("%s*\t\t->\t",arrRoute[i].route);
 				break;
 			case STATIC:
+			case STAWILD:
 				if(arrRoute[i].pfunc==loadFile)
 					printf("%s\t\t->%s\n",arrRoute[i].route,arrRoute[i].path);
 				else if(arrRoute[i].pfunc==deleteFile)
@@ -3516,7 +3510,7 @@ private:
 					{
 						if(isLast&&(now->type==STATIC||now->type==ONEWAY))
 							return true;
-						else if(now->type==WILD)
+						else if(now->type==WILD||now->type==STAWILD)
 							return true;
 						else
 							return false;
@@ -3727,6 +3721,21 @@ private:
 			}
 		}
 		return ;
+	}
+	RouteFuntion* addRoute()
+	{
+		RouteFuntion* temp=NULL; 
+		if(maxNum-now<=2)
+		{
+			temp=(RouteFuntion*)realloc(arrRoute,sizeof(RouteFuntion)*(maxNum+10));
+			if(temp==NULL)
+				return NULL;
+			arrRoute=temp;
+			maxNum+=10;
+		}
+		temp=arrRoute+now;
+		now++;
+		return temp;
 	}
 	inline RouteFuntion* getNowRoute()
 	{
