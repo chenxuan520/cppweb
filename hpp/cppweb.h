@@ -3123,18 +3123,26 @@ public:
 		}
 		return true;
 	}
-	bool deletePath(const char* path)
+	bool deletePath(const char* route)
 	{
-		if(strlen(path)>100)
+		if(strlen(route)>100&&route!=NULL)
 			return false;
 		RouteFuntion* nowRoute=addRoute();
 		if(nowRoute==NULL)
 			return false;
-		nowRoute->type=STATIC;
+		nowRoute->type=STAWILD;
 		nowRoute->ask=GET;
-		strcpy(nowRoute->route,path);
+		if(route[0]=='.'&&route[1]=='/'&&strlen(route)>2)
+			strcpy(nowRoute->route,route+2);
+		else if(route[0]!='/')
+		{
+			strcpy(nowRoute->route,"/");
+			strcat(nowRoute->route,route);
+		}
+		else
+			strcpy(nowRoute->route,route);
 		nowRoute->pfunc=deleteFile;
-		if(false==trie.insert(path,nowRoute))
+		if(false==trie.insert(nowRoute->route,nowRoute))
 		{
 			error="server:route wrong char";
 			if(logError!=NULL)
@@ -3259,7 +3267,7 @@ public:
 		logError=errorFunc;
 		return true;
 	}
-	void run(const char* defaultFile)
+	void run(const char* defaultFile=NULL)
 	{
 		char* getT=(char*)malloc(sizeof(char)*recLen);
 		char* sen=(char*)malloc(sizeof(char)*senLen*1024*1024);
@@ -3386,7 +3394,8 @@ private:
 	{
 		printf("welcome to web server,the server is runing\n");
 		printf("port:\t\t%u\n",boundPort);
-		printf("/\t\t->\t%s\n",defaultFile);
+		if(defaultFile!=NULL)
+			printf("/\t\t->\t%s\n",defaultFile);
 		for(unsigned i=0;i<now;i++)
 		{
 			switch(arrRoute[i].type)
@@ -3402,7 +3411,7 @@ private:
 				if(arrRoute[i].pfunc==loadFile)
 					printf("%s\t\t->%s\n",arrRoute[i].route,arrRoute[i].path);
 				else if(arrRoute[i].pfunc==deleteFile)
-					printf("%s\t\t->delete\n",arrRoute[i].route);
+					printf("%s\t\t->\tdelete\n",arrRoute[i].route);
 				else
 					printf("undefine funtion please check the server\n");
 				continue;
@@ -3429,6 +3438,7 @@ private:
 				break;
 			case CONNECT:
 				printf("CONNECT\n");
+				break;
 			}
 		}
 		if(logFunc!=NULL)
@@ -3744,39 +3754,36 @@ private:
 	struct ThreadArg{
 		HttpServer* pserver;
 		int soc;
-		unsigned memory;
-		unsigned recBufMax;
-		const char* defaultFile;
 	};
 	static void* threadWorker(void* self)
 	{
 		ThreadArg* argv=(ThreadArg*)self;
 		HttpServer& server=*argv->pserver;
 		int cli=argv->soc;
-		char* sen=(char*)malloc(sizeof(char)*argv->memory*1024*0124);
-		char* rec=(char*)malloc(sizeof(char)*argv->recBufMax);
+		char* sen=(char*)malloc(sizeof(char)*server.senLen*1024*0124);
+		char* rec=(char*)malloc(sizeof(char)*server.recLen);
 		if(sen==NULL||rec==NULL)
 		{
 			close(cli);
 			free(self);
 			return NULL;
 		}
-		memset(sen,0,sizeof(char)*argv->memory);
-		memset(rec,0,sizeof(char)*argv->recBufMax);
+		memset(sen,0,sizeof(char)*server.senLen*1024*0124);
+		memset(rec,0,sizeof(char)*server.recLen);
 		if(server.clientIn!=NULL)
 		{
 			int port=0;
 			strcpy((char*)sen,server.getPeerIp(cli,&port));
 			server.clientIn(server,cli,sen,port);
 		}
-		int recLen=server.receiveSocket(cli,rec,sizeof(char)*argv->recBufMax);
+		int recLen=server.receiveSocket(cli,rec,sizeof(char)*server.recLen);
 		while(recLen>=10)
 		{
 			/* server.pool->mutexLock(); */
 			server.func(cli);
 			/* server.pool->mutexUnlock(); */
-			memset(rec,0,sizeof(char)*argv->recBufMax);
-			recLen=server.receiveSocket(cli,rec,sizeof(char)*argv->recBufMax);
+			memset(rec,0,sizeof(char)*server.recLen);
+			recLen=server.receiveSocket(cli,rec,sizeof(char)*server.recLen);
 		}
 		if(server.clientOut!=NULL)
 		{
@@ -3801,7 +3808,8 @@ private:
 		{
 			if(server.logError!=NULL)
 				server.logError(server.error,0);
-			printf("404 get %s wrong\n",buf);
+			if(server.isDebug)
+				printf("404 get %s wrong\n",buf);
 		}
 		staticLen(len);
 	}
