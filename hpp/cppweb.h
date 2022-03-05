@@ -1672,6 +1672,7 @@ public:
 		return true;
 	}
 };
+//the class to deal http request,and create a datagram 
 class DealHttp{
 public:
 	friend class HttpServer;
@@ -1707,9 +1708,9 @@ private:
 	const char* connect;
 	const char* serverName;
 public:
-	Datagram gram;
-	std::unordered_map<std::string,std::string> head;
-	std::unordered_map<std::string,std::string> cookie;
+	Datagram gram;//default gram to create gram
+	std::unordered_map<std::string,std::string> head;//default head toadd middleware
+	std::unordered_map<std::string,std::string> cookie;//default cookie to add middleware
 	DealHttp()
 	{
 		for(int i=0;i<256;i++)
@@ -3081,7 +3082,7 @@ public:
 			free(arrRoute);
 	}
 	bool routeHandle(AskType ask,const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
-	{
+	{//add route handle in all ask type 
 		if(strlen(route)>100)
 			return false;
 		RouteFuntion* nowRoute=addRoute();
@@ -3107,7 +3108,7 @@ public:
 		return true;
 	}
 	bool loadStatic(const char* route,const char* staticFile)
-	{
+	{//load file such as / -> index.html
 		if(strlen(route)>100)
 			return false;
 		RouteFuntion* nowRoute=addRoute();
@@ -3128,7 +3129,7 @@ public:
 		return true;
 	}
 	bool loadStaticFS(const char* route,const char* staticPath)
-	{
+	{//load file system such as /tmp to /root
 		if(strlen(route)>100)
 			return false;
 		RouteFuntion* nowRoute=addRoute();
@@ -3149,7 +3150,7 @@ public:
 		return true;
 	}
 	bool deletePath(const char* route)
-	{
+	{// forbidden the file path
 		if(strlen(route)>100&&route!=NULL)
 			return false;
 		RouteFuntion* nowRoute=addRoute();
@@ -3177,7 +3178,7 @@ public:
 		return true;
 	}
 	bool get(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
-	{
+	{//add routeHandle and ask type is get
 		if(strlen(route)>100)
 			return false;
 		RouteFuntion* nowRoute=addRoute();
@@ -3203,7 +3204,7 @@ public:
 		return true;	
 	}
 	bool post(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
-	{
+	{//the same to last funtion
 		if(strlen(route)>100)
 			return false;
 		RouteFuntion* nowRoute=addRoute();
@@ -3229,7 +3230,7 @@ public:
 		return true;	
 	}
 	bool all(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
-	{
+	{//receive all ask type
 		if(strlen(route)>100)
 			return false;
 		RouteFuntion* nowRoute=addRoute();
@@ -3255,28 +3256,28 @@ public:
 		return true;	
 	}
 	bool clientInHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port))
-	{
+	{//when client in ,it will be call
 		if(clientIn!=NULL)
 			return false;
 		clientIn=pfunc;
 		return true;
 	}
 	bool clientOutHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port))
-	{
+	{//when client out ,itwill be call
 		if(clientOut!=NULL)
 			return false;
 		clientOut=pfunc;
 		return true;
 	}
 	bool setMiddleware(void (*pfunc)(HttpServer&,DealHttp&,int))
-	{
+	{//middleware funtion after get text it will be called
 		if(middleware!=NULL)
 			return false;
 		middleware=pfunc;
 		return true;
 	}
 	inline void continueNext(int cliSock)
-	{
+	{//middleware funtion to continue default task
 		if(middleware==NULL)
 			return;
 		auto temp=middleware;
@@ -3285,7 +3286,7 @@ public:
 		middleware=temp;
 	}
 	bool setLog(void (*pfunc)(const void*,int),void (*errorFunc)(const void*,int))
-	{
+	{//log system 
 		if(logFunc!=NULL||logError!=NULL)
 			return false;
 		logFunc=pfunc;
@@ -3293,7 +3294,7 @@ public:
 		return true;
 	}
 	void run(const char* defaultFile=NULL)
-	{
+	{//server begin to run
 		char* getT=(char*)malloc(sizeof(char)*recLen);
 		char* sen=(char*)malloc(sizeof(char)*senLen*1024*1024);
 		if(sen==NULL||getT==NULL)
@@ -3351,7 +3352,7 @@ public:
 		return this->receiveSocket(num,buffer,bufferLen);
 	}
 	int getCompleteMessage(int sockCli)
-	{
+	{//some time text is not complete ,it can get left text 
 		void*& message=getText;
 		unsigned messageLen=this->getRecLen();
 		if(message==NULL||message==0)
@@ -3385,7 +3386,7 @@ public:
 		return result;
 	}
 	void changeSetting(bool debug,bool isLongCon,bool isAuto=true,unsigned sendLen=1)
-	{
+	{//change setting
 		this->isDebug=debug;
 		this->isLongCon=isLongCon;
 		this->isAutoAnalysis=isAuto;
@@ -3393,15 +3394,15 @@ public:
 			this->senLen=sendLen;
 	}
 	inline void* recText()
-	{
+	{//get the recv text;
 		return this->getText;
 	}
 	inline int getRecLen()
-	{
+	{//get the recv text len
 		return this->textLen;
 	}
 	inline const char* lastError()
-	{
+	{//get the error of server
 		return error;
 	}
 	inline bool disconnect(int soc)
@@ -3409,23 +3410,43 @@ public:
 		return this->disconnectSocket(soc);
 	}
 	inline void selfCreate(unsigned senLen)
-	{
+	{//use getSenBuff to create task by self
 		selfCtrl=true;
 		selfLen=senLen;
 	}
 	inline void* getSenBuff()
-	{
+	{//get the sen buffer
 		return senText;
 	}
+	inline unsigned getMaxSenLen()
+	{//get sen buffer size
+		return this->senLen*1024*1024;
+	}
 	inline void stopServer()
-	{
+	{//stop server run;
 		this->isContinue=false;
 	}
 private:
 	void messagePrint()
 	{
 		printf("welcome to web server,the server is runing\n");
+		switch(model)
+		{
+		case MULTIPLEXING:
+			printf("model:\t\tIO Multiplexing\n");
+			break;
+		case THREAD:
+			printf("model:\t\tThread Pool\n");
+			break;
+		case FORK:
+			printf("model:\t\tProcess Pool\n");
+			break;
+		}
 		printf("port:\t\t%u\n",boundPort);
+		if(isAutoAnalysis)
+			printf("auto:\t\tTrue\n");
+		else
+			printf("auto:\t\tFalse\n");
 		if(defaultFile!=NULL)
 			printf("/\t\t->\t%s\n",defaultFile);
 		for(unsigned i=0;i<now;i++)
@@ -3473,6 +3494,8 @@ private:
 				break;
 			}
 		}
+		if(middleware!=NULL)
+			printf("middleware funtion set\n");
 		if(logFunc!=NULL)
 			printf("log function set\n");
 		if(logError!=NULL)

@@ -3,7 +3,10 @@
 #include<pthread.h>
 #include <stdlib.h>
 #include<signal.h>
+#include<iostream>
+#include<unistd.h>
 #include<sys/wait.h>
+#include<sys/epoll.h>
 #include"../hpp/server.h"
 namespace cppweb{
 void* ThreadPool::worker(void* arg)//the worker for user 
@@ -136,7 +139,15 @@ void ThreadPool::createDetachPthread(void* arg,void* (*pfunc)(void*))//create a 
 	date:2021/11/5
 	funtion:server tcp ip 2.0
 *********************************/
-ServerPool::ServerPool(unsigned short port,unsigned int threadNum):ServerTcpIp(port)
+void* ServerPool::worker(void* argc)
+{
+	Argv argv=*(Argv*)argc;
+	delete (Argv*)argc;
+	if(argv.func!=NULL)
+		argv.func(*argv.pserver,argv.soc);
+	return NULL;
+}
+ServerPool::ServerPool(unsigned short port,unsigned int threadNum)
 {
 	this->threadNum=threadNum;
 	if(threadNum>0)
@@ -155,18 +166,6 @@ ServerPool::~ServerPool()
 {
 	delete pool;
    	pthread_mutex_destroy(&mutex);
-}
-void ServerPool::sigCliDeal(int )
-{
-	while(waitpid(-1, NULL, WNOHANG)>0);
-}
-void* ServerPool::worker(void* argc)
-{
-	Argv argv=*(Argv*)argc;
-	delete (Argv*)argc;
-	if(argv.func!=NULL)
-		argv.func(*argv.pserver,argv.soc);
-	return NULL;
 }
 bool ServerPool::mutexTryLock()
 {
@@ -197,50 +196,12 @@ void ServerPool::threadModel(void (*pfunc)(ServerPool&,int))
 		pool->addTask(task);
 	}
 }
-void ServerPool::epollThread(void (*pfunc)(ServerPool&,int))
-{
-	if(this->threadNum==0)
-	{
-		this->error="thread wrong init";
-		return;
-	}
-	isEpoll=true;
-	int eventNum=epoll_wait(epfd,pevent,512,-1),thing=0,num=0;
-	for(int i=0;i<eventNum;i++)
-	{
-		epoll_event temp=pevent[i];
-		if(temp.data.fd==sock)
-		{
-			sockaddr_in newaddr={0,0,{0},{0}};
-			int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
-			this->addFd(newClient);
-			nowEvent.data.fd=newClient;
-			nowEvent.events=EPOLLIN|EPOLLET;
-			epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
-			thing=1;
-			num=newClient;
-		}
-		else
-		{
-			if(pfunc!=NULL)
-			{
-				Argv* argv=new Argv;
-				argv->func=pfunc;
-				argv->soc=temp.data.fd;
-				argv->pserver=this;
-				ThreadPool::Task task={worker,argv};
-				pool->addTask(task);
-			}
-		}
-	}
-	return;
-}
 void ServerPool::forkModel(void* pneed,void (*pfunc)(ServerPool&,int,void*))
 {
 	signal(SIGCHLD,sigCliDeal);
 	while(1)
 	{
-		sockaddr_in newaddr={0};
+		sockaddr_in newaddr={0,0,{0},{0}};
 		int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
 		if(newClient==-1)
 			continue;
@@ -271,7 +232,7 @@ void ServerPool::forkEpoll(unsigned int senBufChar,unsigned int recBufChar,void 
 			epoll_event temp=pevent[i];
 			if(temp.data.fd==sock)
 			{
-				sockaddr_in newaddr={0};
+				sockaddr_in newaddr={0,0,{0},{0}};
 				int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
 				this->addFd(newClient);
 				nowEvent.data.fd=newClient;
@@ -314,5 +275,43 @@ void ServerPool::forkEpoll(unsigned int senBufChar,unsigned int recBufChar,void 
 			}
 		}
 	}
+}
+void ServerPool::epollThread(void (*pfunc)(ServerPool&,int))
+{
+	if(this->threadNum==0)
+	{
+		this->error="thread wrong init";
+		return;
+	}
+	isEpoll=true;
+	int eventNum=epoll_wait(epfd,pevent,512,-1),thing=0,num=0;
+	for(int i=0;i<eventNum;i++)
+	{
+		epoll_event temp=pevent[i];
+		if(temp.data.fd==sock)
+		{
+			sockaddr_in newaddr={0,0,{0},{0}};
+			int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
+			this->addFd(newClient);
+			nowEvent.data.fd=newClient;
+			nowEvent.events=EPOLLIN|EPOLLET;
+			epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
+			thing=1;
+			num=newClient;
+		}
+		else
+		{
+			if(pfunc!=NULL)
+			{
+				Argv* argv=new Argv;
+				argv->func=pfunc;
+				argv->soc=temp.data.fd;
+				argv->pserver=this;
+				ThreadPool::Task task={worker,argv};
+				pool->addTask(task);
+			}
+		}
+	}
+	return;
 }
 }

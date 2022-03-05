@@ -1,15 +1,22 @@
 #ifndef _SERVER_H_
 #define _SERVER_H_
 #include"./http.h"
-#include<string.h>
+#include"./thread.h"
+#include<cstdlib>
+#include<stdarg.h>
+#include<time.h>
+#include<signal.h>
 #include<netinet/in.h>
 #include<arpa/inet.h>
+#include<sys/wait.h>
 #include<sys/socket.h>
 #include<sys/select.h>
 #include<sys/epoll.h>
 #include<sys/types.h>
 #include<unistd.h>
+#include<string.h>
 #include<netdb.h>
+#include<pthread.h>
 /********************************
 	author:chenxuan
 	date:2021/11/11
@@ -70,79 +77,138 @@ public:
 	}
 };
 class HttpServer:private ServerTcpIp{
-public:
-	enum RouteType{
-		ONEWAY,WILD,STATIC,
+private:
+	enum RouteType{//oneway stand for like /hahah,wild if /hahah/*,static is recource static
+		ONEWAY,WILD,STATIC,STAWILD
 	};
-	enum AskType{
-		GET,POST,PUT,DELETE,OPTIONS,ALL,
+public://main class for http server2.0
+	enum RunModel{//the server model of run
+		FORK,MULTIPLEXING,THREAD
 	};
-	struct RouteFuntion{
+	enum AskType{//different ask ways in http
+		GET,POST,PUT,DELETE,OPTIONS,CONNECT,ALL,
+	};
+	struct RouteFuntion{//inside struct,pack for handle
 		AskType ask;
 		RouteType type;
-		char route[100];
-		const char* path;
-		void (*pfunc)(DealHttp&,HttpServer&,int num,void* sen,int&);
+		char route[128];
+		char path[128];
+		void (*pfunc)(HttpServer&,DealHttp&,int);
 	};
 private:
-	RouteFuntion* array;
+	RouteFuntion* arrRoute;
 	RouteFuntion* pnowRoute;
 	void* getText;
-	unsigned int max;
+	void* senText;
+	const char* defaultFile;
+	unsigned int senLen;
+	unsigned int recLen;
+	unsigned int maxNum;
 	unsigned int now;
 	unsigned int boundPort;
+	unsigned int selfLen;
 	int textLen;
 	bool isDebug;
 	bool isLongCon;
-	bool isFork;
+	bool selfCtrl;
+	bool isContinue;
+	bool isAutoAnalysis;
+	void (*middleware)(HttpServer&,DealHttp&,int num);
 	void (*clientIn)(HttpServer&,int num,void* ip,int port);
 	void (*clientOut)(HttpServer&,int num,void* ip,int port);
-	void (*logFunc)(HttpServer&,const void*,int);
+	void (*logFunc)(const void*,int);
+	void (*logError)(const void*,int);
+	Trie<RouteFuntion> trie;
+	ThreadPool* pool;
+	RunModel model;
 public:
-	HttpServer(unsigned port,bool debug=false);
+	HttpServer(unsigned port,bool debug=false,RunModel serverModel=MULTIPLEXING,unsigned threadNum=5)
+		:ServerTcpIp(port),model(serverModel);
 	~HttpServer();
-	bool clientOutHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port));
+	bool routeHandle(AskType ask,const char* route,void (*pfunc)(HttpServer&,DealHttp&,int));
+	bool loadStatic(const char* route,const char* staticFile);
+	bool loadStaticFS(const char* route,const char* staticPath);
+	bool deletePath(const char* route);
+	bool get(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int));
+	bool post(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int));
+	bool all(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int));
 	bool clientInHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port));
-	bool setLog(void (*pfunc)(HttpServer&,const void*,int));
-	bool routeHandle(AskType ask,RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&));
-	int getCompleteMessage(const void* message,unsigned int messageLen,void* buffer,unsigned int buffLen,int sockCli);
-	bool loadStatic(const char* route,const char* staticPath);
-	bool deletePath(const char* path);
-	bool get(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&));
-	bool post(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&));
-	bool all(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&));
-	void run(unsigned int memory,unsigned int recBufLenChar,const char* defaultFile);
-	int httpSend(int num,void* buffer,int sendLen);
-	int httpRecv(int num,void* buffer,int bufferLen);
-	void changeSetting(bool debug,bool isLongCon,bool isForkModel);
-	inline void* recText()
+	bool clientOutHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port));
+	bool setMiddleware(void (*pfunc)(HttpServer&,DealHttp&,int));
+	inline void continueNext(int cliSock)
+	{//middleware funtion to continue default task
+		if(middleware==NULL)
+			return;
+		auto temp=middleware;
+		middleware=NULL;
+		func(cliSock);
+		middleware=temp;
+	}
+	bool setLog(void (*pfunc)(const void*,int),void (*errorFunc)(const void*,int));
+	void run(const char* defaultFile=NULL);
+	int httpSend(int num,void* buffer,int sendLen)
 	{
+		return this->sendSocket(num,buffer,sendLen);
+	}
+	int httpRecv(int num,void* buffer,int bufferLen)
+	{
+		return this->receiveSocket(num,buffer,bufferLen);
+	}
+	int getCompleteMessage(int sockCli);
+	void changeSetting(bool debug,bool isLongCon,bool isAuto=true,unsigned sendLen=1);
+	inline void* recText()
+	{//get the recv text;
 		return this->getText;
 	}
-	inline int recLen()
-	{
+	inline int getRecLen()
+	{//get the recv text len
 		return this->textLen;
 	}
 	inline const char* lastError()
-	{
+	{//get the error of server
 		return error;
 	}
 	inline bool disconnect(int soc)
 	{
 		return this->disconnectSocket(soc);
 	}
+	inline void selfCreate(unsigned senLen)
+	{//use getSenBuff to create task by self
+		selfCtrl=true;
+		selfLen=senLen;
+	}
+	inline void* getSenBuff()
+	{//get the sen buffer
+		return senText;
+	}
+	inline unsigned getMaxSenLen()
+	{//get sen buffer size
+		return this->senLen*1024*1024;
+	}
+	inline void stopServer()
+	{//stop server run;
+		this->isContinue=false;
+	}
 private:
+	void messagePrint();
+	int func(int num);
+	void epollHttp();
+	void forkHttp();
+	RouteFuntion* addRoute();
 	inline RouteFuntion* getNowRoute()
 	{
 		return pnowRoute;
 	}
-	void messagePrint();
-	int func(int num,void* pget,void* sen,unsigned int senLen,const char* defaultFile,HttpServer& server);
-	void epollHttp(void* pget,int len,unsigned int senLen,void* pneed,const char* defaultFile);
-	void forkHttp(void* pget,int len,unsigned int senLen,void* pneed,const char* defaultFile);
-	static void loadFile(DealHttp& http,HttpServer& server,int senLen,void* sen,int& len);
-	static void deleteFile(DealHttp& http,HttpServer&,int senLen,void* sen,int& len);
-	static void sigCliDeal(int pid);
+	struct ThreadArg{
+		HttpServer* pserver;
+		int soc;
+	};
+	void threadHttp();
+	static void* threadWorker(void* self);
+	static void loadFile(HttpServer& server,DealHttp& http,int senLen);
+	static void deleteFile(HttpServer& server,DealHttp& http,int senLen);
+	static unsigned staticLen(int senLen);
+	void* enlargeMemory(void* old,unsigned& oldSize);
 };
 class Email{
 private:

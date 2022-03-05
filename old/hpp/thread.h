@@ -1,7 +1,23 @@
 #ifndef _THREAD_H_
 #define _THREAD_H_
+#include<cstdlib>
+#include<stdarg.h>
+#include<time.h>
+#include<signal.h>
+#include<netinet/in.h>
+#include<arpa/inet.h>
+#include<sys/wait.h>
+#include<sys/socket.h>
+#include<sys/select.h>
+#include<sys/epoll.h>
+#include<sys/types.h>
+#include<unistd.h>
+#include<string.h>
+#include<netdb.h>
+#include<pthread.h>
 #include<queue>
 #include<pthread.h>
+#include<sys/epoll.h>
 #include"server.h"
 /********************************
 	author:chenxuan
@@ -9,7 +25,7 @@
 	funtion:class thread pool
 *********************************/
 namespace cppweb{
-
+using namespace cppweb;
 class ThreadPool{
 public://a struct for you to add task
 	struct Task{
@@ -57,7 +73,8 @@ public:
 	date:2021/11/5
 	funtion:server tcp ip 2.0
 *********************************/
-class ServerPool:public ServerTcpIp{
+class ServerPool:public ServerTcpIp
+{
 private:
 	struct Argv{
 		ServerPool* pserver;
@@ -76,10 +93,13 @@ private:
 	unsigned int threadNum;
 	bool isEpoll;
 private:
-	static void sigCliDeal(int pid);
+	inline static void sigCliDeal(int )
+	{
+		while(waitpid(-1, NULL, WNOHANG)>0);
+	}
 	static void* worker(void* argc);
 public:
-	ServerPool(unsigned short port,unsigned int threadNum=0);
+	ServerPool(unsigned short port,unsigned int threadNum=0):ServerTcpIp(port);
 	~ServerPool();
 	inline void mutexLock()
 	{
@@ -90,13 +110,15 @@ public:
 		pthread_mutex_unlock(&mutex);
 	}
 	bool mutexTryLock();
+	void threadModel(void (*pfunc)(ServerPool&,int));
 	void forkModel(void* pneed,void (*pfunc)(ServerPool&,int,void*));
 	void forkEpoll(unsigned int senBufChar,unsigned int recBufChar,void (*pfunc)(ServerPool::Thing,int,int,void*,void*,ServerPool&));
-	void threadModel(void (*pfunc)(ServerPool&,int));
 	void epollThread(void (*pfunc)(ServerPool&,int));
 	inline bool threadDeleteSoc(int clisoc)
 	{
 		close(clisoc);
+		if(isEpoll)
+			epoll_ctl(epfd,clisoc,EPOLL_CTL_DEL,NULL);
 		return this->deleteFd(clisoc);
 	}
 };

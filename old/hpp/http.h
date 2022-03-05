@@ -34,6 +34,9 @@ public:
 		std::string version;
 	};
 public:
+	Datagram gram;//default gram to create gram
+	std::unordered_map<std::string,std::string> head;//default head toadd middleware
+	std::unordered_map<std::string,std::string> cookie;//default cookie to add middleware
 	DealHttp();
 	bool cutLineAsk(char* message,const char* pcutIn);
 	const char* analysisHttpAsk(void* message,const char* pneed="GET");
@@ -49,7 +52,7 @@ public:
 	const char* getCookie(void* recText,const char* key,char* value,unsigned int valueLen);
 	void createTop(FileKind kind,char* ptop,unsigned int bufLen,int* topLen,unsigned int fileLen);
 	bool createSendMsg(FileKind kind,char* buffer,unsigned int bufferLen,const char* pfile,int* plong);
-		int createDatagram(const Datagram& gram,void* buffer,unsigned bufferLen);
+	int createDatagram(const Datagram& gram,void* buffer,unsigned bufferLen);
 	char* findFileMsg(const char* pname,int* plen,char* buffer,unsigned int bufferLen);
 	int getFileLen(const char* pname);
 	void getRequestMsg(void* message,Request& request);
@@ -135,7 +138,6 @@ public:
 	}
 	inline void changeSetting(unsigned keyValMaxLen,unsigned floNum)
 	{
-		this->defaultSize=defaultSize;
 		this->maxLen=keyValMaxLen>maxLen?keyValMaxLen:maxLen;
 		this->floNum=floNum;
 	}

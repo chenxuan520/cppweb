@@ -5,8 +5,7 @@
 	if you wang to change you web to a no-static
 *********************************/
 #include"../hpp/dealask.h"
-#include"../hpp/http.h"
-#include"../hpp/server.h"
+#include "../hpp/cppweb.h"
 //#include"../hpp/sql.h"
 /********************************
 	author:chenxuan
@@ -14,7 +13,7 @@
 	funtion:this function is to deal get you can
 	add hpp and add funtion there
 *********************************/
-bool DealAsk::dealGetAsk(ServerTcpIp& server,DealHttp& http,void* pget,void* sen,int soc)
+bool DealAsk::dealGetAsk(ServerTcpIp& ,DealHttp& ,void* ,void*,int )
 {
 	return false;
 }
