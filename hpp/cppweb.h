@@ -1143,7 +1143,6 @@ public:
 		temp->data=data;
 		return true;
 	}
-
 	T* search(const char* word,std::function<bool(const T*,bool isLast)> func) {
 		Node* temp=root;
 		for(unsigned i=0;word[i]!=0;i++)
@@ -3014,6 +3013,7 @@ private:
 	bool isLongCon;
 	bool selfCtrl;
 	bool isContinue;
+	bool isAutoAnalysis;
 	void (*middleware)(HttpServer&,DealHttp&,int num);
 	void (*clientIn)(HttpServer&,int num,void* ip,int port);
 	void (*clientOut)(HttpServer&,int num,void* ip,int port);
@@ -3045,6 +3045,7 @@ public:
 		selfCtrl=false;
 		isLongCon=true;
 		isContinue=true;
+		isAutoAnalysis=true;
 		textLen=0;
 		now=0;
 		maxNum=20;
@@ -3057,8 +3058,13 @@ public:
 		}
 		else
 			memset(arrRoute,0,sizeof(RouteFuntion)*20);
-		if(model==THREAD)
+		if(this->model==THREAD)
 		{
+			if(threadNum==0)
+			{
+				error="thread num is zero";
+				return;
+			}
 			pool=new ThreadPool(threadNum);
 			if(pool==NULL)
 			{
@@ -3066,6 +3072,8 @@ public:
 				return;
 			}
 		}
+		if(this->model==FORK)
+			signal(SIGCHLD,sigCliDeal);
 	}
 	~HttpServer()
 	{
@@ -3376,16 +3384,13 @@ public:
 		textLen=result;
 		return result;
 	}
-	void changeSetting(bool debug,bool isLongCon,bool isForkModel=false,unsigned sendLen=1)
+	void changeSetting(bool debug,bool isLongCon,bool isAuto=true,unsigned sendLen=1)
 	{
 		this->isDebug=debug;
 		this->isLongCon=isLongCon;
-		if(isForkModel)
-			this->model=FORK;
+		this->isAutoAnalysis=isAuto;
 		if(sendLen>0)
 			this->senLen=sendLen;
-		if(this->model==FORK)
-			signal(SIGCHLD,sigCliDeal);
 	}
 	inline void* recText()
 	{
@@ -3593,7 +3598,7 @@ private:
 				len=staticLen(-1);
 			}
 		}
-		else
+		else if(isAutoAnalysis)
 		{
 			if(isDebug)
 				printf("http:%s\n",http.analysisHttpAsk(this->getText));
@@ -3610,6 +3615,8 @@ private:
 					logError(ask,num);
 			}
 		}
+		else
+			http.createSendMsg(DealHttp::NOFOUND,(char*)this->senText,senLen*1024*1024,NULL,&len);
 		if(len==0)
 			http.createSendMsg(DealHttp::NOFOUND,(char*)this->senText,senLen*1024*1024,NULL,&len);
 		if(0>=this->sendSocket(num,this->senText,len))
