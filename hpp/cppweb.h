@@ -29,9 +29,11 @@
 #include<openssl/err.h>
 #endif
 namespace cppweb{
+//class for analyse json and create json text 
+//more information about it is in https://gitee.com/chenxuan520/cppjson
 class Json{
 public:
-	enum TypeJson{
+	enum TypeJson{//object type
 		INT=0,FLOAT=1,ARRAY=2,OBJ=3,STRING=4,BOOL=5,STRUCT=6,EMPTY=7
 	};
 	struct Object{
@@ -68,7 +70,7 @@ public:
 		}
 	};
 private:
-	struct InitType{
+	struct InitType{//struct for ctreate such as {{"as","ds"}} in init;
 		TypeJson type=STRING;
 		void* pval=NULL;
 		const char* error=NULL;
@@ -2849,6 +2851,7 @@ public:
 		pthread_create(&thread,&attr,pfunc,arg);
 	}
 };
+//class for log is use threadpool and it can write 3000000 every sec;
 class LogSystem{
 private:
 	const char* fileName;
@@ -3324,8 +3327,9 @@ public:
 				this->forkHttp();
 			break;
 		case THREAD:
-			while(isContinue);
-				this->threadModel();
+			while(isContinue)
+				this->threadHttp();
+			break;
 		}
 		free(sen);
 		free(getT);
@@ -3372,7 +3376,7 @@ public:
 		textLen=result;
 		return result;
 	}
-	void changeSetting(bool debug,bool isLongCon,bool isForkModel,unsigned sendLen=1)
+	void changeSetting(bool debug,bool isLongCon,bool isForkModel=false,unsigned sendLen=1)
 	{
 		this->isDebug=debug;
 		this->isLongCon=isLongCon;
@@ -3778,7 +3782,7 @@ private:
 		HttpServer* pserver;
 		int soc;
 	};
-	void threadModel()
+	void threadHttp()
 	{
 		while(this->isContinue)
 		{
@@ -3786,7 +3790,6 @@ private:
 			int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
 			if(newClient==-1)
 				continue;
-			this->addFd(newClient);
 			ThreadArg* temp=new ThreadArg;
 			temp->pserver=this;
 			temp->soc=newClient;
@@ -3846,7 +3849,6 @@ private:
 		free(rec);
 		free(self);
 		close(cli);
-		server.deleteFd(cli);
 		return NULL;
 	}
 	static void loadFile(HttpServer& server,DealHttp& http,int senLen)
