@@ -6,7 +6,7 @@ int main()
 {
 	HttpServer server(5200,true);
 	server.deletePath("test");
-	server.run("./index.html");
+	server.run();
 	if(NULL!=server.lastError())
 	{
 		printf("%s\n",server.lastError());

@@ -29,9 +29,11 @@
 #include<openssl/err.h>
 #endif
 namespace cppweb{
+//class for analyse json and create json text 
+//more information about it is in https://gitee.com/chenxuan520/cppjson
 class Json{
 public:
-	enum TypeJson{
+	enum TypeJson{//object type
 		INT=0,FLOAT=1,ARRAY=2,OBJ=3,STRING=4,BOOL=5,STRUCT=6,EMPTY=7
 	};
 	struct Object{
@@ -68,7 +70,7 @@ public:
 		}
 	};
 private:
-	struct InitType{
+	struct InitType{//struct for ctreate such as {{"as","ds"}} in init;
 		TypeJson type=STRING;
 		void* pval=NULL;
 		const char* error=NULL;
@@ -1141,7 +1143,6 @@ public:
 		temp->data=data;
 		return true;
 	}
-
 	T* search(const char* word,std::function<bool(const T*,bool isLast)> func) {
 		Node* temp=root;
 		for(unsigned i=0;word[i]!=0;i++)
@@ -1671,6 +1672,7 @@ public:
 		return true;
 	}
 };
+//the class to deal http request,and create a datagram 
 class DealHttp{
 public:
 	friend class HttpServer;
@@ -1706,9 +1708,9 @@ private:
 	const char* connect;
 	const char* serverName;
 public:
-	Datagram gram;
-	std::unordered_map<std::string,std::string> head;
-	std::unordered_map<std::string,std::string> cookie;
+	Datagram gram;//default gram to create gram
+	std::unordered_map<std::string,std::string> head;//default head toadd middleware
+	std::unordered_map<std::string,std::string> cookie;//default cookie to add middleware
 	DealHttp()
 	{
 		for(int i=0;i<256;i++)
@@ -1833,6 +1835,8 @@ private:
 	}
 	int getFileLen(const char* pname)
 	{
+		if(pname==NULL)
+			return 0;
 		FILE* fp=fopen(pname,"r+");
 		int len=0;
 		if(fp==NULL)
@@ -2847,6 +2851,7 @@ public:
 		pthread_create(&thread,&attr,pfunc,arg);
 	}
 };
+//class for log is use threadpool and it can write 3000000 every sec;
 class LogSystem{
 private:
 	const char* fileName;
@@ -2976,9 +2981,12 @@ private:
 class HttpServer:private ServerTcpIp{
 private:
 	enum RouteType{//oneway stand for like /hahah,wild if /hahah/*,static is recource static
-		ONEWAY,WILD,STATIC,
+		ONEWAY,WILD,STATIC,STAWILD
 	};
 public://main class for http server2.0
+	enum RunModel{//the server model of run
+		FORK,MULTIPLEXING,THREAD
+	};
 	enum AskType{//different ask ways in http
 		GET,POST,PUT,DELETE,OPTIONS,CONNECT,ALL,
 	};
@@ -3004,18 +3012,22 @@ private:
 	int textLen;
 	bool isDebug;
 	bool isLongCon;
-	bool isFork;
 	bool selfCtrl;
 	bool isContinue;
+	bool isAutoAnalysis;
 	void (*middleware)(HttpServer&,DealHttp&,int num);
 	void (*clientIn)(HttpServer&,int num,void* ip,int port);
 	void (*clientOut)(HttpServer&,int num,void* ip,int port);
 	void (*logFunc)(const void*,int);
 	void (*logError)(const void*,int);
 	Trie<RouteFuntion> trie;
+	ThreadPool* pool;
+	RunModel model;
 public:
-	HttpServer(unsigned port,bool debug=false):ServerTcpIp(port)
+	HttpServer(unsigned port,bool debug=false,RunModel serverModel=MULTIPLEXING,unsigned threadNum=5)
+		:ServerTcpIp(port),model(serverModel)
 	{
+		pool=NULL;
 		getText=NULL;
 		senText=NULL;
 		middleware=NULL;
@@ -3033,8 +3045,8 @@ public:
 		isDebug=debug;
 		selfCtrl=false;
 		isLongCon=true;
-		isFork=false;
 		isContinue=true;
+		isAutoAnalysis=true;
 		textLen=0;
 		now=0;
 		maxNum=20;
@@ -3047,6 +3059,22 @@ public:
 		}
 		else
 			memset(arrRoute,0,sizeof(RouteFuntion)*20);
+		if(this->model==THREAD)
+		{
+			if(threadNum==0)
+			{
+				error="thread num is zero";
+				return;
+			}
+			pool=new ThreadPool(threadNum);
+			if(pool==NULL)
+			{
+				error="pool new wrong";
+				return;
+			}
+		}
+		if(this->model==FORK)
+			signal(SIGCHLD,sigCliDeal);
 	}
 	~HttpServer()
 	{
@@ -3054,203 +3082,202 @@ public:
 			free(arrRoute);
 	}
 	bool routeHandle(AskType ask,const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
-	{
+	{//add route handle in all ask type 
 		if(strlen(route)>100)
 			return false;
-		if(maxNum-now<=2)
-		{
-			arrRoute=(RouteFuntion*)realloc(arrRoute,sizeof(RouteFuntion)*(now+10));
-			if(arrRoute==NULL)
-				return false;
-			maxNum+=10;
-		}
-		arrRoute[now].ask=ask;
-		strcpy(arrRoute[now].route,route);
-		arrRoute[now].pfunc=pfunc;
+		RouteFuntion* nowRoute=addRoute();
+		if(nowRoute==NULL)
+			return false;
+		nowRoute->ask=ask;
+		strcpy(nowRoute->route,route);
+		nowRoute->pfunc=pfunc;
 		if(route[strlen(route)-1]=='*')
 		{
-			arrRoute[now].route[strlen(route)-1]=0;
-			arrRoute[now].type=WILD;
+			nowRoute->route[strlen(route)-1]=0;
+			nowRoute->type=WILD;
 		}
 		else
-			arrRoute[now].type=ONEWAY;
-		if(false==trie.insert(arrRoute[now].route,arrRoute+now))
+			nowRoute->type=ONEWAY;
+		if(false==trie.insert(nowRoute->route,nowRoute))
 		{
 			error="server:route wrong char";
 			if(logError!=NULL)
 				logError(this->error,0);
 			return false;
 		}
-		now++;
 		return true;
 	}
-	bool loadStatic(const char* route,const char* staticPath)
-	{
+	bool loadStatic(const char* route,const char* staticFile)
+	{//load file such as / -> index.html
 		if(strlen(route)>100)
 			return false;
-		if(maxNum-now<=2)
-		{
-			arrRoute=(RouteFuntion*)realloc(arrRoute,sizeof(RouteFuntion)*(now+10));
-			if(arrRoute==NULL)
-				return false;
-			maxNum+=10;
-		}
-		arrRoute[now].type=STATIC;
-		arrRoute[now].ask=GET;
-		strcpy(arrRoute[now].route,route);
-		strcpy(arrRoute[now].path,staticPath);
-		arrRoute[now].pfunc=loadFile;
-		if(false==trie.insert(route,arrRoute+now))
+		RouteFuntion* nowRoute=addRoute();
+		if(nowRoute==NULL)
+			return false;
+		nowRoute->type=STATIC;
+		nowRoute->ask=GET;
+		strcpy(nowRoute->route,route);
+		strcpy(nowRoute->path,staticFile);
+		nowRoute->pfunc=loadFile;
+		if(false==trie.insert(route,nowRoute))
 		{
 			error="server:route wrong char";
 			if(logError!=NULL)
 				logError(this->error,0);
 			return false;
 		}
-		now++;
 		return true;
 	}
-	bool deletePath(const char* path)
-	{
-		if(strlen(path)>100)
+	bool loadStaticFS(const char* route,const char* staticPath)
+	{//load file system such as /tmp to /root
+		if(strlen(route)>100)
 			return false;
-		if(maxNum-now<=2)
-		{
-			arrRoute=(RouteFuntion*)realloc(arrRoute,sizeof(RouteFuntion)*(now+10));
-			if(arrRoute==NULL)
-				return false;
-			maxNum+=10;
-		}
-		arrRoute[now].type=STATIC;
-		arrRoute[now].ask=GET;
-		strcpy(arrRoute[now].route,path);
-		arrRoute[now].pfunc=deleteFile;
-		if(false==trie.insert(path,arrRoute+now))
+		RouteFuntion* nowRoute=addRoute();
+		if(nowRoute==NULL)
+			return false;
+		nowRoute->type=STAWILD;
+		nowRoute->ask=GET;
+		strcpy(nowRoute->route,route);
+		strcpy(nowRoute->path,staticPath);
+		nowRoute->pfunc=loadFile;
+		if(false==trie.insert(route,nowRoute))
 		{
 			error="server:route wrong char";
 			if(logError!=NULL)
 				logError(this->error,0);
 			return false;
 		}
-		now++;
+		return true;
+	}
+	bool deletePath(const char* route)
+	{// forbidden the file path
+		if(strlen(route)>100&&route!=NULL)
+			return false;
+		RouteFuntion* nowRoute=addRoute();
+		if(nowRoute==NULL)
+			return false;
+		nowRoute->type=STAWILD;
+		nowRoute->ask=GET;
+		if(route[0]=='.'&&route[1]=='/'&&strlen(route)>2)
+			strcpy(nowRoute->route,route+2);
+		else if(route[0]!='/')
+		{
+			strcpy(nowRoute->route,"/");
+			strcat(nowRoute->route,route);
+		}
+		else
+			strcpy(nowRoute->route,route);
+		nowRoute->pfunc=deleteFile;
+		if(false==trie.insert(nowRoute->route,nowRoute))
+		{
+			error="server:route wrong char";
+			if(logError!=NULL)
+				logError(this->error,0);
+			return false;
+		}
 		return true;
 	}
 	bool get(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
-	{
+	{//add routeHandle and ask type is get
 		if(strlen(route)>100)
 			return false;
-		if(maxNum-now<=2)
-		{
-			arrRoute=(RouteFuntion*)realloc(arrRoute,sizeof(RouteFuntion)*(now+10));
-			if(arrRoute==NULL)
-				return false;
-			maxNum+=10;
-		}
-		arrRoute[now].ask=GET;
-		arrRoute[now].pfunc=pfunc;
-		strcpy(arrRoute[now].route,route);
+		RouteFuntion* nowRoute=addRoute();
+		if(nowRoute==NULL)
+			return false;
+		nowRoute->ask=GET;
+		nowRoute->pfunc=pfunc;
+		strcpy(nowRoute->route,route);
 		if(route[strlen(route)-1]=='*')
 		{
-			arrRoute[now].route[strlen(route)-1]=0;
-			arrRoute[now].type=WILD;
+			nowRoute->route[strlen(route)-1]=0;
+			nowRoute->type=WILD;
 		}
 		else
-			arrRoute[now].type=ONEWAY;
-		if(false==trie.insert(arrRoute[now].route,arrRoute+now))
+			nowRoute->type=ONEWAY;
+		if(false==trie.insert(nowRoute->route,nowRoute))
 		{
 			error="server:route wrong char";
 			if(logError!=NULL)
 				logError(this->error,0);
 			return false;
 		}
-		now++;
 		return true;	
 	}
 	bool post(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
-	{
+	{//the same to last funtion
 		if(strlen(route)>100)
 			return false;
-		if(maxNum-now<=2)
-		{
-			arrRoute=(RouteFuntion*)realloc(arrRoute,sizeof(RouteFuntion)*(now+10));
-			if(arrRoute==NULL)
-				return false;
-			maxNum+=10;
-		}
-		arrRoute[now].ask=POST;
-		strcpy(arrRoute[now].route,route);
-		arrRoute[now].pfunc=pfunc;
+		RouteFuntion* nowRoute=addRoute();
+		if(nowRoute==NULL)
+			return false;
+		nowRoute->ask=POST;
+		strcpy(nowRoute->route,route);
+		nowRoute->pfunc=pfunc;
 		if(route[strlen(route)-1]=='*')
 		{
-			arrRoute[now].route[strlen(route)-1]=0;
-			arrRoute[now].type=WILD;
+			nowRoute->route[strlen(route)-1]=0;
+			nowRoute->type=WILD;
 		}
 		else
-			arrRoute[now].type=ONEWAY;
-		if(false==trie.insert(arrRoute[now].route,arrRoute+now))
+			nowRoute->type=ONEWAY;
+		if(false==trie.insert(nowRoute->route,nowRoute))
 		{
 			error="server:route wrong char";
 			if(logError!=NULL)
 				logError(this->error,0);
 			return false;
 		}
-		now++;
 		return true;	
 	}
 	bool all(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
-	{
+	{//receive all ask type
 		if(strlen(route)>100)
 			return false;
-		if(maxNum-now<=2)
-		{
-			arrRoute=(RouteFuntion*)realloc(arrRoute,sizeof(RouteFuntion)*(now+10));
-			if(arrRoute==NULL)
-				return false;
-			maxNum+=10;
-		}
-		arrRoute[now].ask=ALL;
-		strcpy(arrRoute[now].route,route);
-		arrRoute[now].pfunc=pfunc;
+		RouteFuntion* nowRoute=addRoute();
+		if(nowRoute==NULL)
+			return false;
+		nowRoute->ask=ALL;
+		strcpy(nowRoute->route,route);
+		nowRoute->pfunc=pfunc;
 		if(route[strlen(route)-1]=='*')
 		{
-			arrRoute[now].route[strlen(route)-1]=0;
-			arrRoute[now].type=WILD;
+			nowRoute->route[strlen(route)-1]=0;
+			nowRoute->type=WILD;
 		}
 		else
-			arrRoute[now].type=ONEWAY;
-		if(false==trie.insert(arrRoute[now].route,arrRoute+now))
+			nowRoute->type=ONEWAY;
+		if(false==trie.insert(nowRoute->route,nowRoute))
 		{
 			error="server:route wrong char";
 			if(logError!=NULL)
 				logError(this->error,0);
 			return false;
 		}
-		now++;
 		return true;	
 	}
 	bool clientInHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port))
-	{
+	{//when client in ,it will be call
 		if(clientIn!=NULL)
 			return false;
 		clientIn=pfunc;
 		return true;
 	}
 	bool clientOutHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port))
-	{
+	{//when client out ,itwill be call
 		if(clientOut!=NULL)
 			return false;
 		clientOut=pfunc;
 		return true;
 	}
 	bool setMiddleware(void (*pfunc)(HttpServer&,DealHttp&,int))
-	{
+	{//middleware funtion after get text it will be called
 		if(middleware!=NULL)
 			return false;
 		middleware=pfunc;
 		return true;
 	}
 	inline void continueNext(int cliSock)
-	{
+	{//middleware funtion to continue default task
 		if(middleware==NULL)
 			return;
 		auto temp=middleware;
@@ -3259,15 +3286,15 @@ public:
 		middleware=temp;
 	}
 	bool setLog(void (*pfunc)(const void*,int),void (*errorFunc)(const void*,int))
-	{
+	{//log system 
 		if(logFunc!=NULL||logError!=NULL)
 			return false;
 		logFunc=pfunc;
 		logError=errorFunc;
 		return true;
 	}
-	void run(const char* defaultFile)
-	{
+	void run(const char* defaultFile=NULL)
+	{//server begin to run
 		char* getT=(char*)malloc(sizeof(char)*recLen);
 		char* sen=(char*)malloc(sizeof(char)*senLen*1024*1024);
 		if(sen==NULL||getT==NULL)
@@ -3298,12 +3325,21 @@ public:
 		this->defaultFile=defaultFile;
 		if(isDebug)
 			messagePrint();
-		if(isFork==false)
+		switch(model)
+		{
+		case MULTIPLEXING:
 			while(isContinue)
 				this->epollHttp();
-		else
+			break;
+		case FORK:
 			while(isContinue)
 				this->forkHttp();
+			break;
+		case THREAD:
+			while(isContinue)
+				this->threadHttp();
+			break;
+		}
 		free(sen);
 		free(getT);
 	}
@@ -3316,7 +3352,7 @@ public:
 		return this->receiveSocket(num,buffer,bufferLen);
 	}
 	int getCompleteMessage(int sockCli)
-	{
+	{//some time text is not complete ,it can get left text 
 		void*& message=getText;
 		unsigned messageLen=this->getRecLen();
 		if(message==NULL||message==0)
@@ -3349,26 +3385,24 @@ public:
 		textLen=result;
 		return result;
 	}
-	void changeSetting(bool debug,bool isLongCon,bool isForkModel,unsigned sendLen)
-	{
+	void changeSetting(bool debug,bool isLongCon,bool isAuto=true,unsigned sendLen=1)
+	{//change setting
 		this->isDebug=debug;
 		this->isLongCon=isLongCon;
-		this->isFork=isForkModel;
+		this->isAutoAnalysis=isAuto;
 		if(sendLen>0)
 			this->senLen=sendLen;
-		if(isFork==true)
-			signal(SIGCHLD,sigCliDeal);
 	}
 	inline void* recText()
-	{
+	{//get the recv text;
 		return this->getText;
 	}
 	inline int getRecLen()
-	{
+	{//get the recv text len
 		return this->textLen;
 	}
 	inline const char* lastError()
-	{
+	{//get the error of server
 		return error;
 	}
 	inline bool disconnect(int soc)
@@ -3376,24 +3410,45 @@ public:
 		return this->disconnectSocket(soc);
 	}
 	inline void selfCreate(unsigned senLen)
-	{
+	{//use getSenBuff to create task by self
 		selfCtrl=true;
 		selfLen=senLen;
 	}
 	inline void* getSenBuff()
-	{
+	{//get the sen buffer
 		return senText;
 	}
+	inline unsigned getMaxSenLen()
+	{//get sen buffer size
+		return this->senLen*1024*1024;
+	}
 	inline void stopServer()
-	{
+	{//stop server run;
 		this->isContinue=false;
 	}
 private:
 	void messagePrint()
 	{
 		printf("welcome to web server,the server is runing\n");
+		switch(model)
+		{
+		case MULTIPLEXING:
+			printf("model:\t\tIO Multiplexing\n");
+			break;
+		case THREAD:
+			printf("model:\t\tThread Pool\n");
+			break;
+		case FORK:
+			printf("model:\t\tProcess Pool\n");
+			break;
+		}
 		printf("port:\t\t%u\n",boundPort);
-		printf("/\t\t->\t%s\n",defaultFile);
+		if(isAutoAnalysis)
+			printf("auto:\t\tTrue\n");
+		else
+			printf("auto:\t\tFalse\n");
+		if(defaultFile!=NULL)
+			printf("/\t\t->\t%s\n",defaultFile);
 		for(unsigned i=0;i<now;i++)
 		{
 			switch(arrRoute[i].type)
@@ -3405,10 +3460,11 @@ private:
 				printf("%s*\t\t->\t",arrRoute[i].route);
 				break;
 			case STATIC:
+			case STAWILD:
 				if(arrRoute[i].pfunc==loadFile)
 					printf("%s\t\t->%s\n",arrRoute[i].route,arrRoute[i].path);
 				else if(arrRoute[i].pfunc==deleteFile)
-					printf("%s\t\t->delete\n",arrRoute[i].route);
+					printf("%s\t\t->\tdelete\n",arrRoute[i].route);
 				else
 					printf("undefine funtion please check the server\n");
 				continue;
@@ -3435,8 +3491,11 @@ private:
 				break;
 			case CONNECT:
 				printf("CONNECT\n");
+				break;
 			}
 		}
+		if(middleware!=NULL)
+			printf("middleware funtion set\n");
 		if(logFunc!=NULL)
 			printf("log function set\n");
 		if(logError!=NULL)
@@ -3516,7 +3575,7 @@ private:
 					{
 						if(isLast&&(now->type==STATIC||now->type==ONEWAY))
 							return true;
-						else if(now->type==WILD)
+						else if(now->type==WILD||now->type==STAWILD)
 							return true;
 						else
 							return false;
@@ -3562,7 +3621,7 @@ private:
 				len=staticLen(-1);
 			}
 		}
-		else
+		else if(isAutoAnalysis)
 		{
 			if(isDebug)
 				printf("http:%s\n",http.analysisHttpAsk(this->getText));
@@ -3579,6 +3638,8 @@ private:
 					logError(ask,num);
 			}
 		}
+		else
+			http.createSendMsg(DealHttp::NOFOUND,(char*)this->senText,senLen*1024*1024,NULL,&len);
 		if(len==0)
 			http.createSendMsg(DealHttp::NOFOUND,(char*)this->senText,senLen*1024*1024,NULL,&len);
 		if(0>=this->sendSocket(num,this->senText,len))
@@ -3728,6 +3789,21 @@ private:
 		}
 		return ;
 	}
+	RouteFuntion* addRoute()
+	{
+		RouteFuntion* temp=NULL; 
+		if(maxNum-now<=2)
+		{
+			temp=(RouteFuntion*)realloc(arrRoute,sizeof(RouteFuntion)*(maxNum+10));
+			if(temp==NULL)
+				return NULL;
+			arrRoute=temp;
+			maxNum+=10;
+		}
+		temp=arrRoute+now;
+		now++;
+		return temp;
+	}
 	inline RouteFuntion* getNowRoute()
 	{
 		return pnowRoute;
@@ -3735,49 +3811,76 @@ private:
 	struct ThreadArg{
 		HttpServer* pserver;
 		int soc;
-		unsigned memory;
-		unsigned recBufMax;
-		const char* defaultFile;
 	};
+	void threadHttp()
+	{
+		while(this->isContinue)
+		{
+			sockaddr_in newaddr={0,0,{0},{0}};
+			int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
+			if(newClient==-1)
+				continue;
+			ThreadArg* temp=new ThreadArg;
+			temp->pserver=this;
+			temp->soc=newClient;
+			ThreadPool::Task task={threadWorker,temp};
+			pool->addTask(task);
+		}
+	}
 	static void* threadWorker(void* self)
 	{
 		ThreadArg* argv=(ThreadArg*)self;
 		HttpServer& server=*argv->pserver;
 		int cli=argv->soc;
-		char* sen=(char*)malloc(sizeof(char)*argv->memory*1024*0124);
-		char* rec=(char*)malloc(sizeof(char)*argv->recBufMax);
-		if(sen==NULL||rec==NULL)
+		char* rec=(char*)malloc(sizeof(char)*server.recLen);
+		unsigned int size=sizeof(char)*server.recLen;
+		if(rec==NULL)
 		{
 			close(cli);
 			free(self);
 			return NULL;
 		}
-		memset(sen,0,sizeof(char)*argv->memory);
-		memset(rec,0,sizeof(char)*argv->recBufMax);
+		memset(rec,0,sizeof(char)*server.recLen);
 		if(server.clientIn!=NULL)
 		{
 			int port=0;
-			strcpy((char*)sen,server.getPeerIp(cli,&port));
-			server.clientIn(server,cli,sen,port);
+			server.getPeerIp(cli,&port);
+			server.clientIn(server,cli,server.senText,port);
 		}
-		int recLen=server.receiveSocket(cli,rec,sizeof(char)*argv->recBufMax);
-		while(recLen>=10)
+		int recLen=server.receiveSocket(cli,rec,size);
+		int all=recLen;
+		while((int)size==all)
 		{
-			/* server.pool->mutexLock(); */
+			rec=(char*)server.enlargeMemory(rec,size);
+			recLen=server.receiveSocket(cli,rec,size);
+			if(recLen<=0)
+				break;
+			all+=recLen;
+		}
+		while(all>=10)
+		{
+			server.pool->mutexLock();
+			server.textLen=all;
+			server.getText=rec;
 			server.func(cli);
-			/* server.pool->mutexUnlock(); */
-			memset(rec,0,sizeof(char)*argv->recBufMax);
-			recLen=server.receiveSocket(cli,rec,sizeof(char)*argv->recBufMax);
+			if(server.logFunc!=NULL)
+				server.logFunc(rec,cli);
+			server.getText=NULL;
+			server.pool->mutexUnlock();
+			if(server.isLongCon==false)
+				break;
+			memset(rec,0,sizeof(char)*server.recLen);
+			all=server.receiveSocket(cli,rec,size);
 		}
 		if(server.clientOut!=NULL)
 		{
 			int port=0;
-			strcpy((char*)sen,server.getPeerIp(cli,&port));
-			server.clientOut(server,cli,sen,port);
+			strcpy((char*)server.senText,server.getPeerIp(cli,&port));
+			server.clientOut(server,cli,server.senText,port);
 		}
-		free(sen);
 		free(rec);
 		free(self);
+		close(cli);
 		return NULL;
 	}
 	static void loadFile(HttpServer& server,DealHttp& http,int senLen)
@@ -3792,7 +3895,8 @@ private:
 		{
 			if(server.logError!=NULL)
 				server.logError(server.error,0);
-			printf("404 get %s wrong\n",buf);
+			if(server.isDebug)
+				printf("404 get %s wrong\n",buf);
 		}
 		staticLen(len);
 	}

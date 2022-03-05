@@ -4,8 +4,7 @@
 	funtion:this is main cpp for static web
 *********************************/
 //#include"../hpp/sql.h"
-#include"../hpp/server.h"
-#include"../hpp/http.h"
+#include "../hpp/cppweb.h"
 #include"../hpp/dealask.h"
 #include<stdio.h>
 #include<string.h>
@@ -40,16 +39,13 @@ int funcTwo(ServerTcpIp::Thing thing,int num,int,void* pget,void* sen,ServerTcpI
 		dealAsk.dealClientIn(server,http,pget,sen,num);
 	if(thing==ServerTcpIp::OUT)
 	{
-		if(http.findFirst(pget,"POST")!=NULL)
+		if(strstr((char*)pget,"POST")!=NULL)
 		{	
 			if(false==dealAsk.dealPostAsk(server,http,pget,sen,num))
 				return 0;
 		}
-		else if(http.findFirst(pget,"GET")!=NULL)
+		else if(strstr((char*)pget,"GET")!=NULL)
 		{
-			if(false==http.cutLineAsk((char*)pget,"GET"))
-				return 0;
-			printf("ask:%s\n",(char*)pget);
 			printf("http:%s\n",http.analysisHttpAsk(pget));
 			strcpy(ask,http.analysisHttpAsk(pget));
 			if(false==dealAsk.dealGetAsk(server,http,pget,sen,num))
@@ -207,7 +203,6 @@ void serverHttp(int argc,char** argv)
 		}
 	}
 	ServerTcpIp server((unsigned short)port,100);
-	int thing=0,num=0;
 	char get[2048]={0};
 	char* sen=(char*)malloc(sizeof(char)*memory*1024*1024);
 	if(sen==NULL)

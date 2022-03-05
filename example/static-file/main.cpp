@@ -4,7 +4,7 @@ using namespace cppweb;
 int main()  
 {  
 	HttpServer server(5200,true);
-	server.loadStatic("/file/index.html","index.html");
+	server.loadStaticFS("/root","./temp");
 	server.loadStatic("/file","index.html");
 	if(server.lastError()!=NULL)
 	{

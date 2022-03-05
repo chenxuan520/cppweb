@@ -26,14 +26,14 @@
 ## 项目结构
 
 - hpp中的cppweb.h为所有代码,包含该头文件就可以使用
-- hpp与cpp代码为cppweb.h代码的头文件分离
+- old文件夹为1.0版本的头文件和源文件,不推荐
 - example为使用实例,推荐优先阅读
 - doc为说明文档，包含函数和类的用法
 - test文档为测试文档
-- lib是二进制库，可直接使用
 - class是为编译的一些类，测试中
-- hpp和cpp分别为头文件和源代码
 - bin是可执行文件  
+- install.sh为服务器运行脚本
+- windows文件夹是windows版本
 
 ## 项目说明
 
@@ -51,13 +51,13 @@
 
 3. 支持cookie的生成和读取
 
-4. 包含一个json的解析生成格式化库
+4. 包含一个[json的解析生成格式化库](https://gitee.com/chenxuan520/cppjson)
 
 5. 支持通过路由管理请求
 
 6. 支持日志生成和实现,日志系统约为30万条每秒
 
-7. 使用多进程和IO复用
+7. 具有io复用,多进程,多线程三种模式
 
 8. 包含线程池和线程池服务器
 
@@ -74,18 +74,18 @@
 using namespace cppweb;
 int main()  
 {  
-	HttpServer server(5200,true);//输入运行端口以及是否开启打印的调试模式
-	server.run("index.html");//输入访问路径为 / 时默认文件
-	return 0; //没有错会一直运行,除非出错,可以用lastError获取错取
+    HttpServer server(5200,true);//输入运行端口以及是否开启打印的调试模式
+    server.run("index.html");//输入访问路径为 / 时默认文件
+    return 0; //没有错会一直运行,除非出错,可以用lastError获取错取
 }  
 ```
 
 #### 路由设置
 
 ```cpp
-	server.get("/lam*",[](HttpServer&,DealHttp& http,int)->void{
-		http.gram.body="text";//设置报文内容
-	});
+    server.get("/lam*",[](HttpServer&,DealHttp& http,int)->void{
+        http.gram.body="text";//设置报文内容
+    });
 ```
 
 - 支持lam表达式和普通函数
@@ -97,31 +97,30 @@ int main()
 ```cpp
 void pfunc(HttpServer& server,DealHttp& http,int soc)
 {
-	http.head["try"]="en";
-	server.continueNext(soc);//继续执行后面默认操作,也可以不执行
+    http.head["try"]="en";
+    server.continueNext(soc);//继续执行后面默认操作,也可以不执行
 }
 int main()
 {
-	HttpServer server(5200,true);
-	server.setMiddleware(pfunc);//设置中间件
-	server.get("/root",[](HttpServer&,DealHttp& http,int){
-			   http.gram.body="text";
-			   });
-	server.run("./index.html");
-	return 0;
+    HttpServer server(5200,true);
+    server.setMiddleware(pfunc);//设置中间件
+    server.get("/root",[](HttpServer&,DealHttp& http,int){
+               http.gram.body="text";
+               });
+    server.run("./index.html");
+    return 0;
 }
-
 ```
 
--  支持中间件对报文统一处理
+- 支持中间件对报文统一处理
 
 #### 日志设置
 
 ```cpp
-	server.setLog(LogSystem::recordRequest,NULL);
-	server.get("/stop",[](HttpServer& server,DealHttp&,int){
-			   server.stopServer();
-			   });
+    server.setLog(LogSystem::recordRequest,NULL);
+    server.get("/stop",[](HttpServer& server,DealHttp&,int){
+               server.stopServer();
+               });
 ```
 
 - LogSystem有一些模板,也可以自己设置
@@ -131,30 +130,29 @@ int main()
 ```cpp
 void func(HttpServer& server,DealHttp& http,int)
 {
-	DealHttp::Request req;
-	http.analysisRequest(req,server.recText());
-	printf("old:%s\n",(char*)server.recText());
-	printf("new:%s %s %s\n",req.method.c_str(),req.askPath.c_str(),req.version.c_str());
-	for(auto iter=req.head.begin();iter!=req.head.end();iter++)
-		printf("%s:%s\n",iter->first.c_str(),iter->second.c_str());
-	printf("body:%s\n",req.body);
-	http.gram.statusCode=DealHttp::STATUSOK;
-	http.gram.typeFile=DealHttp::JSON;
-	http.gram.body="{\"ha\":\"ha\"}";
+    DealHttp::Request req;
+    http.analysisRequest(req,server.recText());
+    printf("old:%s\n",(char*)server.recText());
+    printf("new:%s %s %s\n",req.method.c_str(),req.askPath.c_str(),req.version.c_str());
+    for(auto iter=req.head.begin();iter!=req.head.end();iter++)
+        printf("%s:%s\n",iter->first.c_str(),iter->second.c_str());
+    printf("body:%s\n",req.body);
+    http.gram.statusCode=DealHttp::STATUSOK;
+    http.gram.typeFile=DealHttp::JSON;
+    http.gram.body="{\"ha\":\"ha\"}";
 }
 int main()  
 {  
-	HttpServer server(5200,true);//input the port bound
-	server.all("/root",func);
-	server.run("./index.html");
-	if(server.lastError()!=NULL)
-	{
-		std::cout<<server.lastError()<<std::endl;
-		return -1;
-	}
+    HttpServer server(5200,true);//input the port bound
+    server.all("/root",func);
+    server.run("./index.html");
+    if(server.lastError()!=NULL)
+    {
+        std::cout<<server.lastError()<<std::endl;
+        return -1;
+    }
     return 0; 
 }  
-
 ```
 
 - 通过http内置的结构体来解析
@@ -164,26 +162,26 @@ int main()
 ```cpp
 void cookie(HttpServer& server,DealHttp& http,int)
 {
-	char buffer[100]={0};
-	http.getCookie(server.recText(),"key",buffer,100);
-	if(strlen(buffer)==0)
-	{
-		http.gram.body="ready to setting cookie";
-		http.gram.cookie["key"]=http.designCookie("cookie ok",10);
-		return;
-	}
-	Json json={
-		{"key",(const char*)buffer},
-		{"status","ok"}
-	};
-	http.gram.body=json();
-	http.gram.typeFile=DealHttp::JSON;
+    char buffer[100]={0};
+    http.getCookie(server.recText(),"key",buffer,100);
+    if(strlen(buffer)==0)
+    {
+        http.gram.body="ready to setting cookie";
+        http.gram.cookie["key"]=http.designCookie("cookie ok",10);
+        return;
+    }
+    Json json={
+        {"key",(const char*)buffer},
+        {"status","ok"}
+    };
+    http.gram.body=json();
+    http.gram.typeFile=DealHttp::JSON;
 }
 int main()  
 {  
-	HttpServer server(5200,true);
-	server.get("/cookie",cookie);
-	server.run("index.html");
+    HttpServer server(5200,true);
+    server.get("/cookie",cookie);
+    server.run("index.html");
     return 0; 
 }  
 ```
@@ -197,39 +195,39 @@ using namespace std;
 using namespace cppweb;
 int main()
 {
-	char ip[30]={0},topUrl[100]={0},endUrl[100]={0};
-	string str="http://chenxuanweb.top/";
-	DealHttp::dealUrl(str.c_str(),topUrl,endUrl,100,100);
-	ClientTcpIp::getDnsIp(topUrl,ip,30);
-	unsigned port=5200;
-	if(strstr(str.c_str(),"https")!=NULL)
-		port=443;
-	ClientTcpIp client(ip,port);
-	cout<<client.lastError();
-	DealHttp http;
-	DealHttp::Request req;
-	req.head.insert(pair<string,string>{"Host",topUrl});
-	req.askPath=endUrl;
-	req.method="GET";
-	req.version="HTTP/1.1";
-	char buffer[500]={0},rec[5000]={0};
-	http.createAskRequest(req,buffer,500);
-	if(port!=443)
-	{
-		if(false==client.tryConnect())
-			return -1;
-		if(0>client.sendHost(buffer,strlen(buffer)))
-			return -1;
-		client.receiveHost(rec,5000);
-		return 0;
-	}
-	if(false==client.tryConnectSSL())
-		return -1;
-	if(0>client.sendHostSSL(buffer,strlen(buffer)))
-		return -1;
-	client.receiveHostSSL(rec,5000);
-	printf("%s\n\n",rec);
-	return 0;
+    char ip[30]={0},topUrl[100]={0},endUrl[100]={0};
+    string str="http://chenxuanweb.top/";
+    DealHttp::dealUrl(str.c_str(),topUrl,endUrl,100,100);
+    ClientTcpIp::getDnsIp(topUrl,ip,30);
+    unsigned port=5200;
+    if(strstr(str.c_str(),"https")!=NULL)
+        port=443;
+    ClientTcpIp client(ip,port);
+    cout<<client.lastError();
+    DealHttp http;
+    DealHttp::Request req;
+    req.head.insert(pair<string,string>{"Host",topUrl});
+    req.askPath=endUrl;
+    req.method="GET";
+    req.version="HTTP/1.1";
+    char buffer[500]={0},rec[5000]={0};
+    http.createAskRequest(req,buffer,500);
+    if(port!=443)
+    {
+        if(false==client.tryConnect())
+            return -1;
+        if(0>client.sendHost(buffer,strlen(buffer)))
+            return -1;
+        client.receiveHost(rec,5000);
+        return 0;
+    }
+    if(false==client.tryConnectSSL())
+        return -1;
+    if(0>client.sendHostSSL(buffer,strlen(buffer)))
+        return -1;
+    client.receiveHostSSL(rec,5000);
+    printf("%s\n\n",rec);
+    return 0;
 }
 ```
 
@@ -238,10 +236,10 @@ int main()
 #### 静态和删除路径
 
 ```cpp
-	HttpServer server(5200,true);
-	server.loadStatic("/file/index.html","index.html");
-	server.loadStatic("/file","index.html");
-	server.deletePath("test");
+    HttpServer server(5200,true);
+    server.loadStatic("/file/index.html","index.html");
+    server.loadStaticFS("/file","test");
+    server.deletePath("test");
 ```
 
 ## 速度测试
