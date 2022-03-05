@@ -3827,7 +3827,7 @@ private:
 				break;
 			all+=recLen;
 		}
-		if(all>=10)
+		while(all>=10)
 		{
 			server.pool->mutexLock();
 			server.textLen=all;
@@ -3837,6 +3837,8 @@ private:
 				server.logFunc(rec,cli);
 			server.getText=NULL;
 			server.pool->mutexUnlock();
+			if(server.isLongCon==false)
+				break;
 			memset(rec,0,sizeof(char)*server.recLen);
 			all=server.receiveSocket(cli,rec,size);
 		}
