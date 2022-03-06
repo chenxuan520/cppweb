@@ -1086,7 +1086,7 @@ public:
 			int pid=0;
 			if((pid=fork())!=0)
 			{
-				printf("pid=%d\n",pid);
+				printf("process pid=%d\n",pid);
 				exit(0);
 			}
 		}
@@ -1765,7 +1765,7 @@ public:
 		Request():body(NULL){};
 	};
 private:
-	char ask[256];
+	char ask[512];
 	char* pfind;
 	const char* error;
 	const char* connect;
@@ -1776,7 +1776,7 @@ public:
 	std::unordered_map<std::string,std::string> cookie;//default cookie to add middleware
 	DealHttp()
 	{
-		for(int i=0;i<256;i++)
+		for(int i=0;i<512;i++)
 			ask[i]=0;
 		pfind=NULL;
 		error=NULL;
@@ -1959,7 +1959,7 @@ public:
 		pfind=strstr((char*)message,pneed);
 		if(pfind==NULL)
 			return NULL;
-		return this->findBackString(pfind,strlen(pneed),ask,256);
+		return this->findBackString(pfind,strlen(pneed),ask,512);
 	}
 	void* customizeAddTop(void* buffer,unsigned int bufferLen,int statusNum,unsigned int contentLen,const char* contentType="application/json",const char* connection="keep-alive",const char* staEng=NULL)
 	{
@@ -2987,10 +2987,15 @@ public:
 		static char method[32]={0},askPath[256]={0},buffer[512]={0},nowTime[48]={0};
 		static LogSystem loger("access.log");
 		int port=0;
-		sscanf((char*)text,"%31s%255s",method,askPath);
 		time_t now=time(NULL);
 		strftime(nowTime,48,"%Y-%m-%l %H:%M",localtime(&now));
-		sprintf(buffer,"%s %s %s %s",nowTime,ServerTcpIp::getPeerIp(soc,&port),method,askPath);
+		if(soc!=0)
+		{
+			sscanf((char*)text,"%31s%255s",method,askPath);
+			sprintf(buffer,"%s %s %s %s",nowTime,ServerTcpIp::getPeerIp(soc,&port),method,askPath);
+		}
+		else
+			sprintf(buffer,"%s localhost %s wrong",nowTime,text);
 		loger.accessLog(buffer);
 	}
 	static bool recordFileError(const char* fileName)
@@ -3558,11 +3563,11 @@ private:
 			}
 		}
 		if(middleware!=NULL)
-			printf("middleware funtion set\n");
+			printf("middleware\t funtion set\n");
 		if(logFunc!=NULL)
-			printf("log function set\n");
+			printf("log\t function set\n");
 		if(logError!=NULL)
-			printf("error funtion set\n");
+			printf("error\t funtion set\n");
 		if(clientIn!=NULL)
 			printf("client in function set\n");
 		if(clientOut!=NULL)
@@ -3630,6 +3635,8 @@ private:
 			memset(ask,0,sizeof(char)*200);
 			if(isDebug)
 				printf("way not support\n");
+			if(logError!=NULL)
+				logError(ask,num);
 			type=GET;
 		}
 		void (*pfunc)(HttpServer&,DealHttp&,int)=NULL;
