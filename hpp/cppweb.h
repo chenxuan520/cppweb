@@ -1,7 +1,11 @@
+//THIS FILE IS PART OF PROJECT CPPWEB
+//
+//THIS PROGRAM IS FREE SOFTWARE. IS LICENSED UNDER AGPL
+//
+//Copyright (c) 2022 chenxuan 
 #ifndef _CPPWEB_H_
 #define _CPPWEB_H_
 #include<iostream>
-#include<cstdlib>
 #include<stdarg.h>
 #include<time.h>
 #include<signal.h>
@@ -16,6 +20,7 @@
 #include<string.h>
 #include<netdb.h>
 #include<pthread.h>
+#include<cstdlib>
 #include<queue>
 #include<vector>
 #include<stack>
@@ -1165,7 +1170,7 @@ public:
 class ServerTcpIp{
 public:
 	enum Thing{
-		OUT=0,IN=1,SAY=2,
+		CPPOUT=0,CPPIN=1,CPPSAY=2,
 	};
 protected:
 	int sizeAddr;//sizeof(sockaddr_in) connect with addr_in;
@@ -1331,10 +1336,45 @@ public:
 	{
 		return this->error;
 	}
+	void selectModel(void (*pfunc)(Thing,int,ServerTcpIp&))
+	{
+		fd_set temp=fdClients;
+		int sign=select(fd_count+1,&temp,NULL,NULL,NULL);
+		if(sign>0)
+			for(int i=3;i<fd_count+1;i++)
+				if(FD_ISSET(i,&temp))
+				{
+					if(i==sock)
+					{
+						if(fd_count<1024)
+						{
+							sockaddr_in newaddr={0,0,{0},{0}};
+							int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
+							FD_SET(newClient,&fdClients);
+							if(newClient>fd_count)
+							{
+								last_count=fd_count;
+								fd_count=newClient;
+							}
+							if(pfunc!=NULL)
+								pfunc(CPPIN,newClient,*this);
+						}
+						else
+							continue;
+					}
+					else
+					{
+						if(pfunc!=NULL)
+						{
+							pfunc(CPPSAY,i,*this);
+						}
+					}
+				}
+	}
 	bool selectModel(void* pget,int len,void* pneed,int (*pfunc)(Thing ,int ,int,void* ,void*,ServerTcpIp& ))
 	{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
 		fd_set temp=fdClients;
-		Thing pthing=OUT;
+		Thing pthing=CPPOUT;
 		int sign=select(fd_count+1,&temp,NULL,NULL,NULL);
 		if(sign>0)
 		{
@@ -1358,7 +1398,7 @@ public:
 							strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
 							if(pfunc!=NULL)
 							{
-								if(pfunc(IN,newClient,0,pget,pneed,*this))
+								if(pfunc(CPPIN,newClient,0,pget,pneed,*this))
 									return false;
 							}
 						}
@@ -1371,7 +1411,7 @@ public:
 						int socRec=i;
 						if(sRec>0)
 						{
-							pthing=SAY;
+							pthing=CPPSAY;
 						}
 						if(sRec<=0)
 						{
@@ -1381,7 +1421,7 @@ public:
 							if(i==fd_count)
 								fd_count=last_count;
 							*(char*) pget=0;
-							pthing=OUT;
+							pthing=CPPOUT;
 						}
 						if(pfunc!=NULL)
 						{
@@ -1445,9 +1485,32 @@ public:
 		*pcliPort=cliAddr.sin_port;
 		return inet_ntoa(cliAddr.sin_addr); 
 	}
+	void epollModel(void (*pfunc)(Thing,int,ServerTcpIp&))
+	{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
+		int eventNum=epoll_wait(epfd,pevent,512,-1);
+		for(int i=0;i<eventNum;i++)
+		{
+			epoll_event temp=pevent[i];
+			if(temp.data.fd==sock)
+			{
+				sockaddr_in newaddr={0,0,{0},{0}};
+				int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
+				nowEvent.data.fd=newClient;
+				nowEvent.events=EPOLLIN;
+				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
+				if(pfunc!=NULL)
+					pfunc(CPPIN,newClient,*this);
+			}
+			else
+			{
+				if(pfunc!=NULL)
+					pfunc(CPPSAY,temp.data.fd,*this);
+			}
+		}
+	}
 	bool epollModel(void* pget,int len,void* pneed,int (*pfunc)(Thing,int ,int ,void* ,void*,ServerTcpIp& ))
 	{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
-		Thing thing=SAY;
+		Thing thing=CPPSAY;
 		int eventNum=epoll_wait(epfd,pevent,512,-1);
 		for(int i=0;i<eventNum;i++)
 		{
@@ -1463,7 +1526,7 @@ public:
 				strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
 				if(pfunc!=NULL)
 				{
-					if(pfunc(IN,newClient,0,pget,pneed,*this))
+					if(pfunc(CPPIN,newClient,0,pget,pneed,*this))
 						return false;
 				}
 			}
@@ -1472,11 +1535,11 @@ public:
 				int getNum=recv(temp.data.fd,(char*)pget,len,0);
 				int sockRec=temp.data.fd;
 				if(getNum>0)
-					thing=SAY;
+					thing=CPPSAY;
 				else
 				{
 					*(char*)pget=0;
-					thing=OUT;
+					thing=CPPOUT;
 					this->deleteFd(temp.data.fd);
 					epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
 					close(temp.data.fd);
@@ -4089,7 +4152,7 @@ public:
 						if(fork()==0)
 						{
 							close(sock);
-							pfunc(SAY,temp.data.fd,getNum,pget,pneed,*this);
+							pfunc(CPPSAY,temp.data.fd,getNum,pget,pneed,*this);
 							close(temp.data.fd);
 							free(pneed);
 							free(pget);
