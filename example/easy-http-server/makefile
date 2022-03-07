@@ -1,4 +1,4 @@
 all:main
 main:main.cpp ../../hpp/cppweb.h
-	g++ main.cpp -o main -L"../../lib" -I"../../lib" -lserver -lhttp
+	g++ main.cpp -o main -lpthread
 
