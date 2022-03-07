@@ -1077,19 +1077,20 @@ private:
 		return true;
 	}
 };
-class Guard{
+class ProcessCtrl{
 public:
-	Guard(bool isBackGround=false)
+	static int backGround()
 	{
-		if(isBackGround)
+		int pid=0;
+		if((pid=fork())!=0)
 		{
-			int pid=0;
-			if((pid=fork())!=0)
-			{
-				printf("process pid=%d\n",pid);
-				exit(0);
-			}
+			printf("process pid=%d\n",pid);
+			exit(0);
 		}
+		return pid;
+	}
+	static void guard()
+	{
 		while(1)
 		{
 			int pid=fork();
@@ -2995,7 +2996,7 @@ public:
 			sprintf(buffer,"%s %s %s %s",nowTime,ServerTcpIp::getPeerIp(soc,&port),method,askPath);
 		}
 		else
-			sprintf(buffer,"%s localhost %s wrong",nowTime,text);
+			sprintf(buffer,"%s localhost %s wrong",nowTime,(char*)text);
 		loger.accessLog(buffer);
 	}
 	static bool recordFileError(const char* fileName)
@@ -3565,7 +3566,10 @@ private:
 		if(middleware!=NULL)
 			printf("middleware\t funtion set\n");
 		if(logFunc!=NULL)
+		{
+			logFunc("server start",0);
 			printf("log\t function set\n");
+		}
 		if(logError!=NULL)
 			printf("error\t funtion set\n");
 		if(clientIn!=NULL)
@@ -4184,7 +4188,7 @@ public:
 			return;
 		}
 		isEpoll=true;
-		int eventNum=epoll_wait(epfd,pevent,512,-1),thing=0,num=0;
+		int eventNum=epoll_wait(epfd,pevent,512,-1);
 		for(int i=0;i<eventNum;i++)
 		{
 			epoll_event temp=pevent[i];
@@ -4196,8 +4200,6 @@ public:
 				nowEvent.data.fd=newClient;
 				nowEvent.events=EPOLLIN|EPOLLET;
 				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
-				thing=1;
-				num=newClient;
 			}
 			else
 			{
