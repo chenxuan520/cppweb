@@ -45,10 +45,8 @@ void chooseModel(unsigned int* port,bool* pflag)
 *********************************/
 void ifChoose(bool* pb,unsigned int* pport,bool* is_back)
 {
-	char temp[4000]={0};
 	FileGet file;
-	file.getFileMsg("config.json",temp,4000);
-	Json json(temp);
+	Json json(file.getFileBuff("config.json"));
 	if(json["port"]!=NULL)
 		*pport=json["port"]->intVal;
 	else

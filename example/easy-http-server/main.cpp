@@ -1,17 +1,15 @@
 #include <iostream>  
-#include "../../lib/server.h"
-#include "../../lib/http.h"
+#include "../../hpp/cppweb.h"
 using namespace cppweb;
 int main()  
 {  
 	HttpServer server(5200,true);//input the port bound
-	server.changeSetting(true,false,false);
 	if(server.lastError()!=NULL)
 	{
 		std::cout<<server.lastError()<<std::endl;
 		return -1;
 	}
-	server.run(1,4000,"./index.html");
+	server.run("./index.html");
     return 0; 
 }  
 

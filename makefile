@@ -34,10 +34,8 @@ sql: sql.o
 	ar rcs ./lib/libsql.a sql.o
 sql.o: ./cpp/sql.cpp
 	g++ -c ./cpp/sql.cpp -o sql.o
-# install:
-# 	mkdir /usr/local/include/cppweb
-# 	cp ./lib/*.h /usr/local/include/cppweb
-# 	cp ./lib/*.a /usr/local/lib/
-# uninstall:
-# 	rm -rf /usr/local/include/cppweb
-# 	rm /usr/local/lib/libhttp.a /usr/local/lib/libserver.a /usr/local/lib/libthreadpool.a
+install:
+	mkdir /usr/local/include/cppweb
+	cp hpp/cppweb.h /usr/local/include/cppweb
+uninstall:
+	rm -rf /usr/local/include/cppweb
