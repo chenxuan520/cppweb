@@ -2962,6 +2962,19 @@ public:
 			if(buffer[i]!=NULL)
 				free(buffer[i]);
 	}
+	void forceWrite()
+	{
+		while(nowFree.empty());
+		pool.mutexLock();
+		now=nowFree.front();
+		nowFree.pop();
+		pool.mutexUnlock();
+		nowLen=0;
+		std::pair<LogSystem*,char*>* argv=new std::pair<LogSystem*,char*>(this,page);
+		ThreadPool::Task task{worker,argv};
+		pool.addTask(task);
+		page=now;
+	}
 	void accessLog(const char* text)
 	{
 		if(text==NULL)
@@ -2989,7 +3002,7 @@ public:
 		static LogSystem loger("access.log");
 		int port=0;
 		time_t now=time(NULL);
-		strftime(nowTime,48,"%Y-%m-%l %H:%M",localtime(&now));
+		strftime(nowTime,48,"%Y-%m-%d %H:%M",localtime(&now));
 		if(soc!=0)
 		{
 			sscanf((char*)text,"%31s%255s",method,askPath);
