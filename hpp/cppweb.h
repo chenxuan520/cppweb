@@ -3577,18 +3577,18 @@ private:
 			}
 		}
 		if(middleware!=NULL)
-			printf("middleware\t funtion set\n");
+			printf("middleware\t\tfuntion set\n");
 		if(logFunc!=NULL)
 		{
 			logFunc("server start",0);
-			printf("log\t function set\n");
+			printf("log\t\tfunction set\n");
 		}
 		if(logError!=NULL)
-			printf("error\t funtion set\n");
+			printf("error\t\tfuntion set\n");
 		if(clientIn!=NULL)
-			printf("client in function set\n");
+			printf("clientIn\t\tfunction set\n");
 		if(clientOut!=NULL)
-			printf("client out function set\n");
+			printf("clientout\t\tfunction set\n");
 		printf("\n");
 	}
 	int func(int num)
