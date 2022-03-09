@@ -1330,7 +1330,7 @@ public:
 	}
 	int acceptSocketSSL(sockaddr_in& newaddr)
 	{
-		int cli=acceptSocket(newaddr);
+		int cli=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
 		SSL* now=SSL_new(ctx);
 		if(now==NULL)
 		{
@@ -3871,7 +3871,6 @@ private:
 			{
 				sockaddr_in newaddr={0,0,{0},{0}};
 				int newClient=acceptSocket(newaddr);
-				/* this->addFd(newClient); */
 				nowEvent.data.fd=newClient;
 				nowEvent.events=EPOLLIN;
 				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
@@ -3914,7 +3913,6 @@ private:
 						strcpy((char*)this->getText,this->getPeerIp(temp.data.fd,&port));
 						clientOut(*this,temp.data.fd,this->getText,port);
 					}
-					/* this->deleteFd(temp.data.fd); */
 					epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
 					closeSocket(temp.data.fd);
 				}
@@ -3932,8 +3930,7 @@ private:
 			if(temp.data.fd==sock)
 			{
 				sockaddr_in newaddr={0,0,{0},{0}};
-				int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
-				this->addFd(newClient);
+				int newClient=acceptSocket(newaddr);
 				nowEvent.data.fd=newClient;
 				nowEvent.events=EPOLLIN|EPOLLET;
 				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
@@ -3945,12 +3942,12 @@ private:
 			}
 			else
 			{
-				int getNum=recv(temp.data.fd,(char*)this->getText,sizeof(char)*this->recLen,0);
+				int getNum=receiveSocket(temp.data.fd,(char*)this->getText,sizeof(char)*this->recLen,0);
 				int all=getNum;
 				while((int)this->recLen==all)
 				{
 					this->getText=enlargeMemory(this->getText,this->recLen);
-					getNum=recv(temp.data.fd,(char*)this->getText+all,this->recLen-all,MSG_DONTWAIT);
+					getNum=receiveSocket(temp.data.fd,(char*)this->getText+all,this->recLen-all,MSG_DONTWAIT);
 					if(getNum<=0)
 						break;
 					all+=getNum;
@@ -3960,9 +3957,9 @@ private:
 					this->textLen=all;
 					if(fork()==0)
 					{
-						close(sock);
+						closeSocket(sock);
 						func(temp.data.fd);
-						close(temp.data.fd);
+						closeSocket(temp.data.fd);
 						free(this->getText);
 						free(this->senText);
 						exit(0);
@@ -3971,9 +3968,8 @@ private:
 					{
 						if(isLongCon==false)
 						{
-					  		this->deleteFd(temp.data.fd);
 							epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
-							close(temp.data.fd);
+							closeSocket(temp.data.fd);
 						}
 					}
 					if(logFunc!=NULL)
@@ -3989,7 +3985,7 @@ private:
 					}
 					this->deleteFd(temp.data.fd);
 					epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
-					close(temp.data.fd);
+					closeSocket(temp.data.fd);
 				}
 			}
 		}
