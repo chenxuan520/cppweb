@@ -3,6 +3,7 @@
 //THIS PROGRAM IS FREE SOFTWARE. IS LICENSED UNDER AGPL
 //
 //Copyright (c) 2022 chenxuan 
+#define CPPHTTPLIB_OPENSSL_SUPPORT
 #ifndef _CPPWEB_H_
 #define _CPPWEB_H_
 #include<iostream>
@@ -1190,6 +1191,10 @@ protected:
 	sockaddr_in addr;//IPv4 of host;
 	sockaddr_in client;//IPv4 of client;
 	fd_set  fdClients;//file descriptor
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+	SSL_CTX* ctx;
+	std::unordered_map<int,SSL*> sslHash;
+#endif
 protected:
 	int* pfdn;//pointer if file descriptor
 	int fdNumNow;//num of fd now
@@ -1269,6 +1274,24 @@ public:
 			memset(pfdn,0,sizeof(int)*64);
 		fdNumNow=0;
 		fdMax=64;
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+#if OPENSSL_VERSION_NUMBER < 0x1010001fL
+		SSL_load_error_strings();
+		SSL_library_init();
+#else
+		OPENSSL_init_ssl(OPENSSL_INIT_LOAD_SSL_STRINGS | OPENSSL_INIT_LOAD_CRYPTO_STRINGS, NULL);
+#endif
+		ctx=SSL_CTX_new(TLS_method());
+		if(ctx==NULL)
+		{
+			error="create ctx wrong";
+			return;
+		}
+		SSL_CTX_set_options(ctx,
+							SSL_OP_ALL | SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 |
+							SSL_OP_NO_COMPRESSION |
+							SSL_OP_NO_SESSION_RESUMPTION_ON_RENEGOTIATION);
+#endif
 	}
 	virtual ~ServerTcpIp()//clean server
 	{
@@ -1283,8 +1306,62 @@ public:
 			free(pevent);
 		if(pfdn!=NULL)
 			free(pfdn);
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+		if(ctx!=NULL)
+			SSL_CTX_free(ctx);
+#endif
 	}
-	bool bondhost()//bond myself first
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+	bool loadCertificate(const char* certPath,const char* keyPath)
+	{
+		if(ctx==NULL)
+			return false;
+		if(SSL_CTX_use_certificate_chain_file(ctx,certPath)!=1)
+		{
+			error="cert load wrong";
+			return false;
+		}
+		if(SSL_CTX_use_PrivateKey_file(ctx,keyPath,SSL_FILETYPE_PEM)!=1)
+		{
+			error="key load wrong";
+			return false;
+		}
+		return true;
+	}
+	SSL* acceptSocketSSL(int& cli,sockaddr_in& newaddr)
+	{
+		cli=acceptSocket(newaddr);
+		SSL* now=SSL_new(ctx);
+		if(now==NULL)
+		{
+			error="ssl new wrong";
+			return NULL;
+		}
+		SSL_set_fd(now,cli);
+		SSL_accept(now);
+		sslHash.insert(std::pair<int,SSL*>{cli,now});
+		return now;
+	}
+	inline int receiveSocketSSL(SSL* ssl,void* pget,int len,int=0)
+	{
+		return SSL_read(ssl,pget,len);
+	}
+	inline int sendSocketSSL(SSL* ssl,void* pget,int len,int=0)
+	{
+		return SSL_write(ssl,pget,len);
+	}
+	inline void closeSSL(int cli)
+	{
+		if(sslHash.find(cli)!=sslHash.end())
+		{
+			SSL_shutdown(sslHash[cli]);
+			SSL_free(sslHash[cli]);
+			sslHash.erase(sslHash.find(cli));
+		}
+		close(cli);
+	}
+#endif
+	inline bool bondhost()//bond myself first
 	{
 		if(bind(sock,(sockaddr*)&addr,sizeof(addr))==-1)
 			return false;
@@ -1301,6 +1378,10 @@ public:
 		fd_count=sock;
 		return true;
 	}
+	inline int acceptSocket(sockaddr_in& newaddr)
+	{
+		return accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
+	}
 	int acceptClient()//wait until success model one
 	{
 		sockC=accept(sock,(sockaddr*)&client,(socklen_t*)&sizeAddr);
@@ -1315,9 +1396,9 @@ public:
 	{
 		return recv(sockC,(char*)pget,len,0);
 	}
-	inline int receiveSocket(int clisoc,void* pget,int len)
+	inline int receiveSocket(int clisoc,void* pget,int len,int flag=0)
 	{
-		return recv(clisoc,(char*)pget,len,0);
+		return recv(clisoc,(char*)pget,len,flag);
 	}
 	inline int sendClientOne(const void* psen,int len)//model one
 	{
@@ -1329,9 +1410,9 @@ public:
 			if(pfdn[i]!=0)
 				send(pfdn[i],psen,len,0);
 	}
-	inline int sendSocket(int socCli,const void* psen,int len)//send by socket
+	inline int sendSocket(int socCli,const void* psen,int len,int flag=0)//send by socket
 	{
-		return send(socCli,(char*)psen,len,0);
+		return send(socCli,(char*)psen,len,flag);
 	}
 	inline const char* lastError()
 	{
@@ -3751,7 +3832,7 @@ private:
 			if(temp.data.fd==sock)
 			{
 				sockaddr_in newaddr={0,0,{0},{0}};
-				int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
+				int newClient=acceptSocket(newaddr);
 				this->addFd(newClient);
 				nowEvent.data.fd=newClient;
 				nowEvent.events=EPOLLIN;
@@ -3764,12 +3845,12 @@ private:
 			}
 			else
 			{
-				int getNum=recv(temp.data.fd,(char*)this->getText,this->recLen,MSG_DONTWAIT);
+				int getNum=receiveSocket(temp.data.fd,(char*)this->getText,this->recLen,MSG_DONTWAIT);
 				int all=getNum;
 				while((int)this->recLen==all)
 				{
 					this->getText=enlargeMemory(this->getText,this->recLen);
-					getNum=recv(temp.data.fd,(char*)this->getText+all,this->recLen-all,MSG_DONTWAIT);
+					getNum=receiveSocket(temp.data.fd,(char*)this->getText+all,this->recLen-all,MSG_DONTWAIT);
 					if(getNum<=0)
 						break;
 					all+=getNum;
