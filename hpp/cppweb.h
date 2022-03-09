@@ -3,7 +3,7 @@
 //THIS PROGRAM IS FREE SOFTWARE. IS LICENSED UNDER AGPL
 //
 //Copyright (c) 2022 chenxuan 
-#define CPPHTTPLIB_OPENSSL_SUPPORT
+/* #define CPPHTTPLIB_OPENSSL_SUPPORT */
 #ifndef _CPPWEB_H_
 #define _CPPWEB_H_
 #include<iostream>
@@ -1328,29 +1328,41 @@ public:
 		}
 		return true;
 	}
-	SSL* acceptSocketSSL(int& cli,sockaddr_in& newaddr)
+	int acceptSocketSSL(sockaddr_in& newaddr)
 	{
-		cli=acceptSocket(newaddr);
+		int cli=acceptSocket(newaddr);
 		SSL* now=SSL_new(ctx);
 		if(now==NULL)
 		{
 			error="ssl new wrong";
-			return NULL;
+			return cli;
 		}
 		SSL_set_fd(now,cli);
 		SSL_accept(now);
 		sslHash.insert(std::pair<int,SSL*>{cli,now});
-		return now;
+		return cli;
 	}
-	inline int receiveSocketSSL(SSL* ssl,void* pget,int len,int=0)
+	inline int receiveSocketSSL(int num,void* pget,int len,int=0)
 	{
-		return SSL_read(ssl,pget,len);
+		SSL* ssl=NULL;
+		if(sslHash.find(num)!=sslHash.end())
+			ssl=sslHash[num];
+		if(ssl!=NULL)
+			return SSL_read(ssl,pget,len);
+		else
+			return recv(num,pget,len,0);
 	}
-	inline int sendSocketSSL(SSL* ssl,void* pget,int len,int=0)
+	inline int sendSocketSSL(int num,const void* pget,int len,int=0)
 	{
-		return SSL_write(ssl,pget,len);
+		SSL* ssl=NULL;
+		if(sslHash.find(num)!=sslHash.end())
+			ssl=sslHash[num];
+		if(ssl!=NULL)
+			return SSL_write(ssl,pget,len);
+		else
+			return send(num,pget,len,0);
 	}
-	inline void closeSSL(int cli)
+	inline int closeSSL(int cli)
 	{
 		if(sslHash.find(cli)!=sslHash.end())
 		{
@@ -1358,7 +1370,7 @@ public:
 			SSL_free(sslHash[cli]);
 			sslHash.erase(sslHash.find(cli));
 		}
-		close(cli);
+		return close(cli);
 	}
 #endif
 	inline bool bondhost()//bond myself first
@@ -1380,7 +1392,11 @@ public:
 	}
 	inline int acceptSocket(sockaddr_in& newaddr)
 	{
+#ifndef CPPHTTPLIB_OPENSSL_SUPPORT
 		return accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
+#else
+		return acceptSocketSSL(newaddr);
+#endif
 	}
 	int acceptClient()//wait until success model one
 	{
@@ -1398,7 +1414,11 @@ public:
 	}
 	inline int receiveSocket(int clisoc,void* pget,int len,int flag=0)
 	{
+#ifndef CPPHTTPLIB_OPENSSL_SUPPORT
 		return recv(clisoc,(char*)pget,len,flag);
+#else
+		return this->receiveSocketSSL(clisoc,pget,len,flag);
+#endif
 	}
 	inline int sendClientOne(const void* psen,int len)//model one
 	{
@@ -1412,7 +1432,19 @@ public:
 	}
 	inline int sendSocket(int socCli,const void* psen,int len,int flag=0)//send by socket
 	{
+#ifndef CPPHTTPLIB_OPENSSL_SUPPORT
 		return send(socCli,(char*)psen,len,flag);
+#else
+		return sendSocketSSL(socCli,psen,len,flag);
+#endif
+	}
+	inline int closeSocket(int socCli)
+	{
+#ifndef CPPHTTPLIB_OPENSSL_SUPPORT
+		return close(socCli);
+#else
+		return closeSSL(socCli);
+#endif
 	}
 	inline const char* lastError()
 	{
@@ -3244,6 +3276,12 @@ public:
 		if(arrRoute!=NULL)
 			free(arrRoute);
 	}
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+	inline bool loadKeyCert(const char* certPath,const char* keyPath)
+	{
+		return loadCertificate(certPath,keyPath);
+	}
+#endif
 	bool routeHandle(AskType ask,const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
 	{//add route handle in all ask type 
 		if(strlen(route)>100)
@@ -3540,7 +3578,7 @@ public:
 		unsigned result=messageLen;
 		while(leftLen>5&&getLen>0)
 		{
-			getLen=this->httpRecv(sockCli,(char*)message+old+all,recLen-old-all);
+			getLen=this->receiveSocket(sockCli,(char*)message+old+all,recLen-old-all);
 			result+=getLen;
 			all+=getLen;
 			leftLen-=getLen;
@@ -3833,7 +3871,7 @@ private:
 			{
 				sockaddr_in newaddr={0,0,{0},{0}};
 				int newClient=acceptSocket(newaddr);
-				this->addFd(newClient);
+				/* this->addFd(newClient); */
 				nowEvent.data.fd=newClient;
 				nowEvent.events=EPOLLIN;
 				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
@@ -3865,7 +3903,7 @@ private:
 					{
 				  		this->deleteFd(temp.data.fd);
 						epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
-						close(temp.data.fd);						
+						closeSocket(temp.data.fd);
 					}
 				}
 				else
@@ -3876,9 +3914,9 @@ private:
 						strcpy((char*)this->getText,this->getPeerIp(temp.data.fd,&port));
 						clientOut(*this,temp.data.fd,this->getText,port);
 					}
-					this->deleteFd(temp.data.fd);
+					/* this->deleteFd(temp.data.fd); */
 					epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
-					close(temp.data.fd);
+					closeSocket(temp.data.fd);
 				}
 			}
 		}
