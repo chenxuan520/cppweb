@@ -1,6 +1,4 @@
 {
-	//choose the version
-	"version":2,
 	//set the bound port
 	"port":5200,
 	//default file when ask /

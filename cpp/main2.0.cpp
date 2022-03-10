@@ -106,16 +106,9 @@ void serverHttp(int argc,char** argv)
 	if(ifArgc(argc,argv,&is_back,&port)==false&&is_choose==false)
 		chooseModel(&port,&is_back);
 	if(is_back)
-	{
-		int pid=0;
-		if((pid=fork())!=0)
-		{
-			printf("pid=%d\n",pid);
-			return;
-		}
-	}
+		ProcessCtrl::backGround();
 	if(isGuard)
-		Guard guard;
+		ProcessCtrl::guard();
 	HttpServer server(port,true);
 	addHandle(server);
 	server.run(indexName);

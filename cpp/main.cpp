@@ -33,11 +33,11 @@ int funcTwo(ServerTcpIp::Thing thing,int num,int,void* pget,void* sen,ServerTcpI
 	// 	server.disconnectSocketEpoll(num);
 	// 	return 0;
 	// }
-	if(thing==ServerTcpIp::OUT)
+	if(thing==ServerTcpIp::CPPOUT)
 		dealAsk.dealClientOut(server,http,pget,sen,num);
-	if(thing==ServerTcpIp::IN)
+	if(thing==ServerTcpIp::CPPIN)
 		dealAsk.dealClientIn(server,http,pget,sen,num);
-	if(thing==ServerTcpIp::OUT)
+	if(thing==ServerTcpIp::CPPOUT)
 	{
 		if(strstr((char*)pget,"POST")!=NULL)
 		{	
