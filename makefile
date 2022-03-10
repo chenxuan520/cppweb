@@ -37,5 +37,7 @@ sql.o: ./cpp/sql.cpp
 install:
 	mkdir /usr/local/include/cppweb
 	cp hpp/cppweb.h /usr/local/include/cppweb
+update:
+	cp hpp/cppweb.h /usr/local/include/cppweb
 uninstall:
 	rm -rf /usr/local/include/cppweb
