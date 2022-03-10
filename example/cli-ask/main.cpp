@@ -1,5 +1,5 @@
 #include <iostream>
-#define CPPHTTPLIB_OPENSSL_SUPPORT
+#define CPPWEB_OPENSSL
 #include "../../hpp/cppweb.h"
 using namespace std;
 using namespace cppweb;

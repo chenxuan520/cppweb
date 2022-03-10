@@ -57,9 +57,11 @@
 
 6. 支持日志生成和实现,日志系统约为30万条每秒
 
-7. 具有io复用,多进程,多线程三种模式
+7. 具有io复用,多进程,线程池三种模式
 
 8. 包含线程池和线程池服务器
+
+9. 支持https连接(客户端和服务端都可)
 
 ## 搭建服务器
 
@@ -79,6 +81,27 @@ int main()
     return 0; //没有错会一直运行,除非出错,可以用lastError获取错取
 }  
 ```
+
+#### 搭建https
+
+```cpp
+#define CPPWEB_OPENSSL
+#include "../../hpp/cppweb.h"
+using namespace std;
+using namespace cppweb;
+int main()
+{
+    HttpServer server(5201,true,HttpServer::THREAD,5);
+    server.loadKeyCert("./cacert.pem","./privkey.pem","123456");
+    //第一个是证书位置,第二个是私钥位置,第三个是密码(没有可以不填)
+    server.run("./index.html");
+    return 0;
+}
+```
+
+- 需要安装openssl
+
+- 需要包含头文件之前定义宏
 
 #### 路由设置
 

@@ -3,7 +3,7 @@
 //THIS PROGRAM IS FREE SOFTWARE. IS LICENSED UNDER AGPL
 //
 //Copyright (c) 2022 chenxuan 
-/* #define CPPHTTPLIB_OPENSSL_SUPPORT */
+/* #define CPPWEB_OPENSSL */
 #ifndef _CPPWEB_H_
 #define _CPPWEB_H_
 #include<iostream>
@@ -30,7 +30,7 @@
 #include<type_traits>
 #include<unordered_map>
 #include<initializer_list>
-#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+#ifdef CPPWEB_OPENSSL
 #include<openssl/ssl.h>
 #include<openssl/err.h>
 #endif
@@ -1191,7 +1191,7 @@ protected:
 	sockaddr_in addr;//IPv4 of host;
 	sockaddr_in client;//IPv4 of client;
 	fd_set  fdClients;//file descriptor
-#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+#ifdef CPPWEB_OPENSSL
 	SSL_CTX* ctx;
 	std::unordered_map<int,SSL*> sslHash;
 #endif
@@ -1274,7 +1274,7 @@ public:
 			memset(pfdn,0,sizeof(int)*64);
 		fdNumNow=0;
 		fdMax=64;
-#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+#ifdef CPPWEB_OPENSSL
 #if OPENSSL_VERSION_NUMBER < 0x1010001fL
 		SSL_load_error_strings();
 		SSL_library_init();
@@ -1306,13 +1306,13 @@ public:
 			free(pevent);
 		if(pfdn!=NULL)
 			free(pfdn);
-#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+#ifdef CPPWEB_OPENSSL
 		if(ctx!=NULL)
 			SSL_CTX_free(ctx);
 #endif
 	}
-#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
-	bool loadCertificate(const char* certPath,const char* keyPath)
+#ifdef CPPWEB_OPENSSL
+	bool loadCertificate(const char* certPath,const char* keyPath,const char* passwd=NULL)
 	{
 		if(ctx==NULL)
 			return false;
@@ -1321,6 +1321,8 @@ public:
 			error="cert load wrong";
 			return false;
 		}
+		if(passwd!=NULL)
+			SSL_CTX_set_default_passwd_cb_userdata(ctx,(void*)passwd);
 		if(SSL_CTX_use_PrivateKey_file(ctx,keyPath,SSL_FILETYPE_PEM)!=1)
 		{
 			error="key load wrong";
@@ -1379,6 +1381,10 @@ public:
 			return false;
 		return true;
 	}
+	inline void setPort(unsigned short port)
+	{
+		addr.sin_port=htons(port);
+	}
 	bool setlisten()//set listem to accept second
 	{
 		if(listen(sock,backwait)==-1)
@@ -1392,7 +1398,7 @@ public:
 	}
 	inline int acceptSocket(sockaddr_in& newaddr)
 	{
-#ifndef CPPHTTPLIB_OPENSSL_SUPPORT
+#ifndef CPPWEB_OPENSSL
 		return accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
 #else
 		return acceptSocketSSL(newaddr);
@@ -1414,7 +1420,7 @@ public:
 	}
 	inline int receiveSocket(int clisoc,void* pget,int len,int flag=0)
 	{
-#ifndef CPPHTTPLIB_OPENSSL_SUPPORT
+#ifndef CPPWEB_OPENSSL
 		return recv(clisoc,(char*)pget,len,flag);
 #else
 		return this->receiveSocketSSL(clisoc,pget,len,flag);
@@ -1432,7 +1438,7 @@ public:
 	}
 	inline int sendSocket(int socCli,const void* psen,int len,int flag=0)//send by socket
 	{
-#ifndef CPPHTTPLIB_OPENSSL_SUPPORT
+#ifndef CPPWEB_OPENSSL
 		return send(socCli,(char*)psen,len,flag);
 #else
 		return sendSocketSSL(socCli,psen,len,flag);
@@ -1440,7 +1446,7 @@ public:
 	}
 	inline int closeSocket(int socCli)
 	{
-#ifndef CPPHTTPLIB_OPENSSL_SUPPORT
+#ifndef CPPWEB_OPENSSL
 		return close(socCli);
 #else
 		return closeSSL(socCli);
@@ -1682,7 +1688,7 @@ private:
 	char* hostname;//host name
 	char selfIp[100];
 	const char* error;
-#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+#ifdef CPPWEB_OPENSSL
 	SSL* ssl;
 	SSL_CTX* ctx;
 #endif
@@ -1713,14 +1719,14 @@ public:
 			addrC.sin_addr.s_addr=inet_addr(hostIp);
 		addrC.sin_family=AF_INET;//af_intt IPv4
 		addrC.sin_port=htons(port);
-#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+#ifdef CPPWEB_OPENSSL
 		ssl=NULL;
 		ctx=NULL;
 #endif
 	}
 	~ClientTcpIp()
 	{
-#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+#ifdef CPPWEB_OPENSSL
 		if(ssl!=NULL)
 		{
 			SSL_shutdown(ssl);
@@ -1791,7 +1797,7 @@ public:
 	{
 		return error;
 	}
-#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+#ifdef CPPWEB_OPENSSL
 	bool tryConnectSSL()
 	{
 		const SSL_METHOD* meth=SSLv23_client_method();
@@ -3189,7 +3195,7 @@ public://main class for http server2.0
 		AskType ask;
 		RouteType type;
 		char route[128];
-		char path[128];
+		char pathExtra[128];
 		void (*pfunc)(HttpServer&,DealHttp&,int);
 	};
 private:
@@ -3276,10 +3282,10 @@ public:
 		if(arrRoute!=NULL)
 			free(arrRoute);
 	}
-#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
-	inline bool loadKeyCert(const char* certPath,const char* keyPath)
+#ifdef CPPWEB_OPENSSL
+	inline bool loadKeyCert(const char* certPath,const char* keyPath,const char* passwd=NULL)
 	{
-		return loadCertificate(certPath,keyPath);
+		return loadCertificate(certPath,keyPath,passwd);
 	}
 #endif
 	bool routeHandle(AskType ask,const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
@@ -3318,7 +3324,7 @@ public:
 		nowRoute->type=STATIC;
 		nowRoute->ask=GET;
 		strcpy(nowRoute->route,route);
-		strcpy(nowRoute->path,staticFile);
+		strcpy(nowRoute->pathExtra,staticFile);
 		nowRoute->pfunc=loadFile;
 		if(false==trie.insert(route,nowRoute))
 		{
@@ -3339,7 +3345,7 @@ public:
 		nowRoute->type=STAWILD;
 		nowRoute->ask=GET;
 		strcpy(nowRoute->route,route);
-		strcpy(nowRoute->path,staticPath);
+		strcpy(nowRoute->pathExtra,staticPath);
 		nowRoute->pfunc=loadFile;
 		if(false==trie.insert(route,nowRoute))
 		{
@@ -3627,6 +3633,10 @@ public:
 	{//stop server run;
 		this->isContinue=false;
 	}
+	inline RouteFuntion* getNowRoute()
+	{//get the now route;
+		return pnowRoute;
+	}
 private:
 	void messagePrint()
 	{
@@ -3648,6 +3658,11 @@ private:
 			printf("auto:\t\tTrue\n");
 		else
 			printf("auto:\t\tFalse\n");
+#ifdef CPPWEB_OPENSSL
+		printf("ssl:\t\tTrue\n");
+#else
+		printf("ssl:\t\tFalse\n");
+#endif
 		if(defaultFile!=NULL)
 			printf("/\t\t->\t%s\n",defaultFile);
 		for(unsigned i=0;i<now;i++)
@@ -3663,7 +3678,7 @@ private:
 			case STATIC:
 			case STAWILD:
 				if(arrRoute[i].pfunc==loadFile)
-					printf("%s\t\t->%s\n",arrRoute[i].route,arrRoute[i].path);
+					printf("%s\t\t->%s\n",arrRoute[i].route,arrRoute[i].pathExtra);
 				else if(arrRoute[i].pfunc==deleteFile)
 					printf("%s\t\t->\tdelete\n",arrRoute[i].route);
 				else
@@ -4006,10 +4021,6 @@ private:
 		now++;
 		return temp;
 	}
-	inline RouteFuntion* getNowRoute()
-	{
-		return pnowRoute;
-	}
 	struct ThreadArg{
 		HttpServer* pserver;
 		int soc;
@@ -4019,7 +4030,7 @@ private:
 		while(this->isContinue)
 		{
 			sockaddr_in newaddr={0,0,{0},{0}};
-			int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
+			int newClient=acceptSocket(newaddr);
 			if(newClient==-1)
 				continue;
 			ThreadArg* temp=new ThreadArg;
@@ -4092,7 +4103,7 @@ private:
 		http.getAskRoute(server.recText(),"GET",ask,200);
 		HttpServer::RouteFuntion& route=*server.getNowRoute();
 		http.getWildUrl(ask,route.route,temp,200);
-		sprintf(buf,"GET %s%s HTTP/1.1",route.path,temp);
+		sprintf(buf,"GET %s%s HTTP/1.1",route.pathExtra,temp);
 		if(2==http.autoAnalysisGet(buf,(char*)server.getSenBuff(),senLen*1024*1024,NULL,&len))
 		{
 			if(server.logError!=NULL)
