@@ -1409,11 +1409,6 @@ public:
 		sockC=accept(sock,(sockaddr*)&client,(socklen_t*)&sizeAddr);
 		return sockC;
 	}
-	bool acceptClients(int* pcliNum)//model two
-	{
-		*pcliNum=accept(sock,(sockaddr*)&client,(socklen_t*)&sizeAddr);
-		return this->addFd(*pcliNum);
-	}
 	inline int receiveOne(void* pget,int len)//model one
 	{
 		return recv(sockC,(char*)pget,len,0);
@@ -1456,7 +1451,7 @@ public:
 	{
 		return this->error;
 	}
-	void selectModel(void (*pfunc)(Thing,int,ServerTcpIp&))
+	void selectModel(int (*pfunc)(Thing,int,ServerTcpIp&,void*),void* argv)
 	{
 		fd_set temp=fdClients;
 		int sign=select(fd_count+1,&temp,NULL,NULL,NULL);
@@ -1469,15 +1464,26 @@ public:
 						if(fd_count<1024)
 						{
 							sockaddr_in newaddr={0,0,{0},{0}};
-							int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
+							int newClient=acceptSocket(newaddr);
 							FD_SET(newClient,&fdClients);
 							if(newClient>fd_count)
-							{
-								last_count=fd_count;
 								fd_count=newClient;
-							}
 							if(pfunc!=NULL)
-								pfunc(CPPIN,newClient,*this);
+							{
+								int numGet=pfunc(CPPIN,newClient,*this,argv);
+								if(numGet!=0)
+								{
+									FD_CLR(numGet,&fdClients);
+									if(numGet==fd_count)
+										for(int j=numGet-1;j>=0;j--)
+											if(FD_ISSET(j,&fdClients))
+											{
+												fd_count=j;
+												break;
+											}
+									closeSocket(newClient);
+								}
+							}
 						}
 						else
 							continue;
@@ -1486,7 +1492,19 @@ public:
 					{
 						if(pfunc!=NULL)
 						{
-							pfunc(CPPSAY,i,*this);
+							int numGet=pfunc(CPPSAY,i,*this,argv);
+							if(numGet!=0)
+							{
+								FD_CLR(i,&fdClients);
+								if(i==fd_count)
+									for(int j=i-1;j>=0;j--)
+										if(FD_ISSET(j,&fdClients))
+										{
+											fd_count=j;
+											break;
+										}
+								closeSocket(i);
+							}
 						}
 					}
 				}
@@ -1605,26 +1623,40 @@ public:
 		*pcliPort=cliAddr.sin_port;
 		return inet_ntoa(cliAddr.sin_addr); 
 	}
-	void epollModel(void (*pfunc)(Thing,int,ServerTcpIp&))
+	void epollModel(int (*pfunc)(Thing,int,ServerTcpIp&,void*),void* argv)
 	{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
-		int eventNum=epoll_wait(epfd,pevent,512,-1);
+		int eventNum=epoll_wait(epfd,pevent,512,-1),numGet=0;
 		for(int i=0;i<eventNum;i++)
 		{
 			epoll_event temp=pevent[i];
 			if(temp.data.fd==sock)
 			{
 				sockaddr_in newaddr={0,0,{0},{0}};
-				int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
+				int newClient=acceptSocket(newaddr);
 				nowEvent.data.fd=newClient;
 				nowEvent.events=EPOLLIN;
 				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
 				if(pfunc!=NULL)
-					pfunc(CPPIN,newClient,*this);
+				{
+					numGet=pfunc(CPPIN,newClient,*this,argv);
+					if(numGet!=0)
+					{
+						epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
+						closeSocket(temp.data.fd);
+					}
+				}
 			}
 			else
 			{
 				if(pfunc!=NULL)
-					pfunc(CPPSAY,temp.data.fd,*this);
+				{
+					numGet=pfunc(CPPSAY,temp.data.fd,*this,argv);
+					if(numGet!=0)
+					{
+						epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
+						closeSocket(temp.data.fd);
+					}
+				}
 			}
 		}
 	}
@@ -1672,11 +1704,6 @@ public:
 			}
 		}
 		return true;
-	}
-	bool disconnectSocket(int clisock)//disconnect from socket
-	{
-		close(clisock);
-		return this->deleteFd(clisock);
 	}
 };
 class ClientTcpIp{
@@ -3612,9 +3639,9 @@ public:
 	{//get the error of server
 		return error;
 	}
-	inline bool disconnect(int soc)
+	inline void disconnect(int soc)
 	{
-		return this->disconnectSocket(soc);
+		this->closeSocket(soc);
 	}
 	inline void selfCreate(unsigned senLen)
 	{//use getSenBuff to create task by self
@@ -3915,7 +3942,6 @@ private:
 						logFunc(this->recText(),temp.data.fd);
 					if(isLongCon==false)
 					{
-				  		this->deleteFd(temp.data.fd);
 						epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
 						closeSocket(temp.data.fd);
 					}
@@ -3998,7 +4024,6 @@ private:
 						strcpy((char*)this->getText,this->getPeerIp(temp.data.fd,&port));
 						clientOut(*this,temp.data.fd,this->getText,port);
 					}
-					this->deleteFd(temp.data.fd);
 					epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
 					closeSocket(temp.data.fd);
 				}
@@ -4230,7 +4255,6 @@ public:
 			int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
 			if(newClient==-1)
 				continue;
-			this->addFd(newClient);
 			Argv* temp=new Argv;
 			temp->pserver=this;
 			temp->func=pfunc;
@@ -4277,7 +4301,6 @@ public:
 				{
 					sockaddr_in newaddr={0,0,{0},{0}};
 					int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
-					this->addFd(newClient);
 					nowEvent.data.fd=newClient;
 					nowEvent.events=EPOLLIN;
 					epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
@@ -4293,7 +4316,6 @@ public:
 					{
 						*(char*)pget=0;
 						thing=0;
-						this->deleteFd(temp.data.fd);
 						epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
 						close(temp.data.fd);
 					}
@@ -4310,7 +4332,6 @@ public:
 						}
 						else
 						{
-							this->deleteFd(temp.data.fd);
 							epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
 							close(temp.data.fd);
 						}
@@ -4335,7 +4356,6 @@ public:
 			{
 				sockaddr_in newaddr={0,0,{0},{0}};
 				int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
-				this->addFd(newClient);
 				nowEvent.data.fd=newClient;
 				nowEvent.events=EPOLLIN|EPOLLET;
 				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
@@ -4355,12 +4375,11 @@ public:
 		}
 		return;
 	}
-	inline bool threadDeleteSoc(int clisoc)
+	inline void threadDeleteSoc(int clisoc)
 	{
 		close(clisoc);
 		if(isEpoll)
 			epoll_ctl(epfd,clisoc,EPOLL_CTL_DEL,NULL);
-		return this->deleteFd(clisoc);
 	}
 };
 class FileGet{
