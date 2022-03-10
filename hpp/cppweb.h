@@ -3,6 +3,7 @@
 //THIS PROGRAM IS FREE SOFTWARE. IS LICENSED UNDER AGPL
 //
 //Copyright (c) 2022 chenxuan 
+/* #define CPPWEB_OPENSSL */
 #ifndef _CPPWEB_H_
 #define _CPPWEB_H_
 #include<iostream>
@@ -29,7 +30,7 @@
 #include<type_traits>
 #include<unordered_map>
 #include<initializer_list>
-#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+#ifdef CPPWEB_OPENSSL
 #include<openssl/ssl.h>
 #include<openssl/err.h>
 #endif
@@ -1190,6 +1191,10 @@ protected:
 	sockaddr_in addr;//IPv4 of host;
 	sockaddr_in client;//IPv4 of client;
 	fd_set  fdClients;//file descriptor
+#ifdef CPPWEB_OPENSSL
+	SSL_CTX* ctx;
+	std::unordered_map<int,SSL*> sslHash;
+#endif
 protected:
 	int* pfdn;//pointer if file descriptor
 	int fdNumNow;//num of fd now
@@ -1269,6 +1274,24 @@ public:
 			memset(pfdn,0,sizeof(int)*64);
 		fdNumNow=0;
 		fdMax=64;
+#ifdef CPPWEB_OPENSSL
+#if OPENSSL_VERSION_NUMBER < 0x1010001fL
+		SSL_load_error_strings();
+		SSL_library_init();
+#else
+		OPENSSL_init_ssl(OPENSSL_INIT_LOAD_SSL_STRINGS | OPENSSL_INIT_LOAD_CRYPTO_STRINGS, NULL);
+#endif
+		ctx=SSL_CTX_new(TLS_method());
+		if(ctx==NULL)
+		{
+			error="create ctx wrong";
+			return;
+		}
+		SSL_CTX_set_options(ctx,
+							SSL_OP_ALL | SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 |
+							SSL_OP_NO_COMPRESSION |
+							SSL_OP_NO_SESSION_RESUMPTION_ON_RENEGOTIATION);
+#endif
 	}
 	virtual ~ServerTcpIp()//clean server
 	{
@@ -1283,12 +1306,84 @@ public:
 			free(pevent);
 		if(pfdn!=NULL)
 			free(pfdn);
+#ifdef CPPWEB_OPENSSL
+		if(ctx!=NULL)
+			SSL_CTX_free(ctx);
+#endif
 	}
-	bool bondhost()//bond myself first
+#ifdef CPPWEB_OPENSSL
+	bool loadCertificate(const char* certPath,const char* keyPath,const char* passwd=NULL)
+	{
+		if(ctx==NULL)
+			return false;
+		if(SSL_CTX_use_certificate_chain_file(ctx,certPath)!=1)
+		{
+			error="cert load wrong";
+			return false;
+		}
+		if(passwd!=NULL)
+			SSL_CTX_set_default_passwd_cb_userdata(ctx,(void*)passwd);
+		if(SSL_CTX_use_PrivateKey_file(ctx,keyPath,SSL_FILETYPE_PEM)!=1)
+		{
+			error="key load wrong";
+			return false;
+		}
+		return true;
+	}
+	int acceptSocketSSL(sockaddr_in& newaddr)
+	{
+		int cli=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
+		SSL* now=SSL_new(ctx);
+		if(now==NULL)
+		{
+			error="ssl new wrong";
+			return cli;
+		}
+		SSL_set_fd(now,cli);
+		SSL_accept(now);
+		sslHash.insert(std::pair<int,SSL*>{cli,now});
+		return cli;
+	}
+	inline int receiveSocketSSL(int num,void* pget,int len,int=0)
+	{
+		SSL* ssl=NULL;
+		if(sslHash.find(num)!=sslHash.end())
+			ssl=sslHash[num];
+		if(ssl!=NULL)
+			return SSL_read(ssl,pget,len);
+		else
+			return recv(num,pget,len,0);
+	}
+	inline int sendSocketSSL(int num,const void* pget,int len,int=0)
+	{
+		SSL* ssl=NULL;
+		if(sslHash.find(num)!=sslHash.end())
+			ssl=sslHash[num];
+		if(ssl!=NULL)
+			return SSL_write(ssl,pget,len);
+		else
+			return send(num,pget,len,0);
+	}
+	inline int closeSSL(int cli)
+	{
+		if(sslHash.find(cli)!=sslHash.end())
+		{
+			SSL_shutdown(sslHash[cli]);
+			SSL_free(sslHash[cli]);
+			sslHash.erase(sslHash.find(cli));
+		}
+		return close(cli);
+	}
+#endif
+	inline bool bondhost()//bond myself first
 	{
 		if(bind(sock,(sockaddr*)&addr,sizeof(addr))==-1)
 			return false;
 		return true;
+	}
+	inline void setPort(unsigned short port)
+	{
+		addr.sin_port=htons(port);
 	}
 	bool setlisten()//set listem to accept second
 	{
@@ -1301,23 +1396,30 @@ public:
 		fd_count=sock;
 		return true;
 	}
+	inline int acceptSocket(sockaddr_in& newaddr)
+	{
+#ifndef CPPWEB_OPENSSL
+		return accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
+#else
+		return acceptSocketSSL(newaddr);
+#endif
+	}
 	int acceptClient()//wait until success model one
 	{
 		sockC=accept(sock,(sockaddr*)&client,(socklen_t*)&sizeAddr);
 		return sockC;
 	}
-	bool acceptClients(int* pcliNum)//model two
-	{
-		*pcliNum=accept(sock,(sockaddr*)&client,(socklen_t*)&sizeAddr);
-		return this->addFd(*pcliNum);
-	}
 	inline int receiveOne(void* pget,int len)//model one
 	{
 		return recv(sockC,(char*)pget,len,0);
 	}
-	inline int receiveSocket(int clisoc,void* pget,int len)
+	inline int receiveSocket(int clisoc,void* pget,int len,int flag=0)
 	{
-		return recv(clisoc,(char*)pget,len,0);
+#ifndef CPPWEB_OPENSSL
+		return recv(clisoc,(char*)pget,len,flag);
+#else
+		return this->receiveSocketSSL(clisoc,pget,len,flag);
+#endif
 	}
 	inline int sendClientOne(const void* psen,int len)//model one
 	{
@@ -1329,15 +1431,27 @@ public:
 			if(pfdn[i]!=0)
 				send(pfdn[i],psen,len,0);
 	}
-	inline int sendSocket(int socCli,const void* psen,int len)//send by socket
+	inline int sendSocket(int socCli,const void* psen,int len,int flag=0)//send by socket
 	{
-		return send(socCli,(char*)psen,len,0);
+#ifndef CPPWEB_OPENSSL
+		return send(socCli,(char*)psen,len,flag);
+#else
+		return sendSocketSSL(socCli,psen,len,flag);
+#endif
+	}
+	inline int closeSocket(int socCli)
+	{
+#ifndef CPPWEB_OPENSSL
+		return close(socCli);
+#else
+		return closeSSL(socCli);
+#endif
 	}
 	inline const char* lastError()
 	{
 		return this->error;
 	}
-	void selectModel(void (*pfunc)(Thing,int,ServerTcpIp&))
+	void selectModel(int (*pfunc)(Thing,int,ServerTcpIp&,void*),void* argv)
 	{
 		fd_set temp=fdClients;
 		int sign=select(fd_count+1,&temp,NULL,NULL,NULL);
@@ -1350,15 +1464,26 @@ public:
 						if(fd_count<1024)
 						{
 							sockaddr_in newaddr={0,0,{0},{0}};
-							int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
+							int newClient=acceptSocket(newaddr);
 							FD_SET(newClient,&fdClients);
 							if(newClient>fd_count)
-							{
-								last_count=fd_count;
 								fd_count=newClient;
-							}
 							if(pfunc!=NULL)
-								pfunc(CPPIN,newClient,*this);
+							{
+								int numGet=pfunc(CPPIN,newClient,*this,argv);
+								if(numGet!=0)
+								{
+									FD_CLR(numGet,&fdClients);
+									if(numGet==fd_count)
+										for(int j=numGet-1;j>=0;j--)
+											if(FD_ISSET(j,&fdClients))
+											{
+												fd_count=j;
+												break;
+											}
+									closeSocket(newClient);
+								}
+							}
 						}
 						else
 							continue;
@@ -1367,7 +1492,19 @@ public:
 					{
 						if(pfunc!=NULL)
 						{
-							pfunc(CPPSAY,i,*this);
+							int numGet=pfunc(CPPSAY,i,*this,argv);
+							if(numGet!=0)
+							{
+								FD_CLR(i,&fdClients);
+								if(i==fd_count)
+									for(int j=i-1;j>=0;j--)
+										if(FD_ISSET(j,&fdClients))
+										{
+											fd_count=j;
+											break;
+										}
+								closeSocket(i);
+							}
 						}
 					}
 				}
@@ -1486,26 +1623,40 @@ public:
 		*pcliPort=cliAddr.sin_port;
 		return inet_ntoa(cliAddr.sin_addr); 
 	}
-	void epollModel(void (*pfunc)(Thing,int,ServerTcpIp&))
+	void epollModel(int (*pfunc)(Thing,int,ServerTcpIp&,void*),void* argv)
 	{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
-		int eventNum=epoll_wait(epfd,pevent,512,-1);
+		int eventNum=epoll_wait(epfd,pevent,512,-1),numGet=0;
 		for(int i=0;i<eventNum;i++)
 		{
 			epoll_event temp=pevent[i];
 			if(temp.data.fd==sock)
 			{
 				sockaddr_in newaddr={0,0,{0},{0}};
-				int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
+				int newClient=acceptSocket(newaddr);
 				nowEvent.data.fd=newClient;
 				nowEvent.events=EPOLLIN;
 				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
 				if(pfunc!=NULL)
-					pfunc(CPPIN,newClient,*this);
+				{
+					numGet=pfunc(CPPIN,newClient,*this,argv);
+					if(numGet!=0)
+					{
+						epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
+						closeSocket(temp.data.fd);
+					}
+				}
 			}
 			else
 			{
 				if(pfunc!=NULL)
-					pfunc(CPPSAY,temp.data.fd,*this);
+				{
+					numGet=pfunc(CPPSAY,temp.data.fd,*this,argv);
+					if(numGet!=0)
+					{
+						epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
+						closeSocket(temp.data.fd);
+					}
+				}
 			}
 		}
 	}
@@ -1554,11 +1705,6 @@ public:
 		}
 		return true;
 	}
-	bool disconnectSocket(int clisock)//disconnect from socket
-	{
-		close(clisock);
-		return this->deleteFd(clisock);
-	}
 };
 class ClientTcpIp{
 private:
@@ -1569,7 +1715,7 @@ private:
 	char* hostname;//host name
 	char selfIp[100];
 	const char* error;
-#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+#ifdef CPPWEB_OPENSSL
 	SSL* ssl;
 	SSL_CTX* ctx;
 #endif
@@ -1600,14 +1746,14 @@ public:
 			addrC.sin_addr.s_addr=inet_addr(hostIp);
 		addrC.sin_family=AF_INET;//af_intt IPv4
 		addrC.sin_port=htons(port);
-#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+#ifdef CPPWEB_OPENSSL
 		ssl=NULL;
 		ctx=NULL;
 #endif
 	}
 	~ClientTcpIp()
 	{
-#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+#ifdef CPPWEB_OPENSSL
 		if(ssl!=NULL)
 		{
 			SSL_shutdown(ssl);
@@ -1678,7 +1824,7 @@ public:
 	{
 		return error;
 	}
-#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
+#ifdef CPPWEB_OPENSSL
 	bool tryConnectSSL()
 	{
 		const SSL_METHOD* meth=SSLv23_client_method();
@@ -2962,6 +3108,19 @@ public:
 			if(buffer[i]!=NULL)
 				free(buffer[i]);
 	}
+	void forceWrite()
+	{
+		while(nowFree.empty());
+		pool.mutexLock();
+		now=nowFree.front();
+		nowFree.pop();
+		pool.mutexUnlock();
+		nowLen=0;
+		std::pair<LogSystem*,char*>* argv=new std::pair<LogSystem*,char*>(this,page);
+		ThreadPool::Task task{worker,argv};
+		pool.addTask(task);
+		page=now;
+	}
 	void accessLog(const char* text)
 	{
 		if(text==NULL)
@@ -2989,7 +3148,7 @@ public:
 		static LogSystem loger("access.log");
 		int port=0;
 		time_t now=time(NULL);
-		strftime(nowTime,48,"%Y-%m-%l %H:%M",localtime(&now));
+		strftime(nowTime,48,"%Y-%m-%d %H:%M",localtime(&now));
 		if(soc!=0)
 		{
 			sscanf((char*)text,"%31s%255s",method,askPath);
@@ -3063,7 +3222,7 @@ public://main class for http server2.0
 		AskType ask;
 		RouteType type;
 		char route[128];
-		char path[128];
+		char pathExtra[128];
 		void (*pfunc)(HttpServer&,DealHttp&,int);
 	};
 private:
@@ -3150,6 +3309,12 @@ public:
 		if(arrRoute!=NULL)
 			free(arrRoute);
 	}
+#ifdef CPPWEB_OPENSSL
+	inline bool loadKeyCert(const char* certPath,const char* keyPath,const char* passwd=NULL)
+	{
+		return loadCertificate(certPath,keyPath,passwd);
+	}
+#endif
 	bool routeHandle(AskType ask,const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
 	{//add route handle in all ask type 
 		if(strlen(route)>100)
@@ -3186,7 +3351,7 @@ public:
 		nowRoute->type=STATIC;
 		nowRoute->ask=GET;
 		strcpy(nowRoute->route,route);
-		strcpy(nowRoute->path,staticFile);
+		strcpy(nowRoute->pathExtra,staticFile);
 		nowRoute->pfunc=loadFile;
 		if(false==trie.insert(route,nowRoute))
 		{
@@ -3207,7 +3372,7 @@ public:
 		nowRoute->type=STAWILD;
 		nowRoute->ask=GET;
 		strcpy(nowRoute->route,route);
-		strcpy(nowRoute->path,staticPath);
+		strcpy(nowRoute->pathExtra,staticPath);
 		nowRoute->pfunc=loadFile;
 		if(false==trie.insert(route,nowRoute))
 		{
@@ -3446,7 +3611,7 @@ public:
 		unsigned result=messageLen;
 		while(leftLen>5&&getLen>0)
 		{
-			getLen=this->httpRecv(sockCli,(char*)message+old+all,recLen-old-all);
+			getLen=this->receiveSocket(sockCli,(char*)message+old+all,recLen-old-all);
 			result+=getLen;
 			all+=getLen;
 			leftLen-=getLen;
@@ -3474,9 +3639,9 @@ public:
 	{//get the error of server
 		return error;
 	}
-	inline bool disconnect(int soc)
+	inline void disconnect(int soc)
 	{
-		return this->disconnectSocket(soc);
+		this->closeSocket(soc);
 	}
 	inline void selfCreate(unsigned senLen)
 	{//use getSenBuff to create task by self
@@ -3494,6 +3659,10 @@ public:
 	inline void stopServer()
 	{//stop server run;
 		this->isContinue=false;
+	}
+	inline RouteFuntion* getNowRoute()
+	{//get the now route;
+		return pnowRoute;
 	}
 private:
 	void messagePrint()
@@ -3516,6 +3685,11 @@ private:
 			printf("auto:\t\tTrue\n");
 		else
 			printf("auto:\t\tFalse\n");
+#ifdef CPPWEB_OPENSSL
+		printf("ssl:\t\tTrue\n");
+#else
+		printf("ssl:\t\tFalse\n");
+#endif
 		if(defaultFile!=NULL)
 			printf("/\t\t->\t%s\n",defaultFile);
 		for(unsigned i=0;i<now;i++)
@@ -3531,7 +3705,7 @@ private:
 			case STATIC:
 			case STAWILD:
 				if(arrRoute[i].pfunc==loadFile)
-					printf("%s\t\t->%s\n",arrRoute[i].route,arrRoute[i].path);
+					printf("%s\t\t->%s\n",arrRoute[i].route,arrRoute[i].pathExtra);
 				else if(arrRoute[i].pfunc==deleteFile)
 					printf("%s\t\t->\tdelete\n",arrRoute[i].route);
 				else
@@ -3564,18 +3738,18 @@ private:
 			}
 		}
 		if(middleware!=NULL)
-			printf("middleware\t funtion set\n");
+			printf("middleware\t\tfuntion set\n");
 		if(logFunc!=NULL)
 		{
 			logFunc("server start",0);
-			printf("log\t function set\n");
+			printf("log\t\tfunction set\n");
 		}
 		if(logError!=NULL)
-			printf("error\t funtion set\n");
+			printf("error\t\tfuntion set\n");
 		if(clientIn!=NULL)
-			printf("client in function set\n");
+			printf("clientIn\t\tfunction set\n");
 		if(clientOut!=NULL)
-			printf("client out function set\n");
+			printf("clientout\t\tfunction set\n");
 		printf("\n");
 	}
 	int func(int num)
@@ -3738,8 +3912,7 @@ private:
 			if(temp.data.fd==sock)
 			{
 				sockaddr_in newaddr={0,0,{0},{0}};
-				int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
-				this->addFd(newClient);
+				int newClient=acceptSocket(newaddr);
 				nowEvent.data.fd=newClient;
 				nowEvent.events=EPOLLIN;
 				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
@@ -3751,12 +3924,12 @@ private:
 			}
 			else
 			{
-				int getNum=recv(temp.data.fd,(char*)this->getText,this->recLen,MSG_DONTWAIT);
+				int getNum=receiveSocket(temp.data.fd,(char*)this->getText,this->recLen,MSG_DONTWAIT);
 				int all=getNum;
 				while((int)this->recLen==all)
 				{
 					this->getText=enlargeMemory(this->getText,this->recLen);
-					getNum=recv(temp.data.fd,(char*)this->getText+all,this->recLen-all,MSG_DONTWAIT);
+					getNum=receiveSocket(temp.data.fd,(char*)this->getText+all,this->recLen-all,MSG_DONTWAIT);
 					if(getNum<=0)
 						break;
 					all+=getNum;
@@ -3769,9 +3942,8 @@ private:
 						logFunc(this->recText(),temp.data.fd);
 					if(isLongCon==false)
 					{
-				  		this->deleteFd(temp.data.fd);
 						epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
-						close(temp.data.fd);						
+						closeSocket(temp.data.fd);
 					}
 				}
 				else
@@ -3782,9 +3954,8 @@ private:
 						strcpy((char*)this->getText,this->getPeerIp(temp.data.fd,&port));
 						clientOut(*this,temp.data.fd,this->getText,port);
 					}
-					this->deleteFd(temp.data.fd);
 					epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
-					close(temp.data.fd);
+					closeSocket(temp.data.fd);
 				}
 			}
 		}
@@ -3800,8 +3971,7 @@ private:
 			if(temp.data.fd==sock)
 			{
 				sockaddr_in newaddr={0,0,{0},{0}};
-				int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
-				this->addFd(newClient);
+				int newClient=acceptSocket(newaddr);
 				nowEvent.data.fd=newClient;
 				nowEvent.events=EPOLLIN|EPOLLET;
 				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
@@ -3813,12 +3983,12 @@ private:
 			}
 			else
 			{
-				int getNum=recv(temp.data.fd,(char*)this->getText,sizeof(char)*this->recLen,0);
+				int getNum=receiveSocket(temp.data.fd,(char*)this->getText,sizeof(char)*this->recLen,0);
 				int all=getNum;
 				while((int)this->recLen==all)
 				{
 					this->getText=enlargeMemory(this->getText,this->recLen);
-					getNum=recv(temp.data.fd,(char*)this->getText+all,this->recLen-all,MSG_DONTWAIT);
+					getNum=receiveSocket(temp.data.fd,(char*)this->getText+all,this->recLen-all,MSG_DONTWAIT);
 					if(getNum<=0)
 						break;
 					all+=getNum;
@@ -3828,9 +3998,9 @@ private:
 					this->textLen=all;
 					if(fork()==0)
 					{
-						close(sock);
+						closeSocket(sock);
 						func(temp.data.fd);
-						close(temp.data.fd);
+						closeSocket(temp.data.fd);
 						free(this->getText);
 						free(this->senText);
 						exit(0);
@@ -3839,9 +4009,8 @@ private:
 					{
 						if(isLongCon==false)
 						{
-					  		this->deleteFd(temp.data.fd);
 							epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
-							close(temp.data.fd);
+							closeSocket(temp.data.fd);
 						}
 					}
 					if(logFunc!=NULL)
@@ -3855,9 +4024,8 @@ private:
 						strcpy((char*)this->getText,this->getPeerIp(temp.data.fd,&port));
 						clientOut(*this,temp.data.fd,this->getText,port);
 					}
-					this->deleteFd(temp.data.fd);
 					epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
-					close(temp.data.fd);
+					closeSocket(temp.data.fd);
 				}
 			}
 		}
@@ -3878,10 +4046,6 @@ private:
 		now++;
 		return temp;
 	}
-	inline RouteFuntion* getNowRoute()
-	{
-		return pnowRoute;
-	}
 	struct ThreadArg{
 		HttpServer* pserver;
 		int soc;
@@ -3891,7 +4055,7 @@ private:
 		while(this->isContinue)
 		{
 			sockaddr_in newaddr={0,0,{0},{0}};
-			int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
+			int newClient=acceptSocket(newaddr);
 			if(newClient==-1)
 				continue;
 			ThreadArg* temp=new ThreadArg;
@@ -3964,7 +4128,7 @@ private:
 		http.getAskRoute(server.recText(),"GET",ask,200);
 		HttpServer::RouteFuntion& route=*server.getNowRoute();
 		http.getWildUrl(ask,route.route,temp,200);
-		sprintf(buf,"GET %s%s HTTP/1.1",route.path,temp);
+		sprintf(buf,"GET %s%s HTTP/1.1",route.pathExtra,temp);
 		if(2==http.autoAnalysisGet(buf,(char*)server.getSenBuff(),senLen*1024*1024,NULL,&len))
 		{
 			if(server.logError!=NULL)
@@ -4091,7 +4255,6 @@ public:
 			int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
 			if(newClient==-1)
 				continue;
-			this->addFd(newClient);
 			Argv* temp=new Argv;
 			temp->pserver=this;
 			temp->func=pfunc;
@@ -4138,7 +4301,6 @@ public:
 				{
 					sockaddr_in newaddr={0,0,{0},{0}};
 					int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
-					this->addFd(newClient);
 					nowEvent.data.fd=newClient;
 					nowEvent.events=EPOLLIN;
 					epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
@@ -4154,7 +4316,6 @@ public:
 					{
 						*(char*)pget=0;
 						thing=0;
-						this->deleteFd(temp.data.fd);
 						epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
 						close(temp.data.fd);
 					}
@@ -4171,7 +4332,6 @@ public:
 						}
 						else
 						{
-							this->deleteFd(temp.data.fd);
 							epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
 							close(temp.data.fd);
 						}
@@ -4196,7 +4356,6 @@ public:
 			{
 				sockaddr_in newaddr={0,0,{0},{0}};
 				int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
-				this->addFd(newClient);
 				nowEvent.data.fd=newClient;
 				nowEvent.events=EPOLLIN|EPOLLET;
 				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
@@ -4216,12 +4375,11 @@ public:
 		}
 		return;
 	}
-	inline bool threadDeleteSoc(int clisoc)
+	inline void threadDeleteSoc(int clisoc)
 	{
 		close(clisoc);
 		if(isEpoll)
 			epoll_ctl(epfd,clisoc,EPOLL_CTL_DEL,NULL);
-		return this->deleteFd(clisoc);
 	}
 };
 class FileGet{

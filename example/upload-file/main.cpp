@@ -36,7 +36,7 @@ void upload(HttpServer& server,DealHttp& http,int soc)
 int main()  
 {  
 	HttpServer server(5200,true);
-	server.changeSetting(true,true,false,3);
+	server.changeSetting(true,true,true,3);
 	server.routeHandle(HttpServer::POST,"/upload",upload);
 	server.run("index.html");
     return 0; 
