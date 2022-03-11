@@ -1199,6 +1199,7 @@ protected:
 	int* pfdn;//pointer if file descriptor
 	int fdNumNow;//num of fd now
 	int fdMax;//fd max num
+public:
 	bool addFd(int addsoc)//add file des criptor
 	{
 		bool flag=false;
@@ -1587,10 +1588,8 @@ public:
 	bool findSocket(int cliSoc)//find if socket is connect
 	{
 		for(int i=0;i<fdNumNow;i++)
-		{
 			if(pfdn[i]==cliSoc)
 				return true;
-		}
 		return false;
 	}
 	char* getHostName()//get self name
