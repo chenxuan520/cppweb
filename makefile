@@ -1,29 +1,15 @@
-all:main guard main2.0# libserver.a libhttp.a libthreadpool.a
+all:main main2.0
 
-guard:guard.o
-	g++ guard.o -o guard
 guard.o:./cpp/guardHttp.cpp
 	g++ -c ./cpp/guardHttp.cpp -o guard.o
 main2.0:main2.0.o ./hpp/cppweb.h
 	g++ main2.0.o -o main2.0 -lpthread 
 main2.0.o:./cpp/main2.0.cpp 
 	g++ -c ./cpp/main2.0.cpp  -o main2.0.o
-# libserver.a:server.o
-# 	ar rcs ./lib/libserver.a server.o
-# libhttp.a:http.o
-# 	ar rcs ./lib/libhttp.a http.o
-# libthreadpool.a:thread.o
-# 	ar rcs ./lib/libthreadpool.a thread.o
 main:main.o dealask.o 
 	g++ main.o dealask.o -o main
 main.o:./cpp/main.cpp ./hpp/cppweb.h 
 	g++ -c ./cpp/main.cpp -o main.o
-# server.o:./cpp/server.cpp
-# 	g++ -c ./cpp/server.cpp -o server.o
-# http.o:./cpp/http.cpp
-# 	g++ -c ./cpp/http.cpp -o http.o
-# thread.o:./cpp/thread.cpp
-# 	g++ -c ./cpp/thread.cpp -o thread.o
 dealask.o:./cpp/dealask.cpp
 	g++ -c ./cpp/dealask.cpp -o dealask.o
 route.o:./hpp/route.h

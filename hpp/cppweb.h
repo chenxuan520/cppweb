@@ -6,9 +6,6 @@
 /* #define CPPWEB_OPENSSL */
 #ifndef _CPPWEB_H_
 #define _CPPWEB_H_
-#include<iostream>
-#include<stdarg.h>
-#include<time.h>
 #include<signal.h>
 #include<netinet/in.h>
 #include<arpa/inet.h>
@@ -18,9 +15,12 @@
 #include<sys/epoll.h>
 #include<sys/types.h>
 #include<unistd.h>
-#include<string.h>
 #include<netdb.h>
+#include<string.h>
 #include<pthread.h>
+#include<stdarg.h>
+#include<time.h>
+#include<iostream>
 #include<cstdlib>
 #include<queue>
 #include<vector>
@@ -1083,15 +1083,18 @@ public:
 	static int backGround()
 	{
 		int pid=0;
+#ifndef _WIN32
 		if((pid=fork())!=0)
 		{
 			printf("process pid=%d\n",pid);
 			exit(0);
 		}
+#endif
 		return pid;
 	}
 	static void guard()
 	{
+#ifndef _WIN32
 		while(1)
 		{
 			int pid=fork();
@@ -1100,6 +1103,7 @@ public:
 			else
 				break;
 		}
+#endif
 	}
 };
 template<class T>
@@ -1179,21 +1183,20 @@ protected:
 	int backwait;//the most waiting clients ;
 	int numClient;//how many clients now;
 	int fd_count;//sum of clients in fd_set
-	int last_count;//last fd_count
 	int epfd;//file descriptor to ctrl epoll
 	char* hostip;//host IP 
 	char* hostname;//host name
 	const char* error;//error hapen
 	int sock;//file descriptor of host;
 	int sockC;//file descriptor to sign every client;
-	epoll_event nowEvent;//a temp event to get event
-	epoll_event* pevent;//all the event
 	sockaddr_in addr;//IPv4 of host;
 	sockaddr_in client;//IPv4 of client;
 	fd_set  fdClients;//file descriptor
+	epoll_event nowEvent;//a temp event to get event
+	epoll_event* pevent;//all the event
 #ifdef CPPWEB_OPENSSL
-	SSL_CTX* ctx;
-	std::unordered_map<int,SSL*> sslHash;
+	SSL_CTX* ctx;//openssl to https struct 
+	std::unordered_map<int,SSL*> sslHash;//hash to find sock and SSL*
 #endif
 protected:
 	int* pfdn;//pointer if file descriptor
@@ -1238,6 +1241,23 @@ public:
 		}
 		return false;
 	}
+	bool getFd(int* array,int* pcount,int arrayLen)//get epoll array
+	{
+		if(fdNumNow!=0)
+			*pcount=fdNumNow;
+		else
+			return false;
+		for(int i=0;i<fdNumNow&&i<arrayLen;i++)
+			array[i]=pfdn[i];
+		return true;
+	}
+	bool findFd(int cliSoc)//find if socket is connect
+	{
+		for(int i=0;i<fdNumNow;i++)
+			if(pfdn[i]==cliSoc)
+				return true;
+		return false;
+	}
 public:
 	ServerTcpIp(unsigned short port=5200,int epollNum=1,int wait=5)
 	{//port is bound ,epollNum is if open epoll model,wait is listen socket max wait
@@ -1246,7 +1266,6 @@ public:
 		addr.sin_family=AF_INET;//af_intt IPv4
 		addr.sin_port=htons(port);//host to net short
 		fd_count=0;// select model
-		last_count=fd_count;
 		sizeAddr=sizeof(sockaddr);
 		backwait=wait;
 		numClient=0;
@@ -1382,7 +1401,7 @@ public:
 			return false;
 		return true;
 	}
-	inline void setPort(unsigned short port)
+	inline void setPort(unsigned short port)//change the port bound
 	{
 		addr.sin_port=htons(port);
 	}
@@ -1405,7 +1424,7 @@ public:
 		return acceptSocketSSL(newaddr);
 #endif
 	}
-	int acceptClient()//wait until success model one
+	int acceptOne()//wait until success model one
 	{
 		sockC=accept(sock,(sockaddr*)&client,(socklen_t*)&sizeAddr);
 		return sockC;
@@ -1422,15 +1441,9 @@ public:
 		return this->receiveSocketSSL(clisoc,pget,len,flag);
 #endif
 	}
-	inline int sendClientOne(const void* psen,int len)//model one
+	inline int sendOne(const void* psen,int len)//model one
 	{
 		return send(sockC,(char*)psen,len,0);
-	}
-	void sendEverySocket(void* psen,int len)
-	{
-		for(int i=0;i<fdNumNow;i++)
-			if(pfdn[i]!=0)
-				send(pfdn[i],psen,len,0);
 	}
 	inline int sendSocket(int socCli,const void* psen,int len,int flag=0)//send by socket
 	{
@@ -1528,12 +1541,8 @@ public:
 							sockaddr_in newaddr={0,0,{0},{0}};
 							int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
 							FD_SET(newClient,&fdClients);
-							this->addFd(newClient);
 							if(newClient>fd_count)
-							{
-								last_count=fd_count;
 								fd_count=newClient;
-							}
 							strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
 							if(pfunc!=NULL)
 							{
@@ -1555,10 +1564,14 @@ public:
 						if(sRec<=0)
 						{
 							close(i);
-							this->deleteFd(i);
 							FD_CLR(i,&fdClients);
 							if(i==fd_count)
-								fd_count=last_count;
+								for(int j=i-1;j>=0;j--)
+									if(FD_ISSET(j,&fdClients))
+									{
+										fd_count=j;
+										break;
+									}
 							*(char*) pget=0;
 							pthing=CPPOUT;
 						}
@@ -1574,23 +1587,6 @@ public:
 		else
 			return false;
 		return true;
-	}
-	bool updateSocket(int* array,int* pcount,int arrayLen)//get epoll array
-	{
-		if(fdNumNow!=0)
-			*pcount=fdNumNow;
-		else
-			return false;
-		for(int i=0;i<fdNumNow&&i<arrayLen;i++)
-			array[i]=pfdn[i];
-		return true;
-	}
-	bool findSocket(int cliSoc)//find if socket is connect
-	{
-		for(int i=0;i<fdNumNow;i++)
-			if(pfdn[i]==cliSoc)
-				return true;
-		return false;
 	}
 	char* getHostName()//get self name
 	{
@@ -1670,7 +1666,6 @@ public:
 			{
 				sockaddr_in newaddr={0,0,{0},{0}};
 				int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
-				this->addFd(newClient);
 				nowEvent.data.fd=newClient;
 				nowEvent.events=EPOLLIN;
 				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
@@ -1691,7 +1686,6 @@ public:
 				{
 					*(char*)pget=0;
 					thing=CPPOUT;
-					this->deleteFd(temp.data.fd);
 					epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
 					close(temp.data.fd);
 				}
@@ -1709,10 +1703,10 @@ class ClientTcpIp{
 private:
 	int sock;//myself
 	sockaddr_in addrC;//server information
-	char ip[100];//server Ip
+	char ip[128];//server Ip
 	char* hostip;//host ip
 	char* hostname;//host name
-	char selfIp[100];
+	char selfIp[128];
 	const char* error;
 #ifdef CPPWEB_OPENSSL
 	SSL* ssl;
@@ -1721,8 +1715,8 @@ private:
 public:
 	ClientTcpIp(const char* hostIp,unsigned short port)
 	{
-		memset(ip,0,100);
-		memset(selfIp,0,100);
+		memset(ip,0,128);
+		memset(selfIp,0,128);
 		error=NULL;
 		hostip=(char*)malloc(sizeof(char)*50);
 		if(hostip==NULL)
@@ -1793,6 +1787,14 @@ public:
 	bool disconnectHost()
 	{
 		close(sock);
+#ifdef CPPWEB_OPENSSL
+		if(ssl!=NULL)
+		{
+			SSL_shutdown(ssl);
+			SSL_free(ssl);	
+		}
+		ssl=NULL;
+#endif
 		sock=socket(AF_INET,SOCK_STREAM,0);
 		if(sock==-1)
 			return false;
@@ -3214,9 +3216,15 @@ public://main class for http server2.0
 	enum RunModel{//the server model of run
 		FORK,MULTIPLEXING,THREAD
 	};
+#ifndef _WIN32
 	enum AskType{//different ask ways in http
 		GET,POST,PUT,DELETE,OPTIONS,CONNECT,ALL,
 	};
+#else
+	enum AskType{//different ask ways in http
+		GET,POST,PUT,WINDELETE,OPTIONS,CONNECT,ALL,
+	};
+#endif
 	struct RouteFuntion{//inside struct,pack for handle
 		AskType ask;
 		RouteType type;
@@ -3300,8 +3308,10 @@ public:
 				return;
 			}
 		}
+#ifndef _WIN32
 		if(this->model==FORK)
 			signal(SIGCHLD,sigCliDeal);
+#endif
 	}
 	~HttpServer()
 	{
@@ -3558,10 +3568,6 @@ public:
 		this->defaultFile=defaultFile;
 		if(isDebug)
 			messagePrint();
-#ifndef _WIN32
-		if(model==FORK)
-			signal(SIGCHLD,sigCliDeal);
-#endif
 		switch(model)
 		{
 		case FORK:
@@ -3726,7 +3732,11 @@ private:
 			case PUT:
 				printf("PUT\n");
 				break;
+#ifndef _WIN32
 			case DELETE:
+#else
+			case WINDELETE:
+#endif
 				printf("DELETE\n");
 				break;
 			case OPTIONS:
@@ -3792,7 +3802,11 @@ private:
 			http.getAskRoute(this->getText,"DELETE",ask,200);
 			if(isDebug)
 				printf("DELETE url:%s\n",ask);
+#ifndef _WIN32
 			type=DELETE;
+#else
+			type=WINDELETE;
+#endif
 		}
 		else if(strstr(ask,"OPTIONS")!=NULL)
 		{
@@ -4082,7 +4096,7 @@ private:
 		unsigned int size=sizeof(char)*server.recLen;
 		if(rec==NULL)
 		{
-			close(cli);
+			server.closeSocket(cli);
 			free(self);
 			return NULL;
 		}
@@ -4178,10 +4192,12 @@ private:
 		else
 			return temp;
 	}
+#ifndef _WIN32
 	static void sigCliDeal(int )
 	{
 		while(waitpid(-1, NULL, WNOHANG)>0);
 	}
+#endif
 };
 class ServerPool:public ServerTcpIp{
 private:
@@ -4202,10 +4218,12 @@ private:
 	unsigned int threadNum;
 	bool isEpoll;
 private:
+#ifndef _WIN32
 	static void sigCliDeal(int )
 	{
 		while(waitpid(-1, NULL, WNOHANG)>0);
 	}
+#endif
 	static void* worker(void* argc)
 	{
 		Argv argv=*(Argv*)argc;
@@ -4271,6 +4289,7 @@ public:
 			pool->addTask(task);
 		}
 	}
+#ifndef _WIN32
 	void forkModel(void* pneed,void (*pfunc)(ServerPool&,int,void*))
 	{
 		signal(SIGCHLD,sigCliDeal);
@@ -4383,11 +4402,14 @@ public:
 		}
 		return;
 	}
+#endif
 	inline void threadDeleteSoc(int clisoc)
 	{
-		close(clisoc);
+		closeSocket(clisoc);
+#ifndef _WIN32
 		if(isEpoll)
 			epoll_ctl(epfd,clisoc,EPOLL_CTL_DEL,NULL);
+#endif
 	}
 };
 class FileGet{
