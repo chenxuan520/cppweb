@@ -3559,15 +3559,16 @@ public:
 		this->defaultFile=defaultFile;
 		if(isDebug)
 			messagePrint();
+#ifndef _WIN32
+		if(model==FORK)
+			signal(SIGCHLD,sigCliDeal);
+#endif
 		switch(model)
 		{
+		case FORK:
 		case MULTIPLEXING:
 			while(isContinue)
-				this->epollHttp();
-			break;
-		case FORK:
-			while(isContinue)
-				this->forkHttp();
+				this->epollModel(epollHttp,this);
 			break;
 		case THREAD:
 			while(isContinue)
@@ -3648,7 +3649,7 @@ public:
 		selfCtrl=true;
 		selfLen=senLen;
 	}
-	inline void* getSenBuff()
+	inline void* getSenBuffer()
 	{//get the sen buffer
 		return senText;
 	}
@@ -3902,6 +3903,71 @@ private:
 		}
 		return 0;
 	}
+	static int epollHttp(Thing thing,int soc,ServerTcpIp&,void* pserver)
+	{
+		HttpServer& server=*(HttpServer*)pserver;
+		int port=0;
+		if(thing==CPPIN)
+		{
+			if(server.clientIn!=NULL)
+			{
+				strcpy((char*)server.getText,ServerTcpIp::getPeerIp(soc,&port));
+				server.clientIn(server,soc,server.getText,port);
+			}
+			return 0;
+		}
+		else
+		{
+			int getNum=server.receiveSocket(soc,(char*)server.getText,server.recLen,MSG_DONTWAIT);
+			int all=getNum;
+			while((int)server.recLen==all)
+			{
+				server.getText=server.enlargeMemory(server.getText,server.recLen);
+				getNum=server.receiveSocket(soc,(char*)server.getText+all,server.recLen-all,MSG_DONTWAIT);
+				if(getNum<=0)
+					break;
+				all+=getNum;
+			}
+			if(all>0)
+			{
+				server.textLen=all;
+				if(server.model==MULTIPLEXING)
+					server.func(soc);
+				else
+				{
+#ifndef _WIN32
+					if(fork()==0)
+					{
+						server.closeSocket(server.sock);
+						server.func(soc);
+						server.closeSocket(soc);
+						free(server.getText);
+						free(server.senText);
+						exit(0);
+					}
+#else
+					server.func(soc);
+#endif
+				}
+				if(server.logFunc!=NULL)
+					server.logFunc(server.recText(),soc);
+				if(server.isLongCon==false)
+					return soc;
+			}
+			else
+			{
+				if(server.clientOut!=NULL)
+				{
+					int port=0;
+					strcpy((char*)server.getText,server.getPeerIp(soc,&port));
+					server.clientOut(server,soc,server.getText,port);
+				}
+				return soc;
+			}
+
+		}
+		return 0;
+	}
 	void epollHttp()
 	{//pthing is 0 out,1 in,2 say pnum is the num of soc,this->getText is rec,len is the max len of this->getText,pneed is others things
 		memset(this->getText,0,sizeof(char)*this->recLen);
@@ -3937,7 +4003,20 @@ private:
 				if(all>0)
 				{
 					this->textLen=all;
-					func(temp.data.fd);
+					if(model==MULTIPLEXING)
+						func(temp.data.fd);
+					else
+					{
+						if(fork()==0)
+						{
+							closeSocket(sock);
+							func(temp.data.fd);
+							closeSocket(temp.data.fd);
+							free(this->getText);
+							free(this->senText);
+							exit(0);
+						}
+					}
 					if(logFunc!=NULL)
 						logFunc(this->recText(),temp.data.fd);
 					if(isLongCon==false)
@@ -3945,76 +4024,6 @@ private:
 						epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
 						closeSocket(temp.data.fd);
 					}
-				}
-				else
-				{
-					if(this->clientOut!=NULL)
-					{
-						int port=0;
-						strcpy((char*)this->getText,this->getPeerIp(temp.data.fd,&port));
-						clientOut(*this,temp.data.fd,this->getText,port);
-					}
-					epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
-					closeSocket(temp.data.fd);
-				}
-			}
-		}
-		return ;
-	}
-	void forkHttp()
-	{
-		memset(this->getText,0,sizeof(char)*this->recLen);
-		int eventNum=epoll_wait(epfd,pevent,512,-1);
-		for(int i=0;i<eventNum;i++)
-		{
-			epoll_event temp=pevent[i];
-			if(temp.data.fd==sock)
-			{
-				sockaddr_in newaddr={0,0,{0},{0}};
-				int newClient=acceptSocket(newaddr);
-				nowEvent.data.fd=newClient;
-				nowEvent.events=EPOLLIN|EPOLLET;
-				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
-				if(this->clientIn!=NULL)
-				{
-					strcpy((char*)this->getText,inet_ntoa(newaddr.sin_addr));
-					clientIn(*this,newClient,this->getText,newaddr.sin_port);
-				}
-			}
-			else
-			{
-				int getNum=receiveSocket(temp.data.fd,(char*)this->getText,sizeof(char)*this->recLen,0);
-				int all=getNum;
-				while((int)this->recLen==all)
-				{
-					this->getText=enlargeMemory(this->getText,this->recLen);
-					getNum=receiveSocket(temp.data.fd,(char*)this->getText+all,this->recLen-all,MSG_DONTWAIT);
-					if(getNum<=0)
-						break;
-					all+=getNum;
-				}
-				if(all>0)
-				{
-					this->textLen=all;
-					if(fork()==0)
-					{
-						closeSocket(sock);
-						func(temp.data.fd);
-						closeSocket(temp.data.fd);
-						free(this->getText);
-						free(this->senText);
-						exit(0);
-					}
-					else
-					{
-						if(isLongCon==false)
-						{
-							epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
-							closeSocket(temp.data.fd);
-						}
-					}
-					if(logFunc!=NULL)
-						logFunc(this->recText(),temp.data.fd);
 				}
 				else
 				{
@@ -4118,7 +4127,7 @@ private:
 		}
 		free(rec);
 		free(self);
-		close(cli);
+		server.closeSocket(cli);
 		return NULL;
 	}
 	static void loadFile(HttpServer& server,DealHttp& http,int senLen)
@@ -4129,7 +4138,7 @@ private:
 		HttpServer::RouteFuntion& route=*server.getNowRoute();
 		http.getWildUrl(ask,route.route,temp,200);
 		sprintf(buf,"GET %s%s HTTP/1.1",route.pathExtra,temp);
-		if(2==http.autoAnalysisGet(buf,(char*)server.getSenBuff(),senLen*1024*1024,NULL,&len))
+		if(2==http.autoAnalysisGet(buf,(char*)server.getSenBuffer(),senLen*1024*1024,NULL,&len))
 		{
 			if(server.logError!=NULL)
 				server.logError(server.error,0);
@@ -4141,9 +4150,9 @@ private:
 	static void deleteFile(HttpServer& server,DealHttp& http,int senLen)
 	{
 		int len=0;
-		http.customizeAddTop(server.getSenBuff(),senLen*1024*1024,DealHttp::STATUSFORBIDDEN,strlen("403 forbidden"),"text/plain");
-		http.customizeAddBody(server.getSenBuff(),senLen*1024*1024,"403 forbidden",strlen("403 forbidden"));
-		len=strlen((char*)server.getSenBuff());
+		http.customizeAddTop(server.getSenBuffer(),senLen*1024*1024,DealHttp::STATUSFORBIDDEN,strlen("403 forbidden"),"text/plain");
+		http.customizeAddBody(server.getSenBuffer(),senLen*1024*1024,"403 forbidden",strlen("403 forbidden"));
+		len=strlen((char*)server.getSenBuffer());
 		staticLen(len);
 	}
 	static unsigned staticLen(int senLen)
