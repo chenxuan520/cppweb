@@ -3361,29 +3361,13 @@ public:
 		nowRoute->ask=GET;
 		strcpy(nowRoute->route,route);
 		strcpy(nowRoute->pathExtra,staticFile);
-		nowRoute->pfunc=loadFile;
-		if(false==trie.insert(route,nowRoute))
+		if(nowRoute->route[strlen(nowRoute->route)-1]=='*')
 		{
-			error="server:route wrong char";
-			if(logError!=NULL)
-				logError(this->error,0);
-			return false;
+			nowRoute->route[strlen(nowRoute->route)-1]=0;
+			nowRoute->type=STAWILD;
 		}
-		return true;
-	}
-	bool loadStaticFS(const char* route,const char* staticPath)
-	{//load file system such as /tmp to /root
-		if(strlen(route)>100)
-			return false;
-		RouteFuntion* nowRoute=addRoute();
-		if(nowRoute==NULL)
-			return false;
-		nowRoute->type=STAWILD;
-		nowRoute->ask=GET;
-		strcpy(nowRoute->route,route);
-		strcpy(nowRoute->pathExtra,staticPath);
 		nowRoute->pfunc=loadFile;
-		if(false==trie.insert(route,nowRoute))
+		if(false==trie.insert(nowRoute->route,nowRoute))
 		{
 			error="server:route wrong char";
 			if(logError!=NULL)
@@ -3420,83 +3404,17 @@ public:
 		}
 		return true;
 	}
-	bool get(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
+	inline bool get(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
 	{//add routeHandle and ask type is get
-		if(strlen(route)>100)
-			return false;
-		RouteFuntion* nowRoute=addRoute();
-		if(nowRoute==NULL)
-			return false;
-		nowRoute->ask=GET;
-		nowRoute->pfunc=pfunc;
-		strcpy(nowRoute->route,route);
-		if(route[strlen(route)-1]=='*')
-		{
-			nowRoute->route[strlen(route)-1]=0;
-			nowRoute->type=WILD;
-		}
-		else
-			nowRoute->type=ONEWAY;
-		if(false==trie.insert(nowRoute->route,nowRoute))
-		{
-			error="server:route wrong char";
-			if(logError!=NULL)
-				logError(this->error,0);
-			return false;
-		}
-		return true;	
+		return routeHandle(GET,route,pfunc);
 	}
-	bool post(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
+	inline bool post(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
 	{//the same to last funtion
-		if(strlen(route)>100)
-			return false;
-		RouteFuntion* nowRoute=addRoute();
-		if(nowRoute==NULL)
-			return false;
-		nowRoute->ask=POST;
-		strcpy(nowRoute->route,route);
-		nowRoute->pfunc=pfunc;
-		if(route[strlen(route)-1]=='*')
-		{
-			nowRoute->route[strlen(route)-1]=0;
-			nowRoute->type=WILD;
-		}
-		else
-			nowRoute->type=ONEWAY;
-		if(false==trie.insert(nowRoute->route,nowRoute))
-		{
-			error="server:route wrong char";
-			if(logError!=NULL)
-				logError(this->error,0);
-			return false;
-		}
-		return true;	
+		return routeHandle(POST,route,pfunc);
 	}
-	bool all(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
+	inline bool all(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
 	{//receive all ask type
-		if(strlen(route)>100)
-			return false;
-		RouteFuntion* nowRoute=addRoute();
-		if(nowRoute==NULL)
-			return false;
-		nowRoute->ask=ALL;
-		strcpy(nowRoute->route,route);
-		nowRoute->pfunc=pfunc;
-		if(route[strlen(route)-1]=='*')
-		{
-			nowRoute->route[strlen(route)-1]=0;
-			nowRoute->type=WILD;
-		}
-		else
-			nowRoute->type=ONEWAY;
-		if(false==trie.insert(nowRoute->route,nowRoute))
-		{
-			error="server:route wrong char";
-			if(logError!=NULL)
-				logError(this->error,0);
-			return false;
-		}
-		return true;	
+		return routeHandle(ALL,route,pfunc);
 	}
 	bool clientInHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port))
 	{//when client in ,it will be call
@@ -3583,13 +3501,13 @@ public:
 		free(sen);
 		free(getT);
 	}
-	int httpSend(int num,void* buffer,int sendLen)
+	int httpSend(int num,void* buffer,int sendLen,int flag=0)
 	{
-		return this->sendSocket(num,buffer,sendLen);
+		return this->sendSocket(num,buffer,sendLen,flag);
 	}
-	int httpRecv(int num,void* buffer,int bufferLen)
+	int httpRecv(int num,void* buffer,int bufferLen,int flag=0)
 	{
-		return this->receiveSocket(num,buffer,bufferLen);
+		return this->receiveSocket(num,buffer,bufferLen,flag);
 	}
 	int getCompleteMessage(int sockCli)
 	{//some time text is not complete ,it can get left text 
@@ -3711,7 +3629,7 @@ private:
 			case STATIC:
 			case STAWILD:
 				if(arrRoute[i].pfunc==loadFile)
-					printf("%s\t\t->%s\n",arrRoute[i].route,arrRoute[i].pathExtra);
+					printf("%s\t\t->\t%s\n",arrRoute[i].route,arrRoute[i].pathExtra);
 				else if(arrRoute[i].pfunc==deleteFile)
 					printf("%s\t\t->\tdelete\n",arrRoute[i].route);
 				else

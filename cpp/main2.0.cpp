@@ -5,13 +5,10 @@
 *********************************/
 #include "../hpp/cppweb.h"
 #include "../hpp/route.h"
+#include "../hpp/config.h"
 #include<stdio.h>
 #include<string.h>
 using namespace cppweb;
-char indexName[100]="index.html";
-bool isGuard=false;
-bool isLongConnect=true;
-bool isFork=false;
 /********************************
 	author:chenxuan
 	date:2021.7.5
@@ -31,19 +28,13 @@ void chooseModel(unsigned int* port,bool* pflag)
 		*pflag=true;
 	else 
 		*pflag=false;
-	FILE* fp=fopen("my.ini","r+");
-	if(fp!=NULL)
-	{
-		fclose(fp);
-		return;
-	}
 }
 /********************************
 	author:chenxuan
 	date:2021.7.5
 	funtion:from file init server
 *********************************/
-void ifChoose(bool* pb,unsigned int* pport,bool* is_back)
+void ifChoose()
 {
 	FileGet file;
 	Json json(file.getFileBuff("config.json"));
@@ -101,14 +92,6 @@ bool ifArgc(int argc,char** argv,bool* pis_back,unsigned int* pport)
 void serverHttp(int argc,char** argv)
 {
 	unsigned int port=80;
-	bool is_back=false,is_choose=false;
-	ifChoose(&is_choose,&port,&is_back);
-	if(ifArgc(argc,argv,&is_back,&port)==false&&is_choose==false)
-		chooseModel(&port,&is_back);
-	if(is_back)
-		ProcessCtrl::backGround();
-	if(isGuard)
-		ProcessCtrl::guard();
 	HttpServer server(port,true);
 	addHandle(server);
 	server.run(indexName);
