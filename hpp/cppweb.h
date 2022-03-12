@@ -6,6 +6,8 @@
 /* #define CPPWEB_OPENSSL */
 #ifndef _CPPWEB_H_
 #define _CPPWEB_H_
+
+#ifndef _WIN32
 #include<signal.h>
 #include<netinet/in.h>
 #include<arpa/inet.h>
@@ -16,6 +18,7 @@
 #include<sys/types.h>
 #include<unistd.h>
 #include<netdb.h>
+#endif
 #include<string.h>
 #include<pthread.h>
 #include<stdarg.h>
@@ -3327,6 +3330,30 @@ public:
 		return loadCertificate(certPath,keyPath,passwd);
 	}
 #endif
+	void changeModel(RunModel model,unsigned threadNum=5)
+	{
+		if(this->model==model)
+			return;
+		this->model=model;
+		if(this->model==THREAD)
+		{
+			if(threadNum==0)
+			{
+				error="thread num is zero";
+				return;
+			}
+			pool=new ThreadPool(threadNum);
+			if(pool==NULL)
+			{
+				error="pool new wrong";
+				return;
+			}
+		}
+#ifndef _WIN32
+		if(this->model==FORK)
+			signal(SIGCHLD,sigCliDeal);
+#endif
+	}
 	bool routeHandle(AskType ask,const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
 	{//add route handle in all ask type 
 		if(strlen(route)>100)
@@ -3360,14 +3387,14 @@ public:
 		RouteFuntion* nowRoute=addRoute();
 		if(nowRoute==NULL)
 			return false;
-		nowRoute->type=ONEWAY;
-		nowRoute->ask=GET;
+		nowRoute->type=STATIC;
+		nowRoute->ask=ALL;
 		strcpy(nowRoute->route,route);
 		strcpy(nowRoute->pathExtra,location);
 		if(nowRoute->route[strlen(nowRoute->route)-1]=='*')
 		{
 			nowRoute->route[strlen(nowRoute->route)-1]=0;
-			nowRoute->type=WILD;
+			nowRoute->type=STAWILD;
 		}
 		nowRoute->pfunc=rediectGram;
 		if(false==trie.insert(nowRoute->route,nowRoute))
@@ -3662,6 +3689,8 @@ private:
 					printf("%s\t\t->\t%s\n",arrRoute[i].route,arrRoute[i].pathExtra);
 				else if(arrRoute[i].pfunc==deleteFile)
 					printf("%s\t\t->\tdelete\n",arrRoute[i].route);
+				else if(arrRoute[i].pfunc==rediectGram)
+					printf("%s\t\t->\t%s\n",arrRoute[i].route,arrRoute[i].pathExtra);
 				else
 					printf("undefine funtion please check the server\n");
 				continue;

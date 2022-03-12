@@ -11,10 +11,31 @@
 	"background":false,
 	//if use guard
 	"guard":false,
+	//if open the log
+	"logger":true,
+	//auto find the file
+	"auto":true,
+	//301 redirect,the arr must is a objext and have path and redirect,use as this
+	//	"rediect":[
+	// 	{"path":"/root","redirect":"./template"},
+	// 	{"path":"/temp","redirect":"./tem"}
+	// ],
+	"redirect":[],
 	//remove path array
+	//"delete path":["./templaye"],
 	"delete path":[],
-	//replace the path,the arr must is a objext and have old and replace 
+	//replace the path,the arr must is a objext and have path and replace 
+	//	"replace":[
+	// 	{"path":"/root","repalce":"./template"},
+	// 	{"path":"/temp","repalce":"./tem"}
+	// ],
 	"replace":[],
 	//set agent array
-	"reverse proxy":[{"host":"127.0.0.1","port":5201,"path":""}]
+	//this proxy is not ok now,do not use it
+	"reverse proxy":[
+	],
+	//https certificate path
+	"cert path":"./ssl/cacert.pem",
+	"cert password":"123456",
+	"key path":"./ssl/privkey.pem"
 }
