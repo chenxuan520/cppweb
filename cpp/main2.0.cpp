@@ -12,57 +12,52 @@ using namespace cppweb;
 /********************************
 	author:chenxuan
 	date:2021.7.5
-	funtion:if no argc an file use it to init
-*********************************/
-void chooseModel(unsigned int* port,bool* pflag)
-{
-	char temp[10]={0};
-	printf("please input the import(default 80):");
-	scanf("%u",port);
-	printf("please input index.html(default index.html):");
-	scanf("%s",indexName);
-	printf("please input if run in background(default no)y/n:");
-	fflush(stdin);
-	scanf("%s",temp);
-	if(strchr(temp,'y')!=NULL)
-		*pflag=true;
-	else 
-		*pflag=false;
-}
-/********************************
-	author:chenxuan
-	date:2021.7.5
 	funtion:from file init server
 *********************************/
-void ifChoose()
+void readSetting(LoadConfig& load)
 {
-	FileGet file;
-	Json json(file.getFileBuff("config.json"));
-	if(json["port"]!=NULL)
-		*pport=json["port"]->intVal;
-	else
-		*pb=false;
-	if(json["default file"]!=NULL)
-		strcpy(indexName,json["default file"]->strVal.c_str());
-	else
-		*pb=false;
-	if(json["background"]!=NULL)
-		*is_back=json["background"]->boolVal;
-	else
-		*pb=false;
-	if(json["guard"]!=NULL)
-		isGuard=json["guard"]->boolVal;
-	else
-		*pb=false;
-	if(json["fork"]!=NULL)
-		isFork=json["fork"]->boolVal;
-	else
-		*pb=false;
-	if(json["long connect"]!=NULL)
-		isLongConnect=json["long connect"]->boolVal;
-	else
-		*pb=false;
-	*pb=true;
+	load.findConfig("port",[](Json::Object* obj,Config& con){
+					if(obj!=NULL)
+						con.port=obj->intVal;
+					else
+						con.port=5200;
+					});
+	load.findConfig("default file",[](Json::Object* obj,Config& con){
+					if(obj!=NULL)
+						con.defaultFile=obj->strVal;
+					else
+						con.defaultFile="";
+					});
+	load.findConfig("background",[](Json::Object* obj,Config& con){
+					if(obj!=NULL)
+						con.isBack=obj->boolVal;
+					else
+						con.isBack=false;
+					});
+	load.findConfig("guard",[](Json::Object* obj,Config& con){
+					if(obj!=NULL)
+						con.isGuard=obj->boolVal;
+					else
+						con.isGuard=false;
+					});
+	load.findConfig("model",[](Json::Object* obj,Config& con){
+					if(obj!=NULL)
+						con.model=obj->strVal;
+					else
+						con.model="";
+					});
+	load.findConfig("long connect",[](Json::Object* obj,Config& con){
+					if(obj!=NULL)
+						con.isLongConnect=obj->boolVal;
+					else
+						con.isLongConnect=true;
+					});
+	load.findConfig("logger",[](Json::Object* obj,Config& con){
+					if(obj!=NULL)
+						con.isLog=obj->boolVal;
+					else
+						con.isLog=true;
+					});
 	return;
 }
 /********************************

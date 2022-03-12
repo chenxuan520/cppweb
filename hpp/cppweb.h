@@ -1891,7 +1891,8 @@ public:
 		UNKNOWN=0,HTML=1,TXT=2,IMAGE=3,NOFOUND=4,CSS=5,JS=6,ZIP=7,JSON=8,
 	};
 	enum Status{
-		STATUSOK=200,STATUSNOCON=204,STATUSMOVED=301,STATUSBADREQUEST=400,STATUSFORBIDDEN=403,
+		STATUSOK=200,STATUSNOCON=204,STATUSMOVED=301,STATUSMOVTEMP=302,
+		STATUSBADREQUEST=400,STATUSFORBIDDEN=403,
 		STATUSNOFOUND=404,STATUSNOIMPLEMENT=501,
 	};
 	struct Datagram{
@@ -2161,9 +2162,13 @@ public:
 	int customizeAddBody(void* buffer,unsigned int bufferLen,const char* body,unsigned int bodyLen)
 	{
 		int topLen=0;
+		if(buffer==NULL)
+			return -1;
 		strcat((char*)buffer,"\r\n");
 		unsigned int i=0;
 		topLen=strlen((char*)buffer);
+		if(body==NULL||bodyLen==0)
+			return topLen;
 		if(bufferLen<topLen+bodyLen)
 			return -1;
 		char* temp=(char*)buffer+strlen((char*)buffer);
@@ -2525,6 +2530,9 @@ public:
 		case STATUSMOVED:
 			statusEng="Moved Permanently";
 			break;
+		case STATUSMOVTEMP:
+			statusEng="Found";
+			break;
 		case STATUSBADREQUEST:
 			statusEng="Bad Request";
 			break;
@@ -2550,11 +2558,6 @@ public:
 			sprintf((char*)buffer,"%sContent-Type: text/plain\r\n"
 					"Content-Length:%zu\r\n\r\n404 page no found"
 					,(char*)buffer,strlen("404 page no found"));
-			return strlen((char*)buffer);
-		}
-		if(gram.fileLen==0)
-		{
-			sprintf((char*)buffer,"\r\n");
 			return strlen((char*)buffer);
 		}
 		switch(gram.typeFile)
@@ -3350,6 +3353,33 @@ public:
 		}
 		return true;
 	}
+	bool redirect(const char* route,const char* location)
+	{
+		if(strlen(route)>100)
+			return false;
+		RouteFuntion* nowRoute=addRoute();
+		if(nowRoute==NULL)
+			return false;
+		nowRoute->type=ONEWAY;
+		nowRoute->ask=GET;
+		strcpy(nowRoute->route,route);
+		strcpy(nowRoute->pathExtra,location);
+		if(nowRoute->route[strlen(nowRoute->route)-1]=='*')
+		{
+			nowRoute->route[strlen(nowRoute->route)-1]=0;
+			nowRoute->type=WILD;
+		}
+		nowRoute->pfunc=rediectGram;
+		if(false==trie.insert(nowRoute->route,nowRoute))
+		{
+			error="server:route wrong char";
+			if(logError!=NULL)
+				logError(this->error,0);
+			return false;
+		}
+		return true;
+
+	}
 	bool loadStatic(const char* route,const char* staticFile)
 	{//load file such as / -> index.html
 		if(strlen(route)>100)
@@ -4085,6 +4115,12 @@ private:
 		http.customizeAddBody(server.getSenBuffer(),senLen*1024*1024,"403 forbidden",strlen("403 forbidden"));
 		len=strlen((char*)server.getSenBuffer());
 		staticLen(len);
+	}
+	static void rediectGram(HttpServer& server,DealHttp& http,int)
+	{
+		auto now=server.getNowRoute();
+		http.gram.statusCode=DealHttp::STATUSMOVTEMP;
+		http.gram.head.insert(std::pair<std::string,std::string>{"Location",now->pathExtra});
 	}
 	static unsigned staticLen(int senLen)
 	{

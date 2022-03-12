@@ -11,7 +11,7 @@
    
    ### RouteType
    
-   ```
+   ```cpp
        enum RouteType{//oneway stand for like /hahah,wild if /hahah/*,static is recource static
            ONEWAY,WILD,STATIC,STAWILD
        };
@@ -173,18 +173,12 @@ bool get(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,in
 - 路由路径替换，加载静态文件
 
 - 第一个是注册的路由，第二个是映射的路径
+
+- 同样接受*作为泛匹配
   
   ## 使用例子
 
 - 见example内的HttpServer.cpp
-
-### loadStaticFS
-
-```cpp
-bool loadStaticFS(const char* route,const char* staticPath)
-```
-
-- 和上面一个类似,只是这个是基于文件夹,上一个是文件
 
 ### deletePath
 
