@@ -31,10 +31,9 @@
 	// ],
 	"replace":[],
 	//set agent array
-	// "reverse proxy":[
-	// {"model":"RANDOM","path":"/try*","host":["127.0.0.1:5201"],"weight":[1]}
-	// ],
-	"reverse proxy":[],
+	//this proxy is not ok now,do not use it
+	"reverse proxy":[
+	],
 	//https certificate path
 	"cert path":"./ssl/cacert.pem",
 	"cert password":"123456",
