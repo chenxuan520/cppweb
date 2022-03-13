@@ -1174,7 +1174,22 @@ public:
 		}
 		return NULL;
 	}
-
+	bool check(const char* word)
+	{
+		Node* temp=root;
+		for(unsigned i=0;word[i]!=0;i++)
+		{
+			if(word[i]-46<0||word[i]-46>76)
+				return false;
+			if(temp->next[word[i]-46]==NULL)
+				return false;
+			else
+				temp=temp->next[word[i]-46];
+		}
+		if(temp->stop==true)
+			return false;
+		return true;
+	}
 };
 class ServerTcpIp{
 public:
@@ -2737,7 +2752,9 @@ public:
 		{
 			if(isDebug)
 				printf("reconnecting\n");
+#ifndef _WIN32
 			sleep(2);
+#endif
 			sockfd = socket(PF_INET, SOCK_STREAM, 0);
 			if (sockfd < 0)
 			{
@@ -3227,6 +3244,7 @@ public://main class for http server2.0
 		GET,POST,PUT,DELETE,OPTIONS,CONNECT,ALL,
 	};
 #else
+#define MSG_DONTWAIT 1;
 	enum AskType{//different ask ways in http
 		GET,POST,PUT,WINDELETE,OPTIONS,CONNECT,ALL,
 	};
@@ -3381,7 +3399,7 @@ public:
 		return true;
 	}
 	bool redirect(const char* route,const char* location)
-	{
+	{//301 redirect
 		if(strlen(route)>100)
 			return false;
 		RouteFuntion* nowRoute=addRoute();
@@ -3473,19 +3491,13 @@ public:
 	{//receive all ask type
 		return routeHandle(ALL,route,pfunc);
 	}
-	bool clientInHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port))
+	inline void clientInHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port))
 	{//when client in ,it will be call
-		if(clientIn!=NULL)
-			return false;
 		clientIn=pfunc;
-		return true;
 	}
-	bool clientOutHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port))
+	inline void clientOutHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port))
 	{//when client out ,itwill be call
-		if(clientOut!=NULL)
-			return false;
 		clientOut=pfunc;
-		return true;
 	}
 	bool setMiddleware(void (*pfunc)(HttpServer&,DealHttp&,int))
 	{//middleware funtion after get text it will be called
@@ -3503,13 +3515,10 @@ public:
 		func(cliSock);
 		middleware=temp;
 	}
-	bool setLog(void (*pfunc)(const void*,int),void (*errorFunc)(const void*,int))
+	void setLog(void (*pfunc)(const void*,int),void (*errorFunc)(const void*,int))
 	{//log system 
-		if(logFunc!=NULL||logError!=NULL)
-			return false;
 		logFunc=pfunc;
 		logError=errorFunc;
-		return true;
 	}
 	void run(const char* defaultFile=NULL)
 	{//server begin to run
@@ -3908,6 +3917,7 @@ private:
 		}
 		else
 		{
+			memset(server.getText,0,sizeof(char)*server.recLen);
 			int getNum=server.receiveSocket(soc,(char*)server.getText,server.recLen,MSG_DONTWAIT);
 			int all=getNum;
 			while((int)server.recLen==all)
@@ -3958,6 +3968,7 @@ private:
 		}
 		return 0;
 	}
+#ifndef _WIN32
 	void epollHttp()
 	{//pthing is 0 out,1 in,2 say pnum is the num of soc,this->getText is rec,len is the max len of this->getText,pneed is others things
 		memset(this->getText,0,sizeof(char)*this->recLen);
@@ -4030,6 +4041,7 @@ private:
 		}
 		return ;
 	}
+#endif
 	RouteFuntion* addRoute()
 	{
 		RouteFuntion* temp=NULL; 
@@ -4261,10 +4273,15 @@ public:
 		while(1)
 		{
 			sockaddr_in newaddr={0,0,{0},{0}};
-			int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
+			int newClient=acceptSocket(newaddr);
 			if(newClient==-1)
 				continue;
 			Argv* temp=new Argv;
+			if(temp==NULL)
+			{
+				error="malloc wrong";
+				return;
+			}
 			temp->pserver=this;
 			temp->func=pfunc;
 			temp->soc=newClient;

@@ -1,7 +1,7 @@
 all:main
 
-main:./cpp/main.cpp ./hpp/cppweb.h
-	g++ ./cpp/main.cpp -o main -lpthread 
+main:./cpp/main.cpp ./hpp/cppweb.h ./hpp/config.h ./hpp/route.h
+	g++ -g ./cpp/main.cpp -o main -lpthread 
 clean:
 	rm -f *.o 
 sql: sql.o
