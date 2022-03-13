@@ -185,6 +185,7 @@ void proxy(HttpServer& server,DealHttp& http,int soc)
 			LogSystem::recordRequest("rec cliwrong",soc);
 			return;
 		}
+		client.disconnectHost();
 		server.selfCreate(len);
 	}
 	else

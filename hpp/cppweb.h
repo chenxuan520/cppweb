@@ -1102,7 +1102,10 @@ public:
 		{
 			int pid=fork();
 			if(pid!=0)
+			{
 				waitpid(pid, NULL, 0);
+				sleep(10);
+			}
 			else
 				break;
 		}
@@ -1459,6 +1462,20 @@ public:
 		return this->receiveSocketSSL(clisoc,pget,len,flag);
 #endif
 	}
+	int receiveSocket(int cliSoc,std::string& buffer,int flag=0)
+	{
+		char temp[1024]={0};
+		buffer.clear();
+		int len=receiveSocket(cliSoc,temp,1024,flag);
+		if(len<=0)
+			return len;
+		while(len==1024)
+		{
+			buffer.append(temp,1024);
+			len=receiveSocket(cliSoc,temp,1024,flag);
+		}
+		return buffer.size();
+	}
 	inline int sendOne(const void* psen,int len)//model one
 	{
 		return send(sockC,(char*)psen,len,0);
@@ -1794,9 +1811,23 @@ public:
 			return false;
 		return true;
 	}
-	inline int receiveHost(void* prec,int len)
+	inline int receiveHost(void* prec,int len,int flag=0)
 	{
-		return recv(sock,(char*)prec,len,0);
+		return recv(sock,(char*)prec,len,flag);
+	}
+	int receiveHost(std::string& buffer,int flag=0)
+	{
+		char temp[1024]={0};
+		buffer.clear();
+		int len=receiveHost(temp,1024,flag);
+		if(len<=0)
+			return len;
+		while(len==1024)
+		{
+			buffer.append(temp,1024);
+			len=receiveHost(temp,1024,flag);
+		}
+		return buffer.size();
 	}
 	inline int sendHost(const void* ps,int len)
 	{
@@ -3575,6 +3606,10 @@ public:
 	{
 		return this->receiveSocket(num,buffer,bufferLen,flag);
 	}
+	int httpRecv(int num,std::string& buffer,int flag)
+	{
+		return this->receiveSocket(num,buffer,flag);
+	}
 	int getCompleteMessage(int sockCli)
 	{//some time text is not complete ,it can get left text 
 		void*& message=getText;
@@ -3653,6 +3688,10 @@ public:
 	inline RouteFuntion* getNowRoute()
 	{//get the now route;
 		return pnowRoute;
+	}
+	inline void enlagerSenBuffer()
+	{
+		enlargeMemory(this->getText,this->senLen);
 	}
 private:
 	void messagePrint()
