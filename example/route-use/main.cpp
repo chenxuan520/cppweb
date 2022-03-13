@@ -28,7 +28,7 @@ void pfunc(HttpServer& server,DealHttp& http,int)
 }
 void pfuncThree(HttpServer& server,DealHttp& http,int)
 {
-	char* sen=(char*)server.getSenBuff();
+	char* sen=(char*)server.getSenBuffer();
 	http.customizeAddTop(sen,1024*1024,200,strlen("{\"as\":1}"));
 	int len=http.customizeAddBody(sen,1024*1024,"{\"as\":1}",strlen("{\"as\":1}"));
 	server.selfCreate(len);

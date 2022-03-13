@@ -1,7 +1,7 @@
 all:main
 
-main:./cpp/main.cpp ./hpp/cppweb.h ./hpp/config.h ./hpp/route.h
-	g++ -g ./cpp/main.cpp -o main -lpthread 
+main:./cpp/main.cpp ./hpp/cppweb.h
+	g++ ./cpp/main.cpp -o main -lpthread -lwsock32 -std=c++11
 clean:
 	rm -f *.o 
 sql: sql.o
@@ -9,7 +9,7 @@ sql: sql.o
 sql.o: ./cpp/sql.cpp
 	g++ -c ./cpp/sql.cpp -o sql.o
 ssl:./hpp/cppweb.h ./hpp/config.h ./cpp/main.cpp ./hpp/route.h
-	g++ ./cpp/main.cpp -o main -D CPPWEB_OPENSSL -lpthread -lssl -lcrypto
+	g++ ./cpp/main.cpp -o main -D CPPWEB_OPENSSL -lpthread -lwsock32 -lssl -lcrypto -std=c++11
 install:
 	mkdir /usr/local/include/cppweb
 	cp hpp/cppweb.h /usr/local/include/cppweb
