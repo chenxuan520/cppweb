@@ -214,7 +214,7 @@ private:
 	unsigned defaultSize;
 	Object* obj;
 	std::unordered_map<char*,unsigned> memory;
-	std::unordered_map<std::string,Object*> hashMap;
+	/* std::unordered_map<std::string,Object*> hashMap; */
 	std::unordered_map<char*,char*> bracket;
 public:
 	Json()
@@ -553,9 +553,10 @@ public:
 	}
 	Object* operator[](const char* key)
 	{
-		if(hashMap.find(std::string(key))==hashMap.end())
-			return NULL;
-		return hashMap.find(std::string(key))->second;
+		return (*obj)[key];
+		/* if(hashMap.find(std::string(key))==hashMap.end()) */
+		/* 	return NULL; */
+		/* return hashMap.find(std::string(key))->second; */
 	}
 	char*& operator()()
 	{
@@ -619,7 +620,7 @@ private:
 			memset(word,0,sizeof(char)*maxLen);
 			findString(now,word,maxLen);
 			nextObj->key=word;
-			hashMap.insert(std::pair<std::string,Object*>{word,nextObj});
+			/* hashMap.insert(std::pair<std::string,Object*>{word,nextObj}); */
 			now+=strlen(word)+3;
 			memset(word,0,sizeof(char)*maxLen);
 			if(*now=='\"')
@@ -3689,9 +3690,10 @@ public:
 	{//get the now route;
 		return pnowRoute;
 	}
-	inline void enlagerSenBuffer()
+	inline void* enlagerSenBuffer()
 	{
-		enlargeMemory(this->getText,this->senLen);
+		this->getText=enlargeMemory(this->getText,this->senLen);
+		return this->getText;
 	}
 private:
 	void messagePrint()

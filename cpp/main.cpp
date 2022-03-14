@@ -12,6 +12,15 @@ using namespace cppweb;
 /********************************
 	author:chenxuan
 	date:2021.7.5
+	funtion:config server by self
+*********************************/
+void selfConfig(const Config&,HttpServer&)
+{
+
+}
+/********************************
+	author:chenxuan
+	date:2021.7.5
 	funtion:from file init server
 *********************************/
 void readSetting(LoadConfig& load)
@@ -21,6 +30,12 @@ void readSetting(LoadConfig& load)
 						con.port=obj->intVal;
 					else
 						con.port=5200;
+					});
+	load.findConfig("memory",[](Json::Object* obj,Config& con){
+					if(obj!=NULL&&obj->intVal>0)
+						con.defaultMemory=obj->intVal;
+					else
+						con.defaultMemory=1;
 					});
 	load.findConfig("default file",[](Json::Object* obj,Config& con){
 					if(obj!=NULL)
@@ -128,6 +143,7 @@ void readSetting(LoadConfig& load)
 						con.passwd=obj->strVal;
 					});
 #endif
+	load.configToServer(selfConfig);
 	return;
 }
 /********************************
@@ -161,15 +177,6 @@ void dealArgc(int argc,char** argv)
 {
 	if(argc==1)
 		return;
-	if(argc>2||strcmp(argv[1],"help")==0||strcmp(argv[1],"--help")==0)
-	{
-		printf("thank using chenxuanweb,if you have any question\n"
-			   "send email to 1607772321@qq.com to deal problem\nTHANK YOU!\n"
-			   "--help\t\tget the help\n"
-			   "--stop\t\tstop the server\n"
-			   "--reload\t\treload the server\n");
-		exit(0);
-	}
 	if(strcmp(argv[1],"reload")==0||strcmp(argv[1],"--reload")==0||\
 	   strcmp(argv[1],"stop")==0||strcmp(argv[1],"--stop")==0)
 	{
@@ -179,6 +186,7 @@ void dealArgc(int argc,char** argv)
 			return;
 		int pid=0;
 		fscanf(fp,"%d",&pid);
+		printf("dealing %d process\n",pid);
 		if(pid<=66)
 			exit(0);
 		kill(pid,2);
@@ -186,6 +194,16 @@ void dealArgc(int argc,char** argv)
 		if(strcmp(argv[1],"stop")==0||strcmp(argv[1],"--stop")==0)
 			exit(0);
 #endif
+	}
+	else
+	{
+		printf("thank using chenxuanweb,if you have any question\n"
+			   "send email to 1607772321@qq.com to deal problem\nTHANK YOU!\n"
+			   "--help\t\tget the help\n"
+			   "--stop\t\tstop the server\n"
+			   "--reload\t\treload the server\n"
+			   "! only in linux the argv is accepted\n");
+		exit(0);
 	}
 }
 int main(int argc, char** argv) 

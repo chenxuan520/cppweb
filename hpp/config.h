@@ -130,6 +130,7 @@ struct Config{
 	bool isAuto;
 	bool isDebug;
 	int port;
+	int defaultMemory;
 	std::string defaultFile;
 	std::string model;
 	std::string keyPath;
@@ -139,7 +140,7 @@ struct Config{
 	std::vector<std::pair<std::string,std::string>> replacePath;
 	std::vector<std::pair<std::string,std::string>> redirectPath;
 	std::unordered_map<std::string,Proxy> proxyMap;
-	Config():isLongConnect(true),isBack(false),isGuard(false),isLog(false),isAuto(true),isDebug(true),port(5200){};
+	Config():isLongConnect(true),isBack(false),isGuard(false),isLog(false),isAuto(true),isDebug(true),port(5200),defaultMemory(1){};
 }config;
 void proxy(HttpServer& server,DealHttp& http,int soc)
 {
@@ -253,7 +254,7 @@ private:
 	}
 	void configServer(HttpServer& server)
 	{
-		server.changeSetting(true,config.isLongConnect,config.isAuto,3);
+		server.changeSetting(true,config.isLongConnect,config.isAuto,config.defaultMemory);
 		for(auto& now:config.deletePath)
 			server.deletePath(now.c_str());
 		for(auto& now:config.replacePath)

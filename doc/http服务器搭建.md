@@ -2,7 +2,7 @@
 
 - 使用cppweb搭建简单的http服务器
   
-  ## 安装教程
+  ## 脚本安装教程
 1. git clone https://gitee.com/chenxuan520/server-for-static-web.git
 
 2. ./install.sh
@@ -11,7 +11,7 @@
 
 4. 服务器运行 
    
-   ## 填入信息
+   ### 填入信息
 
 5. 填入绑定的端口(如5200)
 
@@ -20,18 +20,33 @@
 7. 填入是否运行在后台 (true or false)
 
 8. 填入是否使用守护进程 (true or false)
+
+## 修改配置法
+
+1. git clone https://gitee.com/chenxuan520/server-for-static-web.git
+
+2. make 
    
-   ## 信息说明
-- 数据库需先安装mysql的库
+   > 如果有https证书也可以make ssl
+
+3. 修改config.json,[介绍](./配置文件说明.md)
+
+4. ./main
+
+## 信息说明
 
 - 不运行在后台的话shell结束会一起结束
 
 - 守护进程可以保证宕机快速重启 
-  
-  ## 修改配置
 
-- 在install.sh运行完后会形成config.json文件在同一个目录下
+## 修改配置
 
-- 内容分别是端口,默认网页,是否运行在后台等
+- 直接修改config.json
 
-- 修改后重启程序即可
+- ./main --reload
+
+- 等待大约半分钟
+
+## 停止服务器
+
+- ./main --stop
