@@ -31,7 +31,9 @@
 	// ],
 	"replace":[],
 	//set agent array
-	//this proxy is not ok now,do not use it
+	// "reverse proxy":[
+	// {"model":"RANDOM","path":"/try*","host":["127.0.0.1:5201"],"weight":[1]}
+	// ],
 	"reverse proxy":[
 	],
 	//https certificate path

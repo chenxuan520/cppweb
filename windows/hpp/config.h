@@ -1,38 +1,14 @@
 #pragma once
 #include "./cppweb.h"
 using namespace cppweb;
-struct Config{
-	struct Proxy{
-		std::string host;
-		int port;
-		Proxy():port(5200){};
-	};
-	bool isLongConnect;
-	bool isBack;
-	bool isGuard;
-	bool isLog;
-	bool isAuto;
-	bool isDebug;
-	int port;
-	std::string defaultFile;
-	std::string model;
-	std::string keyPath;
-	std::string certPath;
-	std::string passwd;
-	std::vector<std::string> deletePath;
-	std::vector<std::pair<std::string,std::string>> replacePath;
-	std::vector<std::pair<std::string,std::string>> redirectPath;
-	std::unordered_map<std::string,Proxy> proxyMap;
-	Config():isLongConnect(true),isBack(false),isGuard(false),isLog(false),isAuto(true),isDebug(true),port(5200){};
-}config;
 class LoadBalance{
 public:
 	enum Model{
-		POLLING,
-		POLLRAN,
-		RANDOM,
-		HASH,
-		TEMPNO
+		POLLING,//one by one 
+		POLLRAN,//polling by random
+		RANDOM,//random find
+		HASH,//use hash
+		TEMPNO//a temp model do not use it
 	};
 private:
 	Model model;
@@ -140,29 +116,78 @@ public:
 	{
 		return model;
 	}
-};
+}loadBanlance(LoadBalance::TEMPNO);
+struct Config{
+	struct Proxy{
+		std::vector<std::string> host;
+		LoadBalance load;
+		Proxy(LoadBalance::Model model=LoadBalance::RANDOM):load(model){};
+	};
+	bool isLongConnect;
+	bool isBack;
+	bool isGuard;
+	bool isLog;
+	bool isAuto;
+	bool isDebug;
+	int port;
+	int defaultMemory;
+	std::string defaultFile;
+	std::string model;
+	std::string keyPath;
+	std::string certPath;
+	std::string passwd;
+	std::vector<std::string> deletePath;
+	std::vector<std::pair<std::string,std::string>> replacePath;
+	std::vector<std::pair<std::string,std::string>> redirectPath;
+	std::unordered_map<std::string,Proxy> proxyMap;
+	Config():isLongConnect(true),isBack(false),isGuard(false),isLog(false),isAuto(true),isDebug(true),port(5200),defaultMemory(1){};
+}config;
 void proxy(HttpServer& server,DealHttp& http,int soc)
 {
 	auto pathNow=server.getNowRoute();
-	if(config.proxyMap.find(pathNow->route)!=config.proxyMap.end())
+	char url[128]={0};
+	std::string strNow=pathNow->route;
+	strNow+='*';
+	http.getWildUrl(server.recText(),pathNow->route,url,128);
+	if(config.proxyMap.find(strNow)!=config.proxyMap.end())
 	{
-		auto now=config.proxyMap[pathNow->route];
+		auto now=config.proxyMap[strNow].load;
 		char ip[48]={0};
-		ClientTcpIp::getDnsIp(now.host.c_str(),ip,48);
-		ClientTcpIp client(ip,now.port);
+		int port=0,temp=0;
+		if(now.getNowModel()!=LoadBalance::HASH)
+			strNow=now.getServer();
+		else
+			strNow=now.getHashServer(ServerTcpIp::getPeerIp(soc,&temp));
+		sscanf(strNow.c_str(),"%[^:]:%d",ip,&port);
+		memset(server.getSenBuffer(),0,server.getMaxSenLen());
+		DealHttp::Request req;
+		http.analysisRequest(req,server.recText());
+		req.askPath=url;
+		req.head["Host"]=strNow;
+		http.createAskRequest(req,server.getSenBuffer(),server.getMaxSenLen());
+		ClientTcpIp client(ip,port);
 		if(false==client.tryConnect())
 		{
 			http.gram.statusCode=DealHttp::STATUSNOFOUND;
 			LogSystem::recordRequest("connect cliwrong",soc);
 			return;
 		}
-		if(false==client.sendHost(server.recText(),server.getRecLen()))
+		if(false==client.sendHost(server.getSenBuffer(),strlen((char*)server.getSenBuffer())))
 		{
 			http.gram.statusCode=DealHttp::STATUSNOFOUND;
 			LogSystem::recordRequest("sen cliwrong",soc);
 			return;
 		}
-		server.selfCreate(client.receiveHost(server.getSenBuffer(),server.getMaxSenLen()));
+		memset(server.getSenBuffer(),0,server.getMaxSenLen());
+		int len=client.receiveHost(server.getSenBuffer(),server.getMaxSenLen());
+		if(len<=0)
+		{
+			http.gram.statusCode=DealHttp::STATUSNOFOUND;
+			LogSystem::recordRequest("rec cliwrong",soc);
+			return;
+		}
+		client.disconnectHost();
+		server.selfCreate(len);
 	}
 	else
 		http.gram.statusCode=DealHttp::STATUSNOFOUND;
@@ -170,9 +195,11 @@ void proxy(HttpServer& server,DealHttp& http,int soc)
 class LoadConfig{
 private:
 	Json json;
+	HttpServer* pserver;
 	const char* error;
+	std::vector<void (*)(const Config&,HttpServer&)> arr;
 public:
-	LoadConfig(const char* buffer):json(buffer),error(NULL)
+	LoadConfig(const char* buffer):json(buffer),pserver(NULL),error(NULL)
 	{
 		if(json.lastError()!=NULL)
 		{
@@ -185,6 +212,10 @@ public:
 		auto root=*json.getRootObj();
 		pfunc(root[key],config);
 	}
+	inline void configToServer(void (*pfunc)(const Config&,HttpServer&))
+	{
+		arr.push_back(pfunc);
+	}
 	void runServer(void (*pfunc)(HttpServer&)=NULL)
 	{
 		configProcess();
@@ -196,6 +227,7 @@ public:
 		else
 			model=HttpServer::MULTIPLEXING;
 		HttpServer server(config.port,config.isDebug,model);
+		pserver=&server;
 		configServer(server);
 		if(pfunc!=NULL)
 			pfunc(server);
@@ -203,6 +235,8 @@ public:
 			server.run(config.defaultFile.c_str());
 		else
 			server.run();
+		if(server.lastError()!=NULL)
+			error=server.lastError();
 	}
 	inline const char* lastError()
 	{
@@ -220,7 +254,7 @@ private:
 	}
 	void configServer(HttpServer& server)
 	{
-		server.changeSetting(true,config.isLongConnect,config.isAuto);
+		server.changeSetting(true,config.isLongConnect,config.isAuto,config.defaultMemory);
 		for(auto& now:config.deletePath)
 			server.deletePath(now.c_str());
 		for(auto& now:config.replacePath)
@@ -231,6 +265,8 @@ private:
 			server.all(now.first.c_str(),proxy);
 		if(config.isLog)
 			server.setLog(LogSystem::recordRequest,LogSystem::recordRequest);
+		for(auto& now:arr)
+			now(config,server);
 #ifdef CPPWEB_OPENSSL
 		if(FileGet::getFileLen(config.certPath.c_str())<=0||
 		   FileGet::getFileLen(config.keyPath.c_str())<=0)

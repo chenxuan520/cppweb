@@ -18,9 +18,6 @@
 #include<sys/types.h>
 #include<unistd.h>
 #include<netdb.h>
-#else
-#include<winsock2.h>
-#define socketlen_t int;
 #endif
 #include<string.h>
 #include<pthread.h>
@@ -217,7 +214,7 @@ private:
 	unsigned defaultSize;
 	Object* obj;
 	std::unordered_map<char*,unsigned> memory;
-	std::unordered_map<std::string,Object*> hashMap;
+	/* std::unordered_map<std::string,Object*> hashMap; */
 	std::unordered_map<char*,char*> bracket;
 public:
 	Json()
@@ -556,9 +553,10 @@ public:
 	}
 	Object* operator[](const char* key)
 	{
-		if(hashMap.find(std::string(key))==hashMap.end())
-			return NULL;
-		return hashMap.find(std::string(key))->second;
+		return (*obj)[key];
+		/* if(hashMap.find(std::string(key))==hashMap.end()) */
+		/* 	return NULL; */
+		/* return hashMap.find(std::string(key))->second; */
 	}
 	char*& operator()()
 	{
@@ -622,7 +620,7 @@ private:
 			memset(word,0,sizeof(char)*maxLen);
 			findString(now,word,maxLen);
 			nextObj->key=word;
-			hashMap.insert(std::pair<std::string,Object*>{word,nextObj});
+			/* hashMap.insert(std::pair<std::string,Object*>{word,nextObj}); */
 			now+=strlen(word)+3;
 			memset(word,0,sizeof(char)*maxLen);
 			if(*now=='\"')
@@ -1105,7 +1103,10 @@ public:
 		{
 			int pid=fork();
 			if(pid!=0)
+			{
 				waitpid(pid, NULL, 0);
+				sleep(10);
+			}
 			else
 				break;
 		}
@@ -1177,7 +1178,22 @@ public:
 		}
 		return NULL;
 	}
-
+	bool check(const char* word)
+	{
+		Node* temp=root;
+		for(unsigned i=0;word[i]!=0;i++)
+		{
+			if(word[i]-46<0||word[i]-46>76)
+				return false;
+			if(temp->next[word[i]-46]==NULL)
+				return false;
+			else
+				temp=temp->next[word[i]-46];
+		}
+		if(temp->stop==true)
+			return false;
+		return true;
+	}
 };
 class ServerTcpIp{
 public:
@@ -1193,20 +1209,13 @@ protected:
 	char* hostip;//host IP 
 	char* hostname;//host name
 	const char* error;//error hapen
+	int sock;//file descriptor of host;
+	int sockC;//file descriptor to sign every client;
 	sockaddr_in addr;//IPv4 of host;
 	sockaddr_in client;//IPv4 of client;
 	fd_set  fdClients;//file descriptor
-#ifndef _WIN32
-	int sock;//file descriptor of host;
-	int sockC;//file descriptor to sign every client;
 	epoll_event nowEvent;//a temp event to get event
 	epoll_event* pevent;//all the event
-#else
-typedef int socklen_t;
-	WSADATA wsa;//apply verson of windows;
-	SOCKET sock;//file descriptor of host;
-	SOCKET sockC;//file descriptor to sign every client;
-#endif
 #ifdef CPPWEB_OPENSSL
 	SSL_CTX* ctx;//openssl to https struct 
 	std::unordered_map<int,SSL*> sslHash;//hash to find sock and SSL*
@@ -1274,13 +1283,6 @@ public:
 public:
 	ServerTcpIp(unsigned short port=5200,int epollNum=1,int wait=5)
 	{//port is bound ,epollNum is if open epoll model,wait is listen socket max wait
-#ifdef _WIN32
-		if(WSAStartup(MAKEWORD(2,2),&wsa)!=0)
-		{
-			error="WSA wrong";
-			return;
-		}
-#endif
 		sock=socket(AF_INET,SOCK_STREAM,0);//AF=addr family internet
 		addr.sin_addr.s_addr=htonl(INADDR_ANY);//inaddr_any
 		addr.sin_family=AF_INET;//af_intt IPv4
@@ -1301,14 +1303,12 @@ public:
 		else
 			memset(hostname,0,sizeof(char)*300);
 		FD_ZERO(&fdClients);//clean fdClients;
-#ifndef _WIN32
 		epfd=epoll_create(epollNum);
 		if((pevent=(epoll_event*)malloc(512*sizeof(epoll_event)))==NULL)
 			error="event wrong";
 		else
 			memset(pevent,0,sizeof(epoll_event)*512);
 		memset(&nowEvent,0,sizeof(epoll_event));
-#endif
 		pfdn=(int*)malloc(sizeof(int)*64);
 		if(pfdn==NULL)
 			error="pfdn wrong";
@@ -1337,22 +1337,15 @@ public:
 	}
 	virtual ~ServerTcpIp()//clean server
 	{
-#ifndef _WIN32
 		close(sock);
 		close(sockC);
 		close(epfd);
-		if(pevent!=NULL)
-			free(pevent);
-#else
-		closesocket(sock);
-		closesocket(sockC);
-		closesocket(epfd);
-		WSACleanup();
-#endif
 		if(hostip!=NULL)
 			free(hostip);
 		if(hostname!=NULL)
 			free(hostname);
+		if(pevent!=NULL)
+			free(pevent);
 		if(pfdn!=NULL)
 			free(pfdn);
 #ifdef CPPWEB_OPENSSL
@@ -1439,12 +1432,10 @@ public:
 		if(listen(sock,backwait)==-1)
 			return false;
 		FD_SET(sock,&fdClients);
-#ifndef _WIN32
 		nowEvent.events=EPOLLIN;
 		nowEvent.data.fd=sock;
 		epoll_ctl(epfd,EPOLL_CTL_ADD,sock,&nowEvent);
 		fd_count=sock;
-#endif
 		return true;
 	}
 	inline int acceptSocket(sockaddr_in& newaddr)
@@ -1472,6 +1463,20 @@ public:
 		return this->receiveSocketSSL(clisoc,pget,len,flag);
 #endif
 	}
+	int receiveSocket(int cliSoc,std::string& buffer,int flag=0)
+	{
+		char temp[1024]={0};
+		buffer.clear();
+		int len=receiveSocket(cliSoc,temp,1024,flag);
+		if(len<=0)
+			return len;
+		while(len==1024)
+		{
+			buffer.append(temp,1024);
+			len=receiveSocket(cliSoc,temp,1024,flag);
+		}
+		return buffer.size();
+	}
 	inline int sendOne(const void* psen,int len)//model one
 	{
 		return send(sockC,(char*)psen,len,0);
@@ -1487,11 +1492,7 @@ public:
 	inline int closeSocket(int socCli)
 	{
 #ifndef CPPWEB_OPENSSL
-#ifndef _WIN32
 		return close(socCli);
-#else
-		return closesocket(socCli);
-#endif
 #else
 		return closeSSL(socCli);
 #endif
@@ -1503,7 +1504,6 @@ public:
 	void selectModel(int (*pfunc)(Thing,int,ServerTcpIp&,void*),void* argv)
 	{
 		fd_set temp=fdClients;
-#ifndef _WIN32
 		int sign=select(fd_count+1,&temp,NULL,NULL,NULL);
 		if(sign>0)
 			for(int i=3;i<fd_count+1;i++)
@@ -1558,52 +1558,7 @@ public:
 						}
 					}
 				}
-#else
-		int sign=select(0,&temp,NULL,NULL,NULL);
-		if(sign>0)
-		{
-			for(int i=0;i<(int)fdClients.fd_count;i++)
-			{
-				if(FD_ISSET(fdClients.fd_array[i],&temp))
-				{
-					if(fdClients.fd_array[i]==sock)
-					{
-						if(fdClients.fd_count<FD_SETSIZE)
-						{
-							SOCKADDR_IN newaddr={0,0,{0,0,0,0},0};
-							SOCKET newClient=acceptSocket(newaddr);
-							FD_SET(newClient,&fdClients);
-							if(pfunc!=NULL)
-							{
-								int numGet=pfunc(CPPIN,newClient,*this,argv);
-								if(numGet!=0)
-								{
-									FD_CLR(numGet,&fdClients);
-									closeSocket(newClient);
-								}
-							}
-						}
-						else
-							continue;
-					}
-					else
-					{
-						if(pfunc!=NULL)
-						{
-							int numGet=pfunc(CPPSAY,fdClients.fd_array[i],*this,argv);
-							if(numGet!=0)
-							{
-								FD_CLR(numGet,&fdClients);
-								closeSocket(numGet);
-							}
-						}
-					}
-				}
-			}
-		}
-#endif
 	}
-#ifndef _WIN32
 	bool selectModel(void* pget,int len,void* pneed,int (*pfunc)(Thing ,int ,int,void* ,void*,ServerTcpIp& ))
 	{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
 		fd_set temp=fdClients;
@@ -1669,7 +1624,6 @@ public:
 			return false;
 		return true;
 	}
-#endif
 	char* getHostName()//get self name
 	{
 		char name[300]={0};
@@ -1702,7 +1656,6 @@ public:
 	}
 	void epollModel(int (*pfunc)(Thing,int,ServerTcpIp&,void*),void* argv)
 	{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
-#ifndef _WIN32
 		int eventNum=epoll_wait(epfd,pevent,512,-1),numGet=0;
 		for(int i=0;i<eventNum;i++)
 		{
@@ -1737,11 +1690,7 @@ public:
 				}
 			}
 		}
-#else
-		selectModel(pfunc,argv);
-#endif
 	}
-#ifndef _WIN32
 	bool epollModel(void* pget,int len,void* pneed,int (*pfunc)(Thing,int ,int ,void* ,void*,ServerTcpIp& ))
 	{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
 		Thing thing=CPPSAY;
@@ -1785,22 +1734,16 @@ public:
 		}
 		return true;
 	}
-#endif
 };
 class ClientTcpIp{
 private:
+	int sock;//myself
 	sockaddr_in addrC;//server information
 	char ip[128];//server Ip
 	char* hostip;//host ip
 	char* hostname;//host name
 	char selfIp[128];
 	const char* error;
-#ifndef _WIN32
-	int sock;//myself
-#else
-	WSADATA wsa;//apply for api
-	int sock;//myself	
-#endif
 #ifdef CPPWEB_OPENSSL
 	SSL* ssl;
 	SSL_CTX* ctx;
@@ -1808,10 +1751,6 @@ private:
 public:
 	ClientTcpIp(const char* hostIp,unsigned short port)
 	{
-#ifdef _WIN32
-		if(WSAStartup(MAKEWORD(2,2),&wsa)!=0)
-			exit(0);
-#endif
 		memset(ip,0,128);
 		memset(selfIp,0,128);
 		error=NULL;
@@ -1856,12 +1795,7 @@ public:
 			free(hostip);
 		if(hostname!=NULL)
 			free(hostname);
-#ifndef _WIN32
 		close(sock);
-#else
-		closesocket(sock);
-		WSACleanup();
-#endif
 	}
 	void addHostIp(const char* ip,unsigned short port=0)
 	{
@@ -1878,9 +1812,23 @@ public:
 			return false;
 		return true;
 	}
-	inline int receiveHost(void* prec,int len)
+	inline int receiveHost(void* prec,int len,int flag=0)
 	{
-		return recv(sock,(char*)prec,len,0);
+		return recv(sock,(char*)prec,len,flag);
+	}
+	int receiveHost(std::string& buffer,int flag=0)
+	{
+		char temp[1024]={0};
+		buffer.clear();
+		int len=receiveHost(temp,1024,flag);
+		if(len<=0)
+			return len;
+		while(len==1024)
+		{
+			buffer.append(temp,1024);
+			len=receiveHost(temp,1024,flag);
+		}
+		return buffer.size();
 	}
 	inline int sendHost(const void* ps,int len)
 	{
@@ -1888,11 +1836,7 @@ public:
 	}
 	bool disconnectHost()
 	{
-#ifndef _WIN32
 		close(sock);
-#else
-		closesocket(sock);
-#endif
 #ifdef CPPWEB_OPENSSL
 		if(ssl!=NULL)
 		{
@@ -2796,25 +2740,6 @@ public:
 		free(buffer);
 		return srcString;
 	}
-#ifdef _WIN32
-	void *memmem(const void *haystack, size_t haystack_len, 
-	    const void * const needle, const size_t needle_len)
-	{
-	    if (haystack == NULL) return NULL; // or assert(haystack != NULL);
-	    if (haystack_len == 0) return NULL;
-	    if (needle == NULL) return NULL; // or assert(needle != NULL);
-	    if (needle_len == 0) return NULL;
-	    
-	    for (const char *h = (const char*)haystack;
-	            haystack_len >= needle_len;
-	            ++h, --haystack_len) {
-	        if (!memcmp(h, needle, needle_len)) {
-	            return (void*)h;
-	        }
-	    }
-	    return NULL;
-	}
-#endif
 };
 class Email{
 private:
@@ -3351,7 +3276,7 @@ public://main class for http server2.0
 		GET,POST,PUT,DELETE,OPTIONS,CONNECT,ALL,
 	};
 #else
-#define MSG_DONTWAIT 0
+#define MSG_DONTWAIT 1;
 	enum AskType{//different ask ways in http
 		GET,POST,PUT,WINDELETE,OPTIONS,CONNECT,ALL,
 	};
@@ -3506,7 +3431,7 @@ public:
 		return true;
 	}
 	bool redirect(const char* route,const char* location)
-	{
+	{//301 redirect
 		if(strlen(route)>100)
 			return false;
 		RouteFuntion* nowRoute=addRoute();
@@ -3598,19 +3523,13 @@ public:
 	{//receive all ask type
 		return routeHandle(ALL,route,pfunc);
 	}
-	bool clientInHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port))
+	inline void clientInHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port))
 	{//when client in ,it will be call
-		if(clientIn!=NULL)
-			return false;
 		clientIn=pfunc;
-		return true;
 	}
-	bool clientOutHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port))
+	inline void clientOutHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port))
 	{//when client out ,itwill be call
-		if(clientOut!=NULL)
-			return false;
 		clientOut=pfunc;
-		return true;
 	}
 	bool setMiddleware(void (*pfunc)(HttpServer&,DealHttp&,int))
 	{//middleware funtion after get text it will be called
@@ -3628,13 +3547,10 @@ public:
 		func(cliSock);
 		middleware=temp;
 	}
-	bool setLog(void (*pfunc)(const void*,int),void (*errorFunc)(const void*,int))
+	void setLog(void (*pfunc)(const void*,int),void (*errorFunc)(const void*,int))
 	{//log system 
-		if(logFunc!=NULL||logError!=NULL)
-			return false;
 		logFunc=pfunc;
 		logError=errorFunc;
-		return true;
 	}
 	void run(const char* defaultFile=NULL)
 	{//server begin to run
@@ -3690,6 +3606,10 @@ public:
 	int httpRecv(int num,void* buffer,int bufferLen,int flag=0)
 	{
 		return this->receiveSocket(num,buffer,bufferLen,flag);
+	}
+	int httpRecv(int num,std::string& buffer,int flag)
+	{
+		return this->receiveSocket(num,buffer,flag);
 	}
 	int getCompleteMessage(int sockCli)
 	{//some time text is not complete ,it can get left text 
@@ -3769,6 +3689,11 @@ public:
 	inline RouteFuntion* getNowRoute()
 	{//get the now route;
 		return pnowRoute;
+	}
+	inline void* enlagerSenBuffer()
+	{
+		this->getText=enlargeMemory(this->getText,this->senLen);
+		return this->getText;
 	}
 private:
 	void messagePrint()
@@ -4033,6 +3958,7 @@ private:
 		}
 		else
 		{
+			memset(server.getText,0,sizeof(char)*server.recLen);
 			int getNum=server.receiveSocket(soc,(char*)server.getText,server.recLen,MSG_DONTWAIT);
 			int all=getNum;
 			while((int)server.recLen==all)
@@ -4388,10 +4314,15 @@ public:
 		while(1)
 		{
 			sockaddr_in newaddr={0,0,{0},{0}};
-			int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
+			int newClient=acceptSocket(newaddr);
 			if(newClient==-1)
 				continue;
 			Argv* temp=new Argv;
+			if(temp==NULL)
+			{
+				error="malloc wrong";
+				return;
+			}
 			temp->pserver=this;
 			temp->func=pfunc;
 			temp->soc=newClient;
