@@ -1830,6 +1830,11 @@ public:
 	}
 #endif
 };
+/*******************************
+ * author:chenxuan
+ * class: client to connect server
+ * example:../example/cli-ask/main.cpp
+******************************/
 class ClientTcpIp{
 private:
 	int sock;//myself
@@ -2036,7 +2041,11 @@ public:
 		return true;
 	}
 };
-//the class to deal http request,and create a datagram 
+/*******************************
+ * author:chenxuan
+ * class:deal http request,and create a datagram
+ * example:../doc/DealHttp.md
+******************************/
 class DealHttp{
 public:
 	friend class HttpServer;
@@ -2847,22 +2856,31 @@ public:
 	void *memmem(const void *haystack, size_t haystack_len, 
 	    const void * const needle, const size_t needle_len)
 	{
-	    if (haystack == NULL) return NULL; // or assert(haystack != NULL);
-	    if (haystack_len == 0) return NULL;
-	    if (needle == NULL) return NULL; // or assert(needle != NULL);
-	    if (needle_len == 0) return NULL;
-	    
-	    for (const char *h = (const char*)haystack;
-	            haystack_len >= needle_len;
-	            ++h, --haystack_len) {
-	        if (!memcmp(h, needle, needle_len)) {
-	            return (void*)h;
-	        }
-	    }
-	    return NULL;
+		if (haystack == NULL) return NULL; // or assert(haystack != NULL);
+		if (haystack_len == 0) return NULL;
+		if (needle == NULL) return NULL; // or assert(needle != NULL);
+		if (needle_len == 0) return NULL;
+
+		for (const char *h = (const char*)haystack;
+			 haystack_len >= needle_len;
+			 ++h, --haystack_len) {
+			if (!memcmp(h, needle, needle_len)) {
+				return (void*)h;
+			}
+		}
+		return NULL;
 	}
 #endif
 };
+/*******************************
+ * author:chenxuan
+ * class:use to send eamil easy
+ * example:{
+ *  Email email;
+ *  email.CreateSend
+ *  email.emailSend
+ * }
+******************************/
 class Email{
 private:
 	sockaddr_in their_addr;
@@ -3320,10 +3338,9 @@ public:
 		strcat(now,"\n");
 		nowLen+=strlen(text)+1;
 	}
-	static void recordRequest(const void* text,int soc)
+	void recordMessage(const void* text,int soc)
 	{
 		static char method[32]={0},askPath[256]={0},buffer[512]={0},nowTime[48]={0};
-		static LogSystem loger("access.log");
 		int port=0;
 		time_t now=time(NULL);
 		strftime(nowTime,48,"%Y-%m-%d %H:%M",localtime(&now));
@@ -3334,7 +3351,12 @@ public:
 		}
 		else
 			sprintf(buffer,"%s localhost %s wrong",nowTime,(char*)text);
-		loger.accessLog(buffer);
+		this->accessLog(buffer);
+	}
+	static void recordRequest(const void* text,int soc)
+	{
+		static LogSystem loger("access.log");
+		loger.recordMessage(text,soc);
 	}
 	static bool recordFileError(const char* fileName)
 	{
@@ -4613,41 +4635,6 @@ public:
 		buffer[i+1]=0;
 		fclose(fp);
 		return true;
-	}
-	bool fileStrstr(const char* fileName,const char* strFind)
-	{
-		int len=0;
-		char* pstr=NULL;
-		len=this->getFileLen(fileName);
-		if(pbuffer!=NULL)
-		{
-			free(pbuffer);
-			pbuffer=NULL;
-		}
-		FILE* fp=fopen(fileName,"r");
-		if(fp==NULL)
-			return false;
-		pbuffer=(char*)malloc(sizeof(char)*(len+10));
-		char* ptemp=pbuffer;
-		if(pbuffer==NULL)
-			return false;
-		memset(pbuffer,0,sizeof(char)*(len+5));
-		if(false==this->getFileMsg(fileName,pbuffer,sizeof(char)*(len+10)))
-			return false;
-		while((*ptemp<65||*ptemp>122)&&ptemp<pbuffer+sizeof(char)*len)
-			ptemp++;
-		pstr=strstr(ptemp,strFind);
-		if(pbuffer!=NULL)
-		{
-			free(pbuffer);
-			pbuffer=NULL;
-		}
-		fclose(fp);
-		if(pstr!=NULL)
-			return true;
-		else
-			return false;
-		return false;
 	}
 	const char* getFileBuff(const char* fileName)
 	{
