@@ -9,7 +9,7 @@
 #### 构造函数
 
 ```cpp
-	ClientTcpIp(const char* hostIp,unsigned short port)
+    ClientTcpIp(const char* hostIp,unsigned short port)
 ```
 
 - 第一个参数为连接ip,第二个为连接的端口
@@ -25,3 +25,7 @@ void addHostIp(const char* ip,unsigned short port=0)
 - 初始化后添加或者更改ip和端口
 
 #### 其他函数类似就不介绍
+
+## Json
+
+- 具体介绍查看[官网](ttps://gitee.com/chenxuan520/cppjson)
