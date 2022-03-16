@@ -18,10 +18,7 @@
 #include<sys/types.h>
 #include<unistd.h>
 #include<netdb.h>
-#else
-#include<winsock2.h>
 #endif
-
 #include<string.h>
 #include<pthread.h>
 #include<stdarg.h>
@@ -36,34 +33,11 @@
 #include<type_traits>
 #include<unordered_map>
 #include<initializer_list>
-
 #ifdef CPPWEB_OPENSSL
 #include<openssl/ssl.h>
 #include<openssl/err.h>
 #endif
-
 namespace cppweb{
-//this class for windows 
-#ifdef _WIN32
-#define socklen_t int
-#define MSG_DONTWAIT 0
-class WSAinit{
-public:
-	WSAinit()
-	{
-		WSADATA wsa;//web server api data
-		if(WSAStartup(MAKEWORD(2,2),&wsa)!=0)
-		{
-			printf("wsadata wrong\n");
-			exit(0);
-		}
-	}
-	~WSAinit()
-	{
-		WSACleanup();
-	}
-}_wsaInit;
-#endif
 //class for analyse json and create json text 
 //more information about it is in https://gitee.com/chenxuan520/cppjson
 class Json{
@@ -1240,10 +1214,8 @@ protected:
 	sockaddr_in addr;//IPv4 of host;
 	sockaddr_in client;//IPv4 of client;
 	fd_set  fdClients;//file descriptor
-#ifndef _WIN32
 	epoll_event nowEvent;//a temp event to get event
 	epoll_event* pevent;//all the event
-#endif
 #ifdef CPPWEB_OPENSSL
 	SSL_CTX* ctx;//openssl to https struct 
 	std::unordered_map<int,SSL*> sslHash;//hash to find sock and SSL*
@@ -1331,7 +1303,6 @@ public:
 		else
 			memset(hostname,0,sizeof(char)*300);
 		FD_ZERO(&fdClients);//clean fdClients;
-#ifndef _WIN32
 		epfd=epoll_create(epollNum);
 		if((pevent=(epoll_event*)malloc(512*sizeof(epoll_event)))==NULL)
 			error="event wrong";
@@ -1343,7 +1314,6 @@ public:
 			error="pfdn wrong";
 		else
 			memset(pfdn,0,sizeof(int)*64);
-#endif
 		fdNumNow=0;
 		fdMax=64;
 #ifdef CPPWEB_OPENSSL
@@ -1367,23 +1337,17 @@ public:
 	}
 	virtual ~ServerTcpIp()//clean server
 	{
-#ifndef _WIN32
 		close(sock);
 		close(sockC);
 		close(epfd);
-		if(pevent!=NULL)
-			free(pevent);
-#else
-		closesocket(sock);
-		closesocket(sockC);
-		closesocket(epfd);
-#endif
-		if(pfdn!=NULL)
-			free(pfdn);
 		if(hostip!=NULL)
 			free(hostip);
 		if(hostname!=NULL)
 			free(hostname);
+		if(pevent!=NULL)
+			free(pevent);
+		if(pfdn!=NULL)
+			free(pfdn);
 #ifdef CPPWEB_OPENSSL
 		if(ctx!=NULL)
 			SSL_CTX_free(ctx);
@@ -1468,11 +1432,9 @@ public:
 		if(listen(sock,backwait)==-1)
 			return false;
 		FD_SET(sock,&fdClients);
-#ifndef _WIN32
 		nowEvent.events=EPOLLIN;
 		nowEvent.data.fd=sock;
 		epoll_ctl(epfd,EPOLL_CTL_ADD,sock,&nowEvent);
-#endif
 		fd_count=sock;
 		return true;
 	}
@@ -1530,11 +1492,7 @@ public:
 	inline int closeSocket(int socCli)
 	{
 #ifndef CPPWEB_OPENSSL
-#ifndef _WIN32
 		return close(socCli);
-#else
-		return closesocket(socCli);
-#endif
 #else
 		return closeSSL(socCli);
 #endif
@@ -1546,7 +1504,6 @@ public:
 	void selectModel(int (*pfunc)(Thing,int,ServerTcpIp&,void*),void* argv)
 	{
 		fd_set temp=fdClients;
-#ifndef _WIN32
 		int sign=select(fd_count+1,&temp,NULL,NULL,NULL);
 		if(sign>0)
 			for(int i=3;i<fd_count+1;i++)
@@ -1601,52 +1558,7 @@ public:
 						}
 					}
 				}
-#else
-		int sign=select(0,&temp,NULL,NULL,NULL);
-		if(sign>0)
-		{
-			for(int i=0;i<(int)fdClients.fd_count;i++)
-			{
-				if(FD_ISSET(fdClients.fd_array[i],&temp))
-				{
-					if(fdClients.fd_array[i]==sock)
-					{
-						if(fdClients.fd_count<FD_SETSIZE)
-						{
-							SOCKADDR_IN newaddr={0,0,{0,0,0,0},0};
-							SOCKET newClient=acceptSocket(newaddr);
-							FD_SET(newClient,&fdClients);
-							if(pfunc!=NULL)
-							{
-								int numGet=pfunc(CPPIN,newClient,*this,argv);
-								if(numGet!=0)
-								{
-									FD_CLR(numGet,&fdClients);
-									closeSocket(newClient);
-								}
-							}
-						}
-						else
-							continue;
-					}
-					else
-					{
-						if(pfunc!=NULL)
-						{
-							int numGet=pfunc(CPPSAY,fdClients.fd_array[i],*this,argv);
-							if(numGet!=0)
-							{
-								FD_CLR(numGet,&fdClients);
-								closeSocket(numGet);
-							}
-						}
-					}
-				}
-			}
-		}
-#endif
 	}
-#ifndef _WIN32
 	bool selectModel(void* pget,int len,void* pneed,int (*pfunc)(Thing ,int ,int,void* ,void*,ServerTcpIp& ))
 	{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
 		fd_set temp=fdClients;
@@ -1712,7 +1624,6 @@ public:
 			return false;
 		return true;
 	}
-#endif
 	char* getHostName()//get self name
 	{
 		char name[300]={0};
@@ -1745,7 +1656,6 @@ public:
 	}
 	void epollModel(int (*pfunc)(Thing,int,ServerTcpIp&,void*),void* argv)
 	{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
-#ifndef _WIN32
 		int eventNum=epoll_wait(epfd,pevent,512,-1),numGet=0;
 		for(int i=0;i<eventNum;i++)
 		{
@@ -1780,11 +1690,7 @@ public:
 				}
 			}
 		}
-#else
-		selectModel(pfunc,argv);
-#endif
 	}
-#ifndef _WIN32
 	bool epollModel(void* pget,int len,void* pneed,int (*pfunc)(Thing,int ,int ,void* ,void*,ServerTcpIp& ))
 	{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
 		Thing thing=CPPSAY;
@@ -1828,7 +1734,6 @@ public:
 		}
 		return true;
 	}
-#endif
 };
 class ClientTcpIp{
 private:
@@ -1890,11 +1795,7 @@ public:
 			free(hostip);
 		if(hostname!=NULL)
 			free(hostname);
-#ifndef _WIN32
 		close(sock);
-#else
-		closesocket(sock);
-#endif
 	}
 	void addHostIp(const char* ip,unsigned short port=0)
 	{
@@ -1935,11 +1836,7 @@ public:
 	}
 	bool disconnectHost()
 	{
-#ifndef _WIN32
 		close(sock);
-#else
-		closesocket(sock);
-#endif
 #ifdef CPPWEB_OPENSSL
 		if(ssl!=NULL)
 		{
@@ -2843,25 +2740,6 @@ public:
 		free(buffer);
 		return srcString;
 	}
-#ifdef _WIN32
-	void *memmem(const void *haystack, size_t haystack_len, 
-	    const void * const needle, const size_t needle_len)
-	{
-	    if (haystack == NULL) return NULL; // or assert(haystack != NULL);
-	    if (haystack_len == 0) return NULL;
-	    if (needle == NULL) return NULL; // or assert(needle != NULL);
-	    if (needle_len == 0) return NULL;
-	    
-	    for (const char *h = (const char*)haystack;
-	            haystack_len >= needle_len;
-	            ++h, --haystack_len) {
-	        if (!memcmp(h, needle, needle_len)) {
-	            return (void*)h;
-	        }
-	    }
-	    return NULL;
-	}
-#endif
 };
 class Email{
 private:
@@ -3398,6 +3276,7 @@ public://main class for http server2.0
 		GET,POST,PUT,DELETE,OPTIONS,CONNECT,ALL,
 	};
 #else
+#define MSG_DONTWAIT 1;
 	enum AskType{//different ask ways in http
 		GET,POST,PUT,WINDELETE,OPTIONS,CONNECT,ALL,
 	};
