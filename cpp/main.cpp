@@ -6,8 +6,6 @@
 #include "../hpp/cppweb.h"
 #include "../hpp/route.h"
 #include "../hpp/config.h"
-#include<stdio.h>
-#include<string.h>
 using namespace cppweb;
 /********************************
 	author:chenxuan

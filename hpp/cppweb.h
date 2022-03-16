@@ -19,8 +19,9 @@
 #include<unistd.h>
 #include<netdb.h>
 #else
-#include<winsock.h>
+#include<winsock2.h>
 #endif
+
 #include<string.h>
 #include<pthread.h>
 #include<stdarg.h>
@@ -44,6 +45,7 @@ namespace cppweb{
 //more information about it is in https://gitee.com/chenxuan520/cppjson
 #ifdef _WIN32
 #define socklen_t int
+#define MSG_DONTWAIT 0
 class WSAinit{
 public:
 	WSAinit()
@@ -1368,13 +1370,13 @@ public:
 		close(epfd);
 		if(pevent!=NULL)
 			free(pevent);
-		if(pfdn!=NULL)
-			free(pfdn);
 #else
 		closesocket(sock);
 		closesocket(sockC);
 		closesocket(epfd);
 #endif
+		if(pfdn!=NULL)
+			free(pfdn);
 		if(hostip!=NULL)
 			free(hostip);
 		if(hostname!=NULL)
@@ -3393,7 +3395,6 @@ public://main class for http server2.0
 		GET,POST,PUT,DELETE,OPTIONS,CONNECT,ALL,
 	};
 #else
-#define MSG_DONTWAIT 1
 	enum AskType{//different ask ways in http
 		GET,POST,PUT,WINDELETE,OPTIONS,CONNECT,ALL,
 	};
