@@ -139,6 +139,7 @@ struct Config{
 	std::vector<std::string> deletePath;
 	std::vector<std::pair<std::string,std::string>> replacePath;
 	std::vector<std::pair<std::string,std::string>> redirectPath;
+	std::unordered_map<std::string,void*> extraConfig;
 	std::unordered_map<std::string,Proxy> proxyMap;
 	Config():isLongConnect(true),isBack(false),isGuard(false),isLog(false),isAuto(true),isDebug(true),port(5200),defaultMemory(1){};
 }config;

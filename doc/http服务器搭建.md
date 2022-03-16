@@ -1,8 +1,11 @@
 ## 本文目标
 
 - 使用cppweb搭建简单的http服务器
-  
-  ## 脚本安装教程
+
+## 脚本安装教程
+
+> linux可用
+
 1. git clone https://gitee.com/chenxuan520/server-for-static-web.git
 
 2. ./install.sh
@@ -23,9 +26,11 @@
 
 ## 修改配置法
 
+> windows和linux都可
+
 1. git clone https://gitee.com/chenxuan520/server-for-static-web.git
 
-2. make 
+2. make (windows下make -f makefile.win)
    
    > 如果有https证书也可以make ssl
 

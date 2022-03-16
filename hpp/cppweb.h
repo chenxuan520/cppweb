@@ -36,13 +36,14 @@
 #include<type_traits>
 #include<unordered_map>
 #include<initializer_list>
+
 #ifdef CPPWEB_OPENSSL
 #include<openssl/ssl.h>
 #include<openssl/err.h>
 #endif
+
 namespace cppweb{
-//class for analyse json and create json text 
-//more information about it is in https://gitee.com/chenxuan520/cppjson
+//this class for windows 
 #ifdef _WIN32
 #define socklen_t int
 #define MSG_DONTWAIT 0
@@ -63,6 +64,8 @@ public:
 	}
 }_wsaInit;
 #endif
+//class for analyse json and create json text 
+//more information about it is in https://gitee.com/chenxuan520/cppjson
 class Json{
 public:
 	enum TypeJson{//object type

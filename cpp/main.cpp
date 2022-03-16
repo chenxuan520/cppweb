@@ -153,12 +153,12 @@ void serverHttp()
 {
 	FileGet file;
 	LoadConfig config(file.getFileBuff("./config.json"));
-	readSetting(config);
 	if(config.lastError()!=NULL)
 	{
 		printf("config wrong %s\n",config.lastError());
 		exit(0);
 	}
+	readSetting(config);
 	config.runServer(addHandle);
 	if(config.lastError()!=NULL)
 	{

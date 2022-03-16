@@ -6,7 +6,6 @@ using namespace cppweb;
 void upload(HttpServer& server,DealHttp& http,int soc)
 {
     char name[100]={0};
-	void* sen=server.getSenBuff();
 	DealHttp::Request req;
 	http.analysisRequest(req,server.recText());
 	if(req.head.find("Content-Length")==req.head.end())
