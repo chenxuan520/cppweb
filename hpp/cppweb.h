@@ -47,6 +47,12 @@ namespace cppweb{
 #ifdef _WIN32
 #define socklen_t int
 #define MSG_DONTWAIT 0
+/***********************************************
+* Author: chenxuan-1607772321@qq.com
+* change time:2022-03-17 14:50:16
+* description:class for windows socket init
+* example: do not use the class
+***********************************************/
 class WSAinit{
 public:
 	WSAinit()
@@ -64,8 +70,11 @@ public:
 	}
 }_wsaInit;
 #endif
-//class for analyse json and create json text 
-//more information about it is in https://gitee.com/chenxuan520/cppjson
+/*******************************
+ * author:chenxuan
+ * class:class for analyse json and create json text 
+ * example:more information about it is in https://gitee.com/chenxuan520/cppjson
+******************************/
 class Json{
 public:
 	enum TypeJson{//object type
@@ -1108,6 +1117,11 @@ private:
 		return true;
 	}
 };
+/*******************************
+ * author:chenxuan
+ * class:class for run server in background and use guard
+ * example:the same as its name,is only for linux
+******************************/
 class ProcessCtrl{
 public:
 	static int backGround()
@@ -1139,6 +1153,14 @@ public:
 #endif
 	}
 };
+/*******************************
+ * author:chenxuan
+ * class:class for trie and get route faster 
+ * example:{
+ * Trie<type> tree;
+ * tree.insert(str,type);
+ * }
+******************************/
 template<class T>
 class Trie {
 private:
@@ -1221,6 +1243,16 @@ public:
 		return true;
 	}
 };
+/***********************************************
+* Author: chenxuan-1607772321@qq.com
+* change time:2022-03-17 14:48:50
+* description:class for server base
+* example:{
+* ServerTcpIp server(port);
+* server.bound();
+* server.setlisten();
+* }
+***********************************************/
 class ServerTcpIp{
 public:
 	enum Thing{
@@ -1830,6 +1862,11 @@ public:
 	}
 #endif
 };
+/*******************************
+ * author:chenxuan
+ * class: client to connect server
+ * example:../example/cli-ask/main.cpp
+******************************/
 class ClientTcpIp{
 private:
 	int sock;//myself
@@ -2036,7 +2073,11 @@ public:
 		return true;
 	}
 };
-//the class to deal http request,and create a datagram 
+/*******************************
+ * author:chenxuan
+ * class:deal http request,and create a datagram
+ * example:../doc/DealHttp.md
+******************************/
 class DealHttp{
 public:
 	friend class HttpServer;
@@ -2847,22 +2888,31 @@ public:
 	void *memmem(const void *haystack, size_t haystack_len, 
 	    const void * const needle, const size_t needle_len)
 	{
-	    if (haystack == NULL) return NULL; // or assert(haystack != NULL);
-	    if (haystack_len == 0) return NULL;
-	    if (needle == NULL) return NULL; // or assert(needle != NULL);
-	    if (needle_len == 0) return NULL;
-	    
-	    for (const char *h = (const char*)haystack;
-	            haystack_len >= needle_len;
-	            ++h, --haystack_len) {
-	        if (!memcmp(h, needle, needle_len)) {
-	            return (void*)h;
-	        }
-	    }
-	    return NULL;
+		if (haystack == NULL) return NULL; // or assert(haystack != NULL);
+		if (haystack_len == 0) return NULL;
+		if (needle == NULL) return NULL; // or assert(needle != NULL);
+		if (needle_len == 0) return NULL;
+
+		for (const char *h = (const char*)haystack;
+			 haystack_len >= needle_len;
+			 ++h, --haystack_len) {
+			if (!memcmp(h, needle, needle_len)) {
+				return (void*)h;
+			}
+		}
+		return NULL;
 	}
 #endif
 };
+/*******************************
+ * author:chenxuan
+ * class:use to send eamil easy
+ * example:{
+ *  Email email;
+ *  email.CreateSend
+ *  email.emailSend
+ * }
+******************************/
 class Email{
 private:
 	sockaddr_in their_addr;
@@ -3239,7 +3289,14 @@ public:
 		pthread_create(&thread,&attr,pfunc,arg);
 	}
 };
-//class for log is use threadpool and it can write 3000000 every sec;
+/*******************************
+ * author:chenxuan
+ * class:class for log is use threadpool and it can write 3000000 every sec;
+ * example:{
+ * LogSystem log("save name");
+ * log.accessLog("str of write");
+ * }
+******************************/
 class LogSystem{
 private:
 	const char* fileName;
@@ -3320,10 +3377,13 @@ public:
 		strcat(now,"\n");
 		nowLen+=strlen(text)+1;
 	}
-	static void recordRequest(const void* text,int soc)
+	void operator()(const void* text,int soc)
+	{
+		recordMessage(text,soc);
+	}
+	void recordMessage(const void* text,int soc)
 	{
 		static char method[32]={0},askPath[256]={0},buffer[512]={0},nowTime[48]={0};
-		static LogSystem loger("access.log");
 		int port=0;
 		time_t now=time(NULL);
 		strftime(nowTime,48,"%Y-%m-%d %H:%M",localtime(&now));
@@ -3334,7 +3394,12 @@ public:
 		}
 		else
 			sprintf(buffer,"%s localhost %s wrong",nowTime,(char*)text);
-		loger.accessLog(buffer);
+		this->accessLog(buffer);
+	}
+	static void recordRequest(const void* text,int soc)
+	{
+		static LogSystem loger("access.log");
+		loger.recordMessage(text,soc);
 	}
 	static bool recordFileError(const char* fileName)
 	{
@@ -3384,6 +3449,11 @@ private:
 		return NULL;
 	}
 };
+/*******************************
+ * author:chenxuan
+ * class:the main class for create server
+ * example:../doc/HttpServer.md
+******************************/
 class HttpServer:private ServerTcpIp{
 private:
 	enum RouteType{//oneway stand for like /hahah,wild if /hahah/*,static is recource static
@@ -4356,6 +4426,11 @@ private:
 	}
 #endif
 };
+/*******************************
+ * author:chenxuan
+ * class:the same as servertcpip but it use threadpool
+ * example:see ServerTcpIp
+******************************/
 class ServerPool:public ServerTcpIp{
 private:
 	struct Argv{
@@ -4574,6 +4649,15 @@ public:
 #endif
 	}
 };
+/*******************************
+ * author:chenxuan
+ * class:easy to get file buffer and write to file
+ * example:{
+ * FileGet file;
+ * const char* buffer=file.getFileBuff("file name");
+ * FileGet::writeToFile(buffer);
+ * }
+******************************/
 class FileGet{
 private:
 	char* pbuffer;
@@ -4613,41 +4697,6 @@ public:
 		buffer[i+1]=0;
 		fclose(fp);
 		return true;
-	}
-	bool fileStrstr(const char* fileName,const char* strFind)
-	{
-		int len=0;
-		char* pstr=NULL;
-		len=this->getFileLen(fileName);
-		if(pbuffer!=NULL)
-		{
-			free(pbuffer);
-			pbuffer=NULL;
-		}
-		FILE* fp=fopen(fileName,"r");
-		if(fp==NULL)
-			return false;
-		pbuffer=(char*)malloc(sizeof(char)*(len+10));
-		char* ptemp=pbuffer;
-		if(pbuffer==NULL)
-			return false;
-		memset(pbuffer,0,sizeof(char)*(len+5));
-		if(false==this->getFileMsg(fileName,pbuffer,sizeof(char)*(len+10)))
-			return false;
-		while((*ptemp<65||*ptemp>122)&&ptemp<pbuffer+sizeof(char)*len)
-			ptemp++;
-		pstr=strstr(ptemp,strFind);
-		if(pbuffer!=NULL)
-		{
-			free(pbuffer);
-			pbuffer=NULL;
-		}
-		fclose(fp);
-		if(pstr!=NULL)
-			return true;
-		else
-			return false;
-		return false;
 	}
 	const char* getFileBuff(const char* fileName)
 	{

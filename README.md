@@ -20,7 +20,7 @@
   
   > 跨平台说明
   > 
-  > 在windows平台下支持clang和MinGW,不支持mscv~~(因为作者不喜欢)~~
+  > 在windows平台下支持clang和MinGW,不支持mscv(~~因为作者不喜欢~~)
   > 
   > 在linux平台支持clang和gcc
   > 
@@ -46,13 +46,6 @@
 - install.sh为服务器运行脚本
 - old文件夹为1.0版本的头文件和源文件,不推荐
 
-## 项目说明
-
-- 该项目可用于个人搭建小网站后端服务,以及负载均衡
-- 本人只是一名大二的学生，框架的不足之处恳请大家通过issue发给我一定认真改进
-- 代码不足之处请务必联系我改进
-- 在使用该项目之前请阅读doc下的文档
-
 ## 项目特点
 
 1. 使用C++编写,拥有较快的运行速度
@@ -63,17 +56,25 @@
 
 4. 包含一个[json的解析生成格式化库](https://gitee.com/chenxuan520/cppjson)(也是作者写的)
 
-5. 支持通过路由管理请求
+5. 包含email类,可以调用发送邮件
 
-6. 支持日志生成和实现,日志系统约为30万条每秒
+6. 支持通过路由管理请求
+   
+   > 支持lam表达式
 
-7. 具有io复用,多进程,线程池三种模式
+7. 支持日志生成和实现,日志系统约为30万条每秒
 
-8. 包含线程池和线程池服务器
+8. 具有io复用,多进程,线程池三种模式
+   
+   > io复用支持epoll(epoll只支持linux)和select模型
 
-9. 支持https连接(客户端和服务端都可)
+9. 包含线程池和线程池服务器
 
-10. 自带由框架编写的服务器
+10. 支持https连接
+    
+    > 包括服务端和客户端
+
+11. 自带由框架编写的服务器
     
     1. 支持路由301转发
     
@@ -84,19 +85,32 @@
     3. 支持路径的替换
     
     4. 通过json配置,自定义程度高
+    
+    5. 自带守护进程和后台运行,宕机快速重启
+
+## 项目说明
+
+- 该项目可用于个人搭建小网站后端服务,以及负载均衡
+- 本人只是一名大二的学生，框架的不足之处恳请大家通过issue发给我一定认真改进
+- 代码不足之处请务必联系我改进
+- 在使用该项目之前请阅读doc下的文档
 
 ## 搭建服务器
 
-- ./install.sh为安装脚本,运行就可以安装
+- 在linux下, ./install.sh为安装脚本,运行就可以安装
 - [doc介绍](./doc/http服务器搭建.md)
 
 ## 框架介绍
+
+#### 服务器运行
+
+- [doc文档](./doc/http服务器搭建.md)
 
 #### 安装框架
 
 - [doc介绍](./doc/框架安装.md)
 
-#### 搭建服务器
+#### 简单使用
 
 ```cpp
 #include "../../hpp/cppweb.h"//包含头文件
@@ -104,7 +118,7 @@ using namespace cppweb;
 int main()  
 {  
     HttpServer server(5200,true);//输入运行端口以及是否开启打印的调试模式
-    server.run("index.html");//输入访问路径为 / 时默认文件
+    server.run("index.html");//输入访问路径为 / 时默认文件,没有可以不填
     return 0; //没有错会一直运行,除非出错,可以用lastError获取错取
 }  
 ```
@@ -242,21 +256,12 @@ int main()
 #### 客户端创建
 
 ```cpp
-#define CPPHTTPLIB_OPENSSL_SUPPORT
-#include "../../hpp/cppweb.h"
-using namespace std;
-using namespace cppweb;
-int main()
-{
-    char ip[30]={0},topUrl[100]={0},endUrl[100]={0};
-    string str="http://chenxuanweb.top/";
-    DealHttp::dealUrl(str.c_str(),topUrl,endUrl,100,100);
-    ClientTcpIp::getDnsIp(topUrl,ip,30);
-    unsigned port=5200;
-    if(strstr(str.c_str(),"https")!=NULL)
-        port=443;
     ClientTcpIp client(ip,port);
-    cout<<client.lastError();
+    if(client.lastError()!=NULL)
+    {
+        printf("error%s\n;",client.lastError());
+        exit(0);
+    }
     DealHttp http;
     DealHttp::Request req;
     req.head.insert(pair<string,string>{"Host",topUrl});
@@ -265,33 +270,45 @@ int main()
     req.version="HTTP/1.1";
     char buffer[500]={0},rec[5000]={0};
     http.createAskRequest(req,buffer,500);
-    if(port!=443)
+    if(!isHttps)
     {
         if(false==client.tryConnect())
-            return -1;
+        {
+            printf("connect wrong\n");
+            exit(0);
+        }
         if(0>client.sendHost(buffer,strlen(buffer)))
-            return -1;
+        {
+            printf("%d",errno);
+            exit(0);
+        }
         client.receiveHost(rec,5000);
-        return 0;
     }
-    if(false==client.tryConnectSSL())
-        return -1;
-    if(0>client.sendHostSSL(buffer,strlen(buffer)))
-        return -1;
-    client.receiveHostSSL(rec,5000);
-    printf("%s\n\n",rec);
-    return 0;
-}
+    else
+    {
+        if(false==client.tryConnectSSL())
+        {
+            printf("connect wrong\n");
+            exit(0);
+        }
+        if(0>client.sendHostSSL(buffer,strlen(buffer)))
+        {
+            printf("%d",errno);
+            exit(0);
+        }
+        client.receiveHostSSL(rec,5000);
+    }
 ```
 
 - 支持https的客户端连接
+- 详情见example下的例子
 
 #### 静态和删除路径
 
 ```cpp
     HttpServer server(5200,true);
     server.loadStatic("/file/index.html","index.html");
-    server.loadStaticFS("/file","test");
+    server.loadStatic("/try/*","test");
     server.deletePath("test");
 ```
 
@@ -345,8 +362,11 @@ HTTP response codes:
 
 [个人官网](http://chenxuanweb.top)
 [个人简历](http://chenxuanweb.top/resume.html)
+
 [gitee](https://gitee.com/chenxuan520/server-for-static-web)
 [github](https://github.com/chenxuan520/cppweb)
+
+(个人网站均运行在该框架之上)
 
 ---
 
