@@ -1,6 +1,15 @@
 #pragma once
 #include "./cppweb.h"
 using namespace cppweb;
+/***********************************************
+* Author: chenxuan-1607772321@qq.com
+* change time:2022-03-17 19:20:18
+* description:class for Reverse proxy
+* example:{ LoadBalance load(RANDOM)
+* load.addServer("127.0.0.1:5200")
+* char* getIp=load.getServer();
+* }
+***********************************************/
 class LoadBalance{
 public:
 	enum Model{
@@ -117,6 +126,11 @@ public:
 		return model;
 	}
 }loadBanlance(LoadBalance::TEMPNO);
+/***********************************************
+* Author: chenxuan-1607772321@qq.com
+* change time:2022-03-17 19:29:17
+* description:struct of server config
+***********************************************/
 struct Config{
 	struct Proxy{
 		std::vector<std::string> host;
@@ -131,6 +145,7 @@ struct Config{
 	bool isDebug;
 	int port;
 	int defaultMemory;
+	int threadNum;
 	std::string defaultFile;
 	std::string model;
 	std::string keyPath;
@@ -141,8 +156,13 @@ struct Config{
 	std::vector<std::pair<std::string,std::string>> redirectPath;
 	std::unordered_map<std::string,void*> extraConfig;
 	std::unordered_map<std::string,Proxy> proxyMap;
-	Config():isLongConnect(true),isBack(false),isGuard(false),isLog(false),isAuto(true),isDebug(true),port(5200),defaultMemory(1){};
+	Config():isLongConnect(true),isBack(false),isGuard(false),isLog(false),isAuto(true),isDebug(true),port(5200),defaultMemory(1),threadNum(0){};
 }config;
+/***********************************************
+* Author: chenxuan-1607772321@qq.com
+* change time:2022-03-17 19:32:20
+* description:function of Reverse proxy
+***********************************************/
 void proxy(HttpServer& server,DealHttp& http,int soc)
 {
 	auto pathNow=server.getNowRoute();
@@ -256,6 +276,8 @@ private:
 	void configServer(HttpServer& server)
 	{
 		server.changeSetting(true,config.isLongConnect,config.isAuto,config.defaultMemory);
+		if(config.model=="THREAD"&&config.threadNum!=0)
+			server.changeModel(HttpServer::THREAD,config.threadNum);
 		for(auto& now:config.deletePath)
 			server.deletePath(now.c_str());
 		for(auto& now:config.replacePath)

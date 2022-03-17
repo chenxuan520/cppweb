@@ -3583,6 +3583,8 @@ public:
 				error="thread num is zero";
 				return;
 			}
+			if(pool!=NULL)
+				delete pool;
 			pool=new ThreadPool(threadNum);
 			if(pool==NULL)
 			{

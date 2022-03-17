@@ -35,6 +35,10 @@ void readSetting(LoadConfig& load)
 					else
 						con.defaultMemory=1;
 					});
+	load.findConfig("thread num",[](Json::Object* obj,Config& con){
+					if(obj!=NULL&&obj->intVal>0)
+						con.threadNum=obj->intVal;
+					});
 	load.findConfig("default file",[](Json::Object* obj,Config& con){
 					if(obj!=NULL)
 						con.defaultFile=obj->strVal;
