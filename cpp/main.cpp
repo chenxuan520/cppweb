@@ -7,12 +7,12 @@
 #include "../hpp/route.h"
 #include "../hpp/config.h"
 using namespace cppweb;
-/********************************
-	author:chenxuan
-	date:2021.7.5
-	funtion:config server by self
-*********************************/
-void selfConfig(const Config&,HttpServer&)
+/***********************************************
+* Author: chenxuan-1607772321@qq.com
+* change time:2022-03-17 23:34:19
+* description:function of extra config 
+***********************************************/
+void readExtraSetting(LoadConfig&)
 {
 
 }
@@ -145,7 +145,7 @@ void readSetting(LoadConfig& load)
 						con.passwd=obj->strVal;
 					});
 #endif
-	load.configToServer(selfConfig);
+	readExtraSetting(load);
 	return;
 }
 /********************************

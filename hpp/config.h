@@ -154,10 +154,9 @@ struct Config{
 	std::vector<std::string> deletePath;
 	std::vector<std::pair<std::string,std::string>> replacePath;
 	std::vector<std::pair<std::string,std::string>> redirectPath;
-	std::unordered_map<std::string,void*> extraConfig;
 	std::unordered_map<std::string,Proxy> proxyMap;
 	Config():isLongConnect(true),isBack(false),isGuard(false),isLog(false),isAuto(true),isDebug(true),port(5200),defaultMemory(1),threadNum(0){};
-}config;
+}_config;
 /***********************************************
 * Author: chenxuan-1607772321@qq.com
 * change time:2022-03-17 19:32:20
@@ -170,9 +169,9 @@ void proxy(HttpServer& server,DealHttp& http,int soc)
 	std::string strNow=pathNow->route;
 	strNow+='*';
 	http.getWildUrl(server.recText(),pathNow->route,url,128);
-	if(config.proxyMap.find(strNow)!=config.proxyMap.end())
+	if(_config.proxyMap.find(strNow)!=_config.proxyMap.end())
 	{
-		auto now=config.proxyMap[strNow].load;
+		auto now=_config.proxyMap[strNow].load;
 		char ip[48]={0};
 		int port=0,temp=0;
 		if(now.getNowModel()!=LoadBalance::HASH)
@@ -218,7 +217,7 @@ private:
 	Json json;
 	HttpServer* pserver;
 	const char* error;
-	std::vector<void (*)(const Config&,HttpServer&)> arr;
+	std::vector<std::pair<std::string,void (*)(Json::Object*,HttpServer&)>> arr;
 public:
 	LoadConfig(const char* buffer):json(buffer),pserver(NULL),error(NULL)
 	{
@@ -231,29 +230,29 @@ public:
 	void findConfig(const char* key,void (*pfunc)(Json::Object*,Config&))
 	{
 		auto root=*json.getRootObj();
-		pfunc(root[key],config);
+		pfunc(root[key],_config);
 	}
-	inline void configToServer(void (*pfunc)(const Config&,HttpServer&))
+	void findConfig(const char* key,void (*pfunc)(Json::Object*,HttpServer&))
 	{
-		arr.push_back(pfunc);
+		arr.push_back(std::pair<std::string,void (*)(Json::Object*,HttpServer&)>{key,pfunc});
 	}
 	void runServer(void (*pfunc)(HttpServer&)=NULL)
 	{
 		configProcess();
 		HttpServer::RunModel model;
-		if(config.model=="THREAD")
+		if(_config.model=="THREAD")
 			model=HttpServer::THREAD;
-		else if(config.model=="FORK")
+		else if(_config.model=="FORK")
 			model=HttpServer::FORK;
 		else
 			model=HttpServer::MULTIPLEXING;
-		HttpServer server(config.port,config.isDebug,model);
+		HttpServer server(_config.port,_config.isDebug,model);
 		pserver=&server;
 		configServer(server);
 		if(pfunc!=NULL)
 			pfunc(server);
-		if(config.defaultFile.size()>0)
-			server.run(config.defaultFile.c_str());
+		if(_config.defaultFile.size()>0)
+			server.run(_config.defaultFile.c_str());
 		else
 			server.run();
 		if(server.lastError()!=NULL)
@@ -266,38 +265,38 @@ public:
 private:
 	void configProcess()
 	{
-		if(config.isBack)
+		if(_config.isBack)
 			ProcessCtrl::backGround();
 		std::string pid=std::to_string(getpid());
 		FileGet::writeToFile("./server.pid",pid.c_str(),pid.size());
-		if(config.isGuard)
+		if(_config.isGuard)
 			ProcessCtrl::guard();
 	}
 	void configServer(HttpServer& server)
 	{
-		server.changeSetting(true,config.isLongConnect,config.isAuto,config.defaultMemory);
-		if(config.model=="THREAD"&&config.threadNum!=0)
-			server.changeModel(HttpServer::THREAD,config.threadNum);
-		for(auto& now:config.deletePath)
+		server.changeSetting(true,_config.isLongConnect,_config.isAuto,_config.defaultMemory);
+		if(_config.model=="THREAD"&&_config.threadNum!=0)
+			server.changeModel(HttpServer::THREAD,_config.threadNum);
+		for(auto& now:_config.deletePath)
 			server.deletePath(now.c_str());
-		for(auto& now:config.replacePath)
+		for(auto& now:_config.replacePath)
 			server.loadStatic(now.first.c_str(),now.second.c_str());
-		for(auto& now:config.redirectPath)
+		for(auto& now:_config.redirectPath)
 			server.redirect(now.first.c_str(),now.second.c_str());
-		for(auto& now:config.proxyMap)
+		for(auto& now:_config.proxyMap)
 			server.all(now.first.c_str(),proxy);
-		if(config.isLog)
+		if(_config.isLog)
 			server.setLog(LogSystem::recordRequest,LogSystem::recordRequest);
 		for(auto& now:arr)
-			now(config,server);
+			now.second(json[now.first.c_str()],server);
 #ifdef CPPWEB_OPENSSL
-		if(FileGet::getFileLen(config.certPath.c_str())<=0||
-		   FileGet::getFileLen(config.keyPath.c_str())<=0)
+		if(FileGet::getFileLen(_config.certPath.c_str())<=0||
+		   FileGet::getFileLen(_config.keyPath.c_str())<=0)
 		{
 			printf("cert file wrong\n");
 			exit(0);
 		}
-		server.loadKeyCert(config.certPath.c_str(),config.keyPath.c_str(),config.passwd.size()==0?NULL:config.passwd.c_str());
+		server.loadKeyCert(_config.certPath.c_str(),_config.keyPath.c_str(),_config.passwd.size()==0?NULL:_config.passwd.c_str());
 #endif
 	}
 };
