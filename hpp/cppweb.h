@@ -47,6 +47,12 @@ namespace cppweb{
 #ifdef _WIN32
 #define socklen_t int
 #define MSG_DONTWAIT 0
+/***********************************************
+* Author: chenxuan-1607772321@qq.com
+* change time:2022-03-17 14:50:16
+* description:class for windows socket init
+* example: do not use the class
+***********************************************/
 class WSAinit{
 public:
 	WSAinit()
@@ -64,8 +70,11 @@ public:
 	}
 }_wsaInit;
 #endif
-//class for analyse json and create json text 
-//more information about it is in https://gitee.com/chenxuan520/cppjson
+/*******************************
+ * author:chenxuan
+ * class:class for analyse json and create json text 
+ * example:more information about it is in https://gitee.com/chenxuan520/cppjson
+******************************/
 class Json{
 public:
 	enum TypeJson{//object type
@@ -1108,6 +1117,11 @@ private:
 		return true;
 	}
 };
+/*******************************
+ * author:chenxuan
+ * class:class for run server in background and use guard
+ * example:the same as its name,is only for linux
+******************************/
 class ProcessCtrl{
 public:
 	static int backGround()
@@ -1139,6 +1153,14 @@ public:
 #endif
 	}
 };
+/*******************************
+ * author:chenxuan
+ * class:class for trie and get route faster 
+ * example:{
+ * Trie<type> tree;
+ * tree.insert(str,type);
+ * }
+******************************/
 template<class T>
 class Trie {
 private:
@@ -1221,6 +1243,16 @@ public:
 		return true;
 	}
 };
+/***********************************************
+* Author: chenxuan-1607772321@qq.com
+* change time:2022-03-17 14:48:50
+* description:class for server base
+* example:{
+* ServerTcpIp server(port);
+* server.bound();
+* server.setlisten();
+* }
+***********************************************/
 class ServerTcpIp{
 public:
 	enum Thing{
@@ -3257,7 +3289,14 @@ public:
 		pthread_create(&thread,&attr,pfunc,arg);
 	}
 };
-//class for log is use threadpool and it can write 3000000 every sec;
+/*******************************
+ * author:chenxuan
+ * class:class for log is use threadpool and it can write 3000000 every sec;
+ * example:{
+ * LogSystem log("save name");
+ * log.accessLog("str of write");
+ * }
+******************************/
 class LogSystem{
 private:
 	const char* fileName;
@@ -3338,6 +3377,10 @@ public:
 		strcat(now,"\n");
 		nowLen+=strlen(text)+1;
 	}
+	void operator()(const void* text,int soc)
+	{
+		recordMessage(text,soc);
+	}
 	void recordMessage(const void* text,int soc)
 	{
 		static char method[32]={0},askPath[256]={0},buffer[512]={0},nowTime[48]={0};
@@ -3406,6 +3449,11 @@ private:
 		return NULL;
 	}
 };
+/*******************************
+ * author:chenxuan
+ * class:the main class for create server
+ * example:../doc/HttpServer.md
+******************************/
 class HttpServer:private ServerTcpIp{
 private:
 	enum RouteType{//oneway stand for like /hahah,wild if /hahah/*,static is recource static
@@ -4378,6 +4426,11 @@ private:
 	}
 #endif
 };
+/*******************************
+ * author:chenxuan
+ * class:the same as servertcpip but it use threadpool
+ * example:see ServerTcpIp
+******************************/
 class ServerPool:public ServerTcpIp{
 private:
 	struct Argv{
@@ -4596,6 +4649,15 @@ public:
 #endif
 	}
 };
+/*******************************
+ * author:chenxuan
+ * class:easy to get file buffer and write to file
+ * example:{
+ * FileGet file;
+ * const char* buffer=file.getFileBuff("file name");
+ * FileGet::writeToFile(buffer);
+ * }
+******************************/
 class FileGet{
 private:
 	char* pbuffer;
