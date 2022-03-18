@@ -105,3 +105,9 @@
 - int type, no setting defaults to 1
 
 - The function is to set the initial send buffer size, the unit is M
+
+#### thread num
+
+- Specify the number of threads, int type, the default is 5
+
+- Only works in THREAD mode 
