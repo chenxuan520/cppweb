@@ -1145,7 +1145,7 @@ public:
 			if(pid!=0)
 			{
 				waitpid(pid, NULL, 0);
-				sleep(10);
+				sleep(15);
 			}
 			else
 				break;
@@ -1482,7 +1482,11 @@ public:
 			SSL_free(sslHash[cli]);
 			sslHash.erase(sslHash.find(cli));
 		}
+#ifndef _WIN32
 		return close(cli);
+#else
+		return closesocket(cli);
+#endif
 	}
 #endif
 	inline bool bondhost()//bond myself first
@@ -3148,6 +3152,18 @@ public:
 		return buffer;
 	}
 };
+/***********************************************
+* Author: chenxuan-1607772321@qq.com
+* change time:2022-03-18 10:18:50
+* description:as its name
+* example: {
+* ThreadPool pool(threadNum);
+* ThreadPool::Task task;
+* task.arg=(the thing you want to give thread)
+* task.ptask=(the function worker)
+* pool.addTask(task);
+* }
+***********************************************/
 class ThreadPool{
 public://a struct for you to add task
 	struct Task{
@@ -3393,7 +3409,7 @@ public:
 			sprintf(buffer,"%s %s %s %s",nowTime,ServerTcpIp::getPeerIp(soc,&port),method,askPath);
 		}
 		else
-			sprintf(buffer,"%s localhost %s wrong",nowTime,(char*)text);
+			sprintf(buffer,"%s localhost %s",nowTime,(char*)text);
 		this->accessLog(buffer);
 	}
 	static void recordRequest(const void* text,int soc)
