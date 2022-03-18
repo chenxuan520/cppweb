@@ -191,7 +191,8 @@ void dealArgc(int argc,char** argv)
 		printf("dealing %d process\n",pid);
 		if(pid<=66)
 			exit(0);
-		kill(pid,9);
+		kill(pid,2);
+		kill(pid+1,2);
 		fclose(fp);
 		if(strcmp(argv[1],"stop")==0||strcmp(argv[1],"--stop")==0)
 			exit(0);

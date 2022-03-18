@@ -3589,7 +3589,7 @@ public:
 #endif
 	void changeModel(RunModel model,unsigned threadNum=5)
 	{
-		if(this->model==model)
+		if(this->model==model&&model!=THREAD)
 			return;
 		this->model=model;
 		if(this->model==THREAD)
