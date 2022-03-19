@@ -1,6 +1,6 @@
 {
 	//set the bound port
-	"port":5204,
+	"port":5200,
 	//default file when ask /
 	"default file":"index.html",
 	//if fork model,use "MULTIPLEXING" or "FORK" or"THREAD"

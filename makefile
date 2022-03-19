@@ -1,7 +1,7 @@
 all:main
 
 main:./cpp/main.cpp ./hpp/cppweb.h ./hpp/config.h ./hpp/route.h
-	g++ -g ./cpp/main.cpp -o main -lpthread 
+	g++ ./cpp/main.cpp -o main -lpthread 
 clean:
 	rm -f *.o 
 sql: sql.o
@@ -17,3 +17,5 @@ update:
 	cp hpp/cppweb.h /usr/local/include/cppweb
 uninstall:
 	rm -rf /usr/local/include/cppweb
+debug:
+	g++ -g ./cpp/main.cpp -o main -lpthread
