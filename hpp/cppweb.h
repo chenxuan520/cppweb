@@ -1145,7 +1145,7 @@ public:
 			if(pid!=0)
 			{
 				waitpid(pid, NULL, 0);
-				sleep(10);
+				sleep(15);
 			}
 			else
 				break;
@@ -1482,7 +1482,11 @@ public:
 			SSL_free(sslHash[cli]);
 			sslHash.erase(sslHash.find(cli));
 		}
+#ifndef _WIN32
 		return close(cli);
+#else
+		return closesocket(cli);
+#endif
 	}
 #endif
 	inline bool bondhost()//bond myself first
@@ -3148,6 +3152,18 @@ public:
 		return buffer;
 	}
 };
+/***********************************************
+* Author: chenxuan-1607772321@qq.com
+* change time:2022-03-18 10:18:50
+* description:as its name
+* example: {
+* ThreadPool pool(threadNum);
+* ThreadPool::Task task;
+* task.arg=(the thing you want to give thread)
+* task.ptask=(the function worker)
+* pool.addTask(task);
+* }
+***********************************************/
 class ThreadPool{
 public://a struct for you to add task
 	struct Task{
@@ -3383,17 +3399,25 @@ public:
 	}
 	void recordMessage(const void* text,int soc)
 	{
-		static char method[32]={0},askPath[256]={0},buffer[512]={0},nowTime[48]={0};
+		static char method[64]={0},askPath[256]={0},buffer[512]={0},nowTime[48]={0};
 		int port=0;
 		time_t now=time(NULL);
 		strftime(nowTime,48,"%Y-%m-%d %H:%M",localtime(&now));
-		if(soc!=0)
+		if(soc>0)
 		{
-			sscanf((char*)text,"%31s%255s",method,askPath);
+			memset(askPath,0,sizeof(char)*256);
+			sscanf((char*)text,"%64s%255s",method,askPath);
+			if(strlen(askPath)==0)
+				strcpy(askPath,"no found");
 			sprintf(buffer,"%s %s %s %s",nowTime,ServerTcpIp::getPeerIp(soc,&port),method,askPath);
 		}
+		else if(soc==-1)
+		{
+			std::pair<LogSystem*,char*>* argv=new std::pair<LogSystem*,char*>(this,page);
+			worker(argv);
+		}
 		else
-			sprintf(buffer,"%s localhost %s wrong",nowTime,(char*)text);
+			sprintf(buffer,"%s localhost %s",nowTime,(char*)text);
 		this->accessLog(buffer);
 	}
 	static void recordRequest(const void* text,int soc)
@@ -3573,7 +3597,7 @@ public:
 #endif
 	void changeModel(RunModel model,unsigned threadNum=5)
 	{
-		if(this->model==model)
+		if(this->model==model&&model!=THREAD)
 			return;
 		this->model=model;
 		if(this->model==THREAD)
@@ -3583,6 +3607,8 @@ public:
 				error="thread num is zero";
 				return;
 			}
+			if(pool!=NULL)
+				delete pool;
 			pool=new ThreadPool(threadNum);
 			if(pool==NULL)
 			{
