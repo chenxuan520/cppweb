@@ -3399,14 +3399,22 @@ public:
 	}
 	void recordMessage(const void* text,int soc)
 	{
-		static char method[32]={0},askPath[256]={0},buffer[512]={0},nowTime[48]={0};
+		static char method[64]={0},askPath[256]={0},buffer[512]={0},nowTime[48]={0};
 		int port=0;
 		time_t now=time(NULL);
 		strftime(nowTime,48,"%Y-%m-%d %H:%M",localtime(&now));
-		if(soc!=0)
+		if(soc>0)
 		{
-			sscanf((char*)text,"%31s%255s",method,askPath);
+			memset(askPath,0,sizeof(char)*256);
+			sscanf((char*)text,"%64s%255s",method,askPath);
+			if(strlen(askPath)==0)
+				strcpy(askPath,"no found");
 			sprintf(buffer,"%s %s %s %s",nowTime,ServerTcpIp::getPeerIp(soc,&port),method,askPath);
+		}
+		else if(soc==-1)
+		{
+			std::pair<LogSystem*,char*>* argv=new std::pair<LogSystem*,char*>(this,page);
+			worker(argv);
 		}
 		else
 			sprintf(buffer,"%s localhost %s",nowTime,(char*)text);

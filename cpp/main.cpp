@@ -27,7 +27,10 @@ void readSetting(LoadConfig& load)
 					if(obj!=NULL)
 						con.port=obj->intVal;
 					else
+					{
+						printf("Warning:port not define,use defalt 5200 port\n");
 						con.port=5200;
+					}
 					});
 	load.findConfig("memory",[](Json::Object* obj,Config& con){
 					if(obj!=NULL&&obj->intVal>0)
@@ -67,7 +70,10 @@ void readSetting(LoadConfig& load)
 					if(obj!=NULL)
 						con.model=obj->strVal;
 					else
+					{
+						printf("Warning:model not define,use defalt MULTIPLEXING\n");
 						con.model="";
+					}
 					});
 	load.findConfig("long connect",[](Json::Object* obj,Config& con){
 					if(obj!=NULL)
@@ -93,6 +99,8 @@ void readSetting(LoadConfig& load)
 							if((*now)["path"]!=NULL&&(*now)["replace"]!=NULL)
 								con.replacePath.push_back(\
 												std::pair<std::string,std::string>{(*now)["path"]->strVal,(*now)["replace"]->strVal});
+							else
+								printf("Warning:define replace but format is wrong\n");
 						}
 					});
 	load.findConfig("redirect",[](Json::Object* obj,Config& con){
@@ -102,6 +110,8 @@ void readSetting(LoadConfig& load)
 							if((*now)["path"]!=NULL&&(*now)["redirect"]!=NULL)
 								con.redirectPath.push_back(\
 												std::pair<std::string,std::string>{(*now)["path"]->strVal,(*now)["redirect"]->strVal});
+							else
+								printf("Warning:define redirect but format is wrong\n");
 						}
 					});
 	load.findConfig("reverse proxy",[](Json::Object* obj,Config& con){
@@ -110,7 +120,10 @@ void readSetting(LoadConfig& load)
 						{
 							auto now=*pnow;
 							if((now)["weight"]==NULL||(now)["host"]==NULL||(now)["path"]==NULL||(now)["model"]==NULL)
-								return;
+							{
+								printf("Warning:define proxy but format is wrong\n");
+								continue;
+							}
 							Config::Proxy temp(LoadBalance::TEMPNO);
 							auto& strNow=now["model"]->strVal;
 							if(strNow=="HASH")
@@ -135,10 +148,14 @@ void readSetting(LoadConfig& load)
 	load.findConfig("key path",[](Json::Object* obj,Config& con){
 					if(obj!=NULL)
 						con.keyPath=obj->strVal;
+					else
+						printf("Warning:use ssl but not define key path,https cannot work!\n");
 					});
 	load.findConfig("cert path",[](Json::Object* obj,Config& con){
 					if(obj!=NULL)
 						con.certPath=obj->strVal;
+					else
+						printf("Warning:use ssl but not define cert path,https cannot work!\n");
 					});
 	load.findConfig("cert password",[](Json::Object* obj,Config& con){
 					if(obj!=NULL)
@@ -196,6 +213,11 @@ void dealArgc(int argc,char** argv)
 		fclose(fp);
 		if(strcmp(argv[1],"stop")==0||strcmp(argv[1],"--stop")==0)
 			exit(0);
+		else
+		{
+			printf("wait for the port unbound...\n");
+			sleep(5);
+		}
 #endif
 	}
 	else

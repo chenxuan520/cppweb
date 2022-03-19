@@ -1,4 +1,9 @@
 #pragma once
+/***********************************************
+* Author: chenxuan-1607772321@qq.com
+* change time:2022-03-19 11:55:48
+* description:this file is for server config,do not change it
+***********************************************/
 #include "./cppweb.h"
 using namespace cppweb;
 /***********************************************
@@ -212,6 +217,18 @@ void proxy(HttpServer& server,DealHttp& http,int soc)
 	else
 		http.gram.statusCode=DealHttp::STATUSNOFOUND;
 }
+// description:deal kill signal
+static void _dealSignalKill(int)
+{
+	LogSystem::recordRequest("server stop sucessfully",0);
+	exit(0);
+}
+/***********************************************
+* Author: chenxuan-1607772321@qq.com
+* change time:2022-03-19 11:56:49
+* description:main config class
+* example: use it by {load.findConfig}
+***********************************************/
 class LoadConfig{
 private:
 	Json json;
@@ -286,7 +303,14 @@ private:
 		for(auto& now:_config.proxyMap)
 			server.all(now.first.c_str(),proxy);
 		if(_config.isLog)
+		{
 			server.setLog(LogSystem::recordRequest,LogSystem::recordRequest);
+#ifndef _WIN32
+			signal(SIGINT,_dealSignalKill);
+			signal(SIGQUIT,_dealSignalKill);
+			signal(SIGTERM,_dealSignalKill);
+#endif
+		}
 		for(auto& now:arr)
 			now.second(json[now.first.c_str()],server);
 #ifdef CPPWEB_OPENSSL
