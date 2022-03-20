@@ -2912,7 +2912,7 @@ public:
  * author:chenxuan
  * class:use to send eamil easy
  * example:{
- *  Email email;
+ *  Email email("qq.com");
  *  email.CreateSend
  *  email.emailSend
  * }
