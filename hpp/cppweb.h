@@ -1124,6 +1124,7 @@ private:
 ******************************/
 class ProcessCtrl{
 public:
+	static int childPid;
 	static int backGround()
 	{
 		int pid=0;
@@ -1144,6 +1145,7 @@ public:
 			int pid=fork();
 			if(pid!=0)
 			{
+				childPid=pid;
 				waitpid(pid, NULL, 0);
 				sleep(15);
 			}
@@ -1153,6 +1155,7 @@ public:
 #endif
 	}
 };
+int ProcessCtrl::childPid=0;
 /*******************************
  * author:chenxuan
  * class:class for trie and get route faster 
@@ -4737,9 +4740,13 @@ public:
 		getFileMsg(fileName,pbuffer,sizeof(char)*getFileLen(fileName)+10);
 		return pbuffer;
 	}
-	static bool writeToFile(const char* fileName,const char* buffer,unsigned int writeLen)
+	static bool writeToFile(const char* fileName,const char* buffer,unsigned int writeLen,bool isCat=false)
 	{
-		FILE* fp=fopen(fileName,"wb+");
+		FILE* fp=NULL;
+		if(!isCat)
+			fp=fopen(fileName,"wb+");
+		else
+			fp=fopen(fileName,"ab+");
 		if(fp==NULL)
 			return false;
 		for(unsigned int i=0;i<writeLen;i++)
