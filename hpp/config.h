@@ -220,7 +220,11 @@ void proxy(HttpServer& server,DealHttp& http,int soc)
 // description:deal kill signal
 static void _dealSignalKill(int)
 {
-	LogSystem::recordRequest("server stop sucessfully",0);
+	LogSystem::recordRequest("server stop ",0);
+#ifndef _WIN32
+	if(ProcessCtrl::childPid!=0)
+		kill(ProcessCtrl::childPid,2);
+#endif
 	exit(0);
 }
 /***********************************************
