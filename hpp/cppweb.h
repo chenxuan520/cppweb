@@ -1124,6 +1124,7 @@ private:
 ******************************/
 class ProcessCtrl{
 public:
+	static int childPid;
 	static int backGround()
 	{
 		int pid=0;
@@ -1139,11 +1140,15 @@ public:
 	static void guard()
 	{
 #ifndef _WIN32
+		signal(SIGINT,endGuard);
+		signal(SIGQUIT,endGuard);
+		signal(SIGTERM,endGuard);
 		while(1)
 		{
 			int pid=fork();
 			if(pid!=0)
 			{
+				childPid=pid;
 				waitpid(pid, NULL, 0);
 				sleep(15);
 			}
@@ -1152,7 +1157,17 @@ public:
 		}
 #endif
 	}
+private:
+#ifndef _WIN32
+	static void endGuard(int)
+	{
+		if(ProcessCtrl::childPid!=0)
+			kill(ProcessCtrl::childPid,2);
+		exit(0);
+	}
+#endif
 };
+int ProcessCtrl::childPid=0;
 /*******************************
  * author:chenxuan
  * class:class for trie and get route faster 
@@ -2912,7 +2927,7 @@ public:
  * author:chenxuan
  * class:use to send eamil easy
  * example:{
- *  Email email;
+ *  Email email("qq.com");
  *  email.CreateSend
  *  email.emailSend
  * }
@@ -4737,9 +4752,13 @@ public:
 		getFileMsg(fileName,pbuffer,sizeof(char)*getFileLen(fileName)+10);
 		return pbuffer;
 	}
-	static bool writeToFile(const char* fileName,const char* buffer,unsigned int writeLen)
+	static bool writeToFile(const char* fileName,const char* buffer,unsigned int writeLen,bool isCat=false)
 	{
-		FILE* fp=fopen(fileName,"wb+");
+		FILE* fp=NULL;
+		if(!isCat)
+			fp=fopen(fileName,"wb+");
+		else
+			fp=fopen(fileName,"ab+");
 		if(fp==NULL)
 			return false;
 		for(unsigned int i=0;i<writeLen;i++)
