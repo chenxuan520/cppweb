@@ -26,8 +26,8 @@
 	"delete path":[],
 	//replace the path,the arr must is a objext and have path and replace 
 	//	"replace":[
-	// 	{"path":"/root","repalce":"./template"},
-	// 	{"path":"/temp","repalce":"./tem"}
+	// 	{"path":"/root","replace":"./template"},
+	// 	{"path":"/temp","replace":"./tem"}
 	// ],
 	"replace":[],
 	//set agent array
