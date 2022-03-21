@@ -1140,6 +1140,9 @@ public:
 	static void guard()
 	{
 #ifndef _WIN32
+		signal(SIGINT,endGuard);
+		signal(SIGQUIT,endGuard);
+		signal(SIGTERM,endGuard);
 		while(1)
 		{
 			int pid=fork();
@@ -1154,6 +1157,15 @@ public:
 		}
 #endif
 	}
+private:
+#ifndef _WIN32
+	static void endGuard(int)
+	{
+		if(ProcessCtrl::childPid!=0)
+			kill(ProcessCtrl::childPid,2);
+		exit(0);
+	}
+#endif
 };
 int ProcessCtrl::childPid=0;
 /*******************************
