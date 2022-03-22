@@ -2174,7 +2174,7 @@ private:
 		sscanf(temp+strlen(askWay)+1,format,buffer);
 		return buffer;
 	}
-	void createTop(FileKind kind,char* ptop,unsigned int bufLen,int* topLen,unsigned int fileLen)//1:http 2:down 3:pic
+	void createTop(FileKind kind,char* ptop,unsigned int bufLen,int* topLen,unsigned int fileLen)
 	{
 		if(bufLen<100)
 		{
@@ -2236,19 +2236,19 @@ private:
 		}
 		*topLen=strlen(ptop);
 	}
-	char* findFileMsg(const char* pname,int* plen,char* buffer,unsigned int bufferLen)
+	int findFileMsg(const char* pname,int* plen,char* buffer,unsigned int bufferLen)
 	{
 		FILE* fp=fopen(pname,"rb+");
 		unsigned int flen=0,i=0;
 		if(fp==NULL)
-			return NULL;
+			return 1;
 		fseek(fp,0,SEEK_END);
 		flen=ftell(fp);
 		if(flen>=bufferLen)
 		{
 			this->error="buffer too short";
 			fclose(fp);
-			return NULL;
+			return 2;
 		}
 		fseek(fp,0,SEEK_SET);
 		for(i=0;i<flen;i++)
@@ -2256,7 +2256,7 @@ private:
 		buffer[i]=0;
 		*plen=flen;
 		fclose(fp);
-		return buffer;
+		return 0;
 	}
 	int getFileLen(const char* pname)
 	{
@@ -2293,23 +2293,25 @@ private:
 		return word;
 	}
 public:
-	bool createSendMsg(FileKind kind,char* buffer,unsigned int bufferLen,const char* pfile,int* plong)
+	int createSendMsg(FileKind kind,char* buffer,unsigned int bufferLen,const char* pfile,int* plong)
 	{
 		int temp=0;
-		int len=0,noUse=0;
+		int len=0,noUse=0,flag=0;
 		if(kind==NOFOUND)
 		{
 			this->createTop(kind,buffer,bufferLen,&temp,len);
 			*plong=len+temp+1;
-			return true;
+			return 0;
 		}
 		len=this->getFileLen(pfile);
 		if(len==0)
-			return false;
+			return 1;
 		this->createTop(kind,buffer,bufferLen,&temp,len);
-		this->findFileMsg(pfile,&noUse,buffer+temp,bufferLen);
+		flag=this->findFileMsg(pfile,&noUse,buffer+temp,bufferLen-temp);
+		if(flag==2)
+			return 2;
 		*plong=len+temp+1;
-		return true;
+		return 0;
 	}
 	const char* analysisHttpAsk(void* message,const char* pneed="GET")
 	{
@@ -2464,101 +2466,32 @@ public:
 	}
 	int autoAnalysisGet(const char* message,char* psend,unsigned int bufferLen,const char* pfirstFile,int* plen)
 	{
+		if(bufferLen<128)
+			return 2;
 		if(NULL==this->analysisHttpAsk((void*)message))
-			return 0;
+			return 1;
+		int temp=0;
 		if(strcmp(ask,"HTTP/1.1")==0||strcmp(ask,"HTTP/1.0")==0)
-		{
-			if(false==this->createSendMsg(HTML,psend,bufferLen,pfirstFile,plen))
-			{
-				if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
-					return 0;
-				else 
-					return 2;
-			}
-			else
-				return 1;
-		}
+			temp=this->createSendMsg(HTML,psend,bufferLen,pfirstFile,plen);
 		else if(strstr(ask,".html"))
-		{
-			if(false==this->createSendMsg(HTML,psend,bufferLen,ask,plen))
-				if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
-					return 0;
-				else 
-					return 2;
-			else
-				return 1;
-		}
+			temp=this->createSendMsg(HTML,psend,bufferLen,ask,plen);
 		else if(strstr(ask,".txt"))
-		{
-			if(false==this->createSendMsg(TXT,psend,bufferLen,ask,plen))
-				if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
-					return 0;
-				else 
-					return 2;
-			else
-				return 1;			
-		}
+			temp=this->createSendMsg(TXT,psend,bufferLen,ask,plen);
 		else if(strstr(ask,".zip"))
-		{
-			if(false==this->createSendMsg(ZIP,psend,bufferLen,ask,plen))
-				if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
-					return 0;
-				else 
-					return 2;
-			else
-				return 1;			
-		}
+			temp=this->createSendMsg(ZIP,psend,bufferLen,ask,plen);
 		else if(strstr(ask,".png")||strstr(ask,".PNG")||strstr(ask,".jpg")||strstr(ask,".jpeg"))
-		{
-			if(false==this->createSendMsg(IMAGE,psend,bufferLen,ask,plen))
-				if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
-					return 0;
-				else 
-					return 2;
-			else
-				return 1;					
-		}
+			temp=this->createSendMsg(IMAGE,psend,bufferLen,ask,plen);
 		else if(strstr(ask,".css"))
-		{
-			if(false==this->createSendMsg(CSS,psend,bufferLen,ask,plen))
-				if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
-					return 0;
-				else 
-					return 2;
-			else
-				return 1;					
-		}
+			temp=this->createSendMsg(CSS,psend,bufferLen,ask,plen);
 		else if(strstr(ask,".js"))
-		{
-			if(false==this->createSendMsg(JS,psend,bufferLen,ask,plen))
-				if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
-					return 0;
-				else 
-					return 2;
-			else
-				return 1;
-		}
+			temp=this->createSendMsg(JS,psend,bufferLen,ask,plen);
 		else if(strstr(ask,".json"))
-		{
-			if(false==this->createSendMsg(JSON,psend,bufferLen,ask,plen))
-				if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
-					return 0;
-				else 
-					return 2;
-			else
-				return 1;
-		}
+			temp=this->createSendMsg(JSON,psend,bufferLen,ask,plen);
 		else 
-		{
-			if(false==this->createSendMsg(UNKNOWN,psend,bufferLen,ask,plen))
-				if(false==this->createSendMsg(NOFOUND,psend,bufferLen,pfirstFile,plen))
-					return 0;
-				else 
-					return 2;
-			else
-				return 1;
-		}
-		return 1;
+			temp=this->createSendMsg(UNKNOWN,psend,bufferLen,ask,plen);
+		if(temp!=0)
+			this->createSendMsg(NOFOUND,psend,bufferLen,ask,plen);
+		return temp;
 	}
 	const char* getKeyValue(const void* message,const char* key,char* value,unsigned int maxValueLen,bool onlyFromBody=false)
 	{
@@ -3559,7 +3492,7 @@ public:
 		logFunc=NULL;
 		logError=NULL;
 		pnowRoute=NULL;
-		senLen=1;
+		senLen=1024*1024;
 		recLen=2048;
 		selfLen=0;
 		boundPort=port;
@@ -3787,7 +3720,7 @@ public:
 	void run(const char* defaultFile=NULL)
 	{//server begin to run
 		char* getT=(char*)malloc(sizeof(char)*recLen);
-		char* sen=(char*)malloc(sizeof(char)*senLen*1024*1024);
+		char* sen=(char*)malloc(sizeof(char)*senLen);
 		if(sen==NULL||getT==NULL)
 		{
 			this->error="server:malloc get and sen wrong";
@@ -3796,7 +3729,7 @@ public:
 			return;
 		}
 		memset(getT,0,sizeof(char)*recLen);
-		memset(sen,0,sizeof(char)*senLen*1024*1024);
+		memset(sen,0,sizeof(char)*senLen);
 		if(false==this->bondhost())
 		{
 			this->error="server:bound wrong";
@@ -3883,7 +3816,7 @@ public:
 		this->isLongCon=isLongCon;
 		this->isAutoAnalysis=isAuto;
 		if(sendLen>0)
-			this->senLen=sendLen;
+			this->senLen=sendLen*1024*1024;
 	}
 	inline void* recText()
 	{//get the recv text;
@@ -3912,7 +3845,7 @@ public:
 	}
 	inline unsigned getMaxSenLen()
 	{//get sen buffer size
-		return this->senLen*1024*1024;
+		return this->senLen;
 	}
 	inline void stopServer()
 	{//stop server run;
@@ -3924,8 +3857,8 @@ public:
 	}
 	inline void* enlagerSenBuffer()
 	{//Proactively scale up sen buffer
-		this->getText=enlargeMemory(this->getText,this->senLen);
-		return this->getText;
+		this->senText=enlargeMemory(this->senText,this->senLen);
+		return this->senText;
 	}
 private:
 	void messagePrint()
@@ -4143,11 +4076,11 @@ private:
 				{
 					if(http.gram.fileLen==0)
 						http.gram.fileLen=http.gram.body.size();
-					len=http.createDatagram(http.gram,this->senText,this->senLen*1024*1024);
+					len=http.createDatagram(http.gram,this->senText,this->senLen);
 					while(len==-1)
 					{
 						this->senText=enlargeMemory(this->senText,this->senLen);
-						len=http.createDatagram(http.gram,this->senText,this->senLen*1024*1024);
+						len=http.createDatagram(http.gram,this->senText,this->senLen);
 					}
 				}
 			}
@@ -4164,20 +4097,30 @@ private:
 			if(http.analysisHttpAsk(this->getText)!=NULL)
 			{
 				strcpy(ask,http.analysisHttpAsk(this->getText));
-				flag=http.autoAnalysisGet((char*)this->getText,(char*)this->senText,senLen*1024*1024,defaultFile,&len);
+				do{
+					flag=http.autoAnalysisGet((char*)this->getText,(char*)this->senText,senLen,defaultFile,&len);
+					if(flag==2&&this->senLen<10*1024*1024)
+						this->enlagerSenBuffer();
+				}while(flag==2&&this->senLen<10*1024*1024);
 			}
-			if(flag==2)
+			if(flag==1)
 			{
 				if(isDebug)
 					printf("404 get %s wrong\n",ask);
 				if(logError!=NULL)
 					logError(ask,num);
 			}
+			else if(flag==2)
+			{
+				if(logError!=NULL)
+					logError("memory wrong",0);
+				http.createSendMsg(DealHttp::NOFOUND,(char*)this->senText,senLen,NULL,&len);
+			}
 		}
 		else
-			http.createSendMsg(DealHttp::NOFOUND,(char*)this->senText,senLen*1024*1024,NULL,&len);
+			http.createSendMsg(DealHttp::NOFOUND,(char*)this->senText,senLen,NULL,&len);
 		if(len==0)
-			http.createSendMsg(DealHttp::NOFOUND,(char*)this->senText,senLen*1024*1024,NULL,&len);
+			http.createSendMsg(DealHttp::NOFOUND,(char*)this->senText,senLen,NULL,&len);
 		if(0>=this->sendSocket(num,this->senText,len))
 		{
 			if(isDebug)
@@ -4420,28 +4363,36 @@ private:
 		server.closeSocket(cli);
 		return NULL;
 	}
-	static void loadFile(HttpServer& server,DealHttp& http,int senLen)
+	static void loadFile(HttpServer& server,DealHttp& http,int)
 	{
-		int len=0;
+		int len=0,flag=0;
 		char ask[200]={0},buf[500]={0},temp[200]={0};
 		http.getAskRoute(server.recText(),"GET",ask,200);
 		HttpServer::RouteFuntion& route=*server.getNowRoute();
 		http.getWildUrl(ask,route.route,temp,200);
 		sprintf(buf,"GET %s%s HTTP/1.1",route.pathExtra,temp);
-		if(2==http.autoAnalysisGet(buf,(char*)server.getSenBuffer(),senLen*1024*1024,NULL,&len))
+		do
 		{
-			if(server.logError!=NULL)
-				server.logError(server.error,0);
-			if(server.isDebug)
-				printf("404 get %s wrong\n",buf);
-		}
+			flag=http.autoAnalysisGet(buf,(char*)server.getSenBuffer(),server.senLen,NULL,&len);
+			if(flag==2)
+				server.enlagerSenBuffer();
+			else if(flag==1)
+			{
+				if(flag==1&&server.logError!=NULL)
+					server.logError(server.error,0);
+				if(server.isDebug)
+					printf("404 get %s wrong\n",buf);
+			}
+			else
+				break;
+		}while(flag==2);
 		staticLen(len);
 	}
 	static void deleteFile(HttpServer& server,DealHttp& http,int senLen)
 	{
 		int len=0;
-		http.customizeAddTop(server.getSenBuffer(),senLen*1024*1024,DealHttp::STATUSFORBIDDEN,strlen("403 forbidden"),"text/plain");
-		http.customizeAddBody(server.getSenBuffer(),senLen*1024*1024,"403 forbidden",strlen("403 forbidden"));
+		http.customizeAddTop(server.getSenBuffer(),senLen,DealHttp::STATUSFORBIDDEN,strlen("403 forbidden"),"text/plain");
+		http.customizeAddBody(server.getSenBuffer(),senLen,"403 forbidden",strlen("403 forbidden"));
 		len=strlen((char*)server.getSenBuffer());
 		staticLen(len);
 	}
