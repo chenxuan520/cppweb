@@ -3923,7 +3923,7 @@ public:
 		return pnowRoute;
 	}
 	inline void* enlagerSenBuffer()
-	{
+	{//Proactively scale up sen buffer
 		this->getText=enlargeMemory(this->getText,this->senLen);
 		return this->getText;
 	}
@@ -3968,11 +3968,26 @@ private:
 			case STATIC:
 			case STAWILD:
 				if(arrRoute[i].pfunc==loadFile)
-					printf("%s\t\t->\t%s\n",arrRoute[i].route,arrRoute[i].pathExtra);
+				{
+					if(arrRoute[i].type==STATIC)
+						printf("%s\t\t->\t%s\n",arrRoute[i].route,arrRoute[i].pathExtra);
+					else
+						printf("%s*\t\t->\t%s\n",arrRoute[i].route,arrRoute[i].pathExtra);
+				}
 				else if(arrRoute[i].pfunc==deleteFile)
-					printf("%s\t\t->\tdelete\n",arrRoute[i].route);
+				{
+					if(arrRoute[i].type==STATIC)
+						printf("%s\t\t->\tdelete\n",arrRoute[i].route);
+					else
+						printf("%s*\t\t->\tdelete\n",arrRoute[i].route);
+				}
 				else if(arrRoute[i].pfunc==rediectGram)
-					printf("%s\t\t->\t%s\n",arrRoute[i].route,arrRoute[i].pathExtra);
+				{
+					if(arrRoute[i].type==STATIC)
+						printf("%s\t\t->\t%s\n",arrRoute[i].route,arrRoute[i].pathExtra);
+					else
+						printf("%s*\t\t->\t%s\n",arrRoute[i].route,arrRoute[i].pathExtra);
+				}
 				else
 					printf("undefine funtion please check the server\n");
 				continue;
