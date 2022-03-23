@@ -42,6 +42,10 @@ void readSetting(LoadConfig& load)
 					if(obj!=NULL&&obj->intVal>0)
 						con.threadNum=obj->intVal;
 					});
+	load.findConfig("message print",[](Json::Object* obj,Config& con){
+					if(obj!=NULL)
+						con.isDebug=obj->boolVal;
+					});
 	load.findConfig("default file",[](Json::Object* obj,Config& con){
 					if(obj!=NULL)
 						con.defaultFile=obj->strVal;

@@ -237,10 +237,10 @@ int getCompleteMessage(int sockCli)
 ### changeSetting
 
 ```cpp
-void changeSetting(bool debug,bool isLongCon,bool isAuto=true,unsigned sendLen=1)
+void changeSetting(bool debug,bool isLongCon,bool isAuto=true,unsigned senMaxLen=1)
 ```
 
-- Change the settings, the first is whether to debug mode, the second is whether to long link, the third is whether to enable the default path recognition, the fourth is the send buffer size, the unit is **M**
+- Change the settings, the first is whether to debug mode, the second is whether to long link, the third is whether to enable the default path recognition, the fourth is the send buffer max size, the unit is **M**
 
 ### stopServer
 
