@@ -3746,6 +3746,8 @@ public:
 				logError(error,0);
 			return;
 		}
+		if(logFunc!=NULL)
+			logFunc("server start",0);
 		this->getText=getT;
 		this->senText=sen;
 		this->defaultFile=defaultFile;
@@ -3959,10 +3961,7 @@ private:
 		if(middleware!=NULL)
 			printf("middleware\t\tfuntion set\n");
 		if(logFunc!=NULL)
-		{
-			logFunc("server start",0);
 			printf("log\t\tfunction set\n");
-		}
 		if(logError!=NULL)
 			printf("error\t\tfuntion set\n");
 		if(clientIn!=NULL)

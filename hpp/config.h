@@ -295,7 +295,7 @@ private:
 	}
 	void configServer(HttpServer& server)
 	{
-		server.changeSetting(true,_config.isLongConnect,_config.isAuto,_config.defaultMemory);
+		server.changeSetting(_config.isDebug,_config.isLongConnect,_config.isAuto,_config.defaultMemory);
 		if(_config.model=="THREAD"&&_config.threadNum!=0)
 			server.changeModel(HttpServer::THREAD,_config.threadNum);
 		for(auto& now:_config.deletePath)

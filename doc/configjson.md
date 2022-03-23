@@ -41,6 +41,10 @@
 
 - Whether to enable automatic path recognition
 
+### message print
+
+- bool type,whether to print message in stdout
+
 ### redirect
 
 - redirection, the structure is an array
