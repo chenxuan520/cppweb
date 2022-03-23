@@ -3459,6 +3459,7 @@ private:
 	const char* defaultFile;
 	unsigned int senLen;
 	unsigned int recLen;
+	unsigned int maxLen;
 	unsigned int maxNum;
 	unsigned int now;
 	unsigned int boundPort;
@@ -3493,6 +3494,7 @@ public:
 		logError=NULL;
 		pnowRoute=NULL;
 		senLen=1024*1024;
+		maxLen=10;
 		recLen=2048;
 		selfLen=0;
 		boundPort=port;
@@ -3810,13 +3812,13 @@ public:
 		textLen=result;
 		return result;
 	}
-	void changeSetting(bool debug,bool isLongCon,bool isAuto=true,unsigned sendLen=1)
+	void changeSetting(bool debug,bool isLongCon,bool isAuto=true,unsigned maxSendLen=10)
 	{//change setting
 		this->isDebug=debug;
 		this->isLongCon=isLongCon;
 		this->isAutoAnalysis=isAuto;
-		if(sendLen>0)
-			this->senLen=sendLen*1024*1024;
+		if(maxSendLen>1)
+			this->maxLen=maxSendLen;
 	}
 	inline void* recText()
 	{//get the recv text;
@@ -4099,9 +4101,9 @@ private:
 				strcpy(ask,http.analysisHttpAsk(this->getText));
 				do{
 					flag=http.autoAnalysisGet((char*)this->getText,(char*)this->senText,senLen,defaultFile,&len);
-					if(flag==2&&this->senLen<10*1024*1024)
+					if(flag==2&&this->senLen<maxLen*1024*1024)
 						this->enlagerSenBuffer();
-				}while(flag==2&&this->senLen<10*1024*1024);
+				}while(flag==2&&this->senLen<maxLen*1024*1024);
 			}
 			if(flag==1)
 			{
@@ -4374,7 +4376,7 @@ private:
 		do
 		{
 			flag=http.autoAnalysisGet(buf,(char*)server.getSenBuffer(),server.senLen,NULL,&len);
-			if(flag==2)
+			if(flag==2&&server.senLen<server.maxLen*1024*1024)
 				server.enlagerSenBuffer();
 			else if(flag==1)
 			{
