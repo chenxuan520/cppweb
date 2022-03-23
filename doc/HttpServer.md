@@ -237,10 +237,10 @@ int getCompleteMessage(int sockCli)
 ### changeSetting
 
 ```cpp
-void changeSetting(bool debug,bool isLongCon,bool isAuto=true,unsigned sendLen=1)
+void changeSetting(bool debug,bool isLongCon,bool isAuto=true,unsigned maxSendLen=1)
 ```
 
-- 改变设置,第一个是是否调试模式,第二个是是否长链接,第三个是是否开启路径默认识别,第四个是发送缓冲区大小,单位为**M**
+- 改变设置,第一个是是否调试模式,第二个是是否长链接,第三个是是否开启路径默认识别,第四个是发送缓冲区最大大小,单位为**M**
 
 ### stopServer
 
