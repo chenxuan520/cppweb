@@ -2710,11 +2710,7 @@ public:
 		{
 		case UNKNOWN:
 			if(gram.typeName.size()==0||gram.typeName.size()>200)
-			{
-				error="type name wrong";
-				strcat((char*)buffer,"\r\n");
-				return strlen((char*)buffer);
-			}
+				break;
 			sprintf(temp,"Content-Type:%s\r\n",gram.typeName.c_str());
 			break;
 		case NOFOUND:
