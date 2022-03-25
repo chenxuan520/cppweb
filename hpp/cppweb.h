@@ -2099,7 +2099,6 @@ public:
 ******************************/
 class DealHttp{
 public:
-	friend class HttpServer;
 	enum FileKind{
 		UNKNOWN=0,HTML=1,TXT=2,IMAGE=3,NOFOUND=4,CSS=5,JS=6,ZIP=7,JSON=8,
 	};
@@ -2163,16 +2162,6 @@ private:
 	inline char* findFirst(void* message,const char* ptofind)
 	{
 		return strstr((char*)message,ptofind);
-	}
-	const char* getAskRoute(const void* message,const char* askWay,char* buffer,unsigned int bufferLen)
-	{
-		char* temp=strstr((char*)message,askWay);
-		if(temp==NULL)
-			return NULL;
-		char format[20]={0};
-		sprintf(format,"%%%us",bufferLen);
-		sscanf(temp+strlen(askWay)+1,format,buffer);
-		return buffer;
 	}
 	void createTop(FileKind kind,char* ptop,unsigned int bufLen,int* topLen,unsigned int fileLen)
 	{
@@ -2754,6 +2743,16 @@ public:
 			for(auto iter=cookie.begin();iter!=cookie.end();iter++)
 				setCookie(buffer,bufferLen,iter->first.c_str(),iter->second.c_str());
 		return customizeAddBody(buffer,bufferLen,gram.body.c_str(),gram.fileLen);
+	}
+	const char* getAskRoute(const void* message,const char* askWay,char* buffer,unsigned int bufferLen)
+	{
+		char* temp=strstr((char*)message,askWay);
+		if(temp==NULL)
+			return NULL;
+		char format[20]={0};
+		sprintf(format,"%%%us",bufferLen);
+		sscanf(temp+strlen(askWay)+1,format,buffer);
+		return buffer;
 	}
 	void changeSetting(const char* connectStatus,const char* serverName)
 	{

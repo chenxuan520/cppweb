@@ -3,6 +3,7 @@
 #include <sys/stat.h>
 using namespace cppweb;
 using namespace std;
+extern char* passwd;
 /***********************************************
 * Author: chenxuan-1607772321@qq.com
 * change time:2022-03-24 09:07:41
@@ -214,4 +215,52 @@ void mkdirNow(HttpServer& server,DealHttp& http,int)
 		http.gram.body="{\"status\":\"wrong\"}";
 		return;
 	}
+}
+/***********************************************
+* Author: chenxuan-1607772321@qq.com
+* change time:2022-03-25 12:03:24
+* description:login in 
+***********************************************/
+void loginIn(HttpServer& server,DealHttp& http,int)
+{
+	char value[128]={0};
+	if(NULL==http.getKeyValue(server.recText(),"passwd",value,128))
+	{
+		http.gram.body="Verify identity wrong";
+		return;
+	}
+	if(strcmp(passwd,value)!=0)
+	{
+		http.gram.body="Verify passwd wrong";
+		return;
+	}
+	else
+	{
+		Json json={{"status","ok"}};
+		http.gram.cookie["disk"]=http.designCookie(passwd,120);
+		http.gram.body=json();
+		http.gram.statusCode=DealHttp::STATUSOK;
+		return;
+	}
+}
+/***********************************************
+* Author: chenxuan-1607772321@qq.com
+* change time:2022-03-25 12:54:14
+* description:middware get cookie 
+***********************************************/
+void middleware(HttpServer& server,DealHttp& http,int soc)
+{
+	char value[128]={0},path[128]={0};
+	sscanf((char*)server.recText(),"%s%s",value,path);
+	if(strstr(path,"login")!=NULL)
+		server.continueNext(soc);
+	else if(NULL==http.getCookie(server.recText(),"disk",value,128)||strcmp(value,passwd)!=0)
+	{
+		int len=0;
+		http.createSendMsg(DealHttp::HTML,(char*)server.getSenBuffer(),server.getMaxSenLen(),"./login.html",&len);
+		server.httpSend(soc,server.getSenBuffer(),len);
+		return;
+	}
+	else
+		server.continueNext(soc);
 }

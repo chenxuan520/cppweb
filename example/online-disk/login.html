@@ -1,10 +1,10 @@
-<html lang="zh-CN">
-  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-  <head>
-    <meta name="generator">
-    <title>online disk</title>
-	<style>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Login</title>
+		<style>
 	* {
 		margin:0;
 		padding:0;
@@ -168,74 +168,16 @@
 	 color:#888;
 	}
 	</style>
-  </head>
-  <body>
-  	<div class="container">
-  		<div id="contact">
-		  	<div id="div">
-		  		<h3>当前目录文件</h3>
-		  	</div>
-		  	<h4>选择操作文件明或目录名</h4>
-		  	<input type="text" id="mkdir">
-		  	<button type="button" id="submit" onclick="mkdir();">mkdir</button>
-		  	<button type="button" id="delete" onclick="remove();">delete</button>
-			<form action="/upload" method="post" enctype="multipart/form-data" id="sen">
-				 	<h4>点击按钮选择文件</h4><input type="file" class="file1" name="file1" />
-				 <button type="submit" class="but1">upload</button>
+</head>
+<body>
+	<div class="container">
+		<div id="contact">
+			<form action="/login" method="post">
+				<h3>请输入密码</h3></br>
+				<input type="text" name="passwd"></br>
+				<button type="submit">login</button>
 			</form>
-  		</div>
+		</div>
 	</div>
-  </body>
-  <script>
-  	var url=window.location.pathname;
-  	var allUrl=window.location.href;
-  	var sen=document.getElementById("sen");
-  	sen.action+=url;
-  	sen.action+="/";
-	console.log(sen.action);
-	axios.post("/message"+url, {
-	}).then(function (response) {
-	    // console.log(response.data);
-	    var arr=JSON.parse(JSON.stringify(response.data))['list'];
-  		var div = document.getElementById("div");
-	    for(var i in arr)
-	    {
-  			var linkTmp = document.createElement("a");
-  			linkTmp.innerText=arr[i];
-  			linkTmp.href =allUrl;
-  			var len=linkTmp.href.length;
-  			if(linkTmp.href[len-1]=='/')
-  				linkTmp.href+=arr[i];
-  			else
-  				linkTmp.href+="/"+arr[i];
-	    	console.log(arr[i]);
-	    	div.appendChild(linkTmp);
-	    	div.appendChild(document.createElement("br"));
-	    }
-  	});
-  </script>
-  <script>
-  	function mkdir()
-  	{
-  		var sen=document.getElementById("mkdir");
-  		var url=window.location.pathname+"/"+sen.value;
-  		console.log(url);
-	  	axios.post("/mkdir"+url, {
-		}).then(function (response) {
-			var status=JSON.parse(JSON.stringify(response.data))['status'];
-			alert(status);
-		});
-  	}
-  	function remove()
-  	{
-  		 var sen=document.getElementById("mkdir");
-  		var url=window.location.pathname+"/"+sen.value;
-  		console.log(url);
-	  	axios.post("/delete"+url, {
-		}).then(function (response) {
-			var status=JSON.parse(JSON.stringify(response.data))['status'];
-			alert(status);
-		});
-  	}
-  </script>
+</body>
 </html>
