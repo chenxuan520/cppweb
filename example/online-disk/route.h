@@ -252,7 +252,7 @@ void middleware(HttpServer& server,DealHttp& http,int soc)
 {
 	char value[128]={0},path[128]={0};
 	sscanf((char*)server.recText(),"%s%s",value,path);
-	if(strstr(path,"login")!=NULL)
+	if(strcmp(value,"POST")==0&&strstr(path,"login")!=NULL)
 		server.continueNext(soc);
 	else if(NULL==http.getCookie(server.recText(),"disk",value,128)||strcmp(value,passwd)!=0)
 	{

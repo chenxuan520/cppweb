@@ -20,11 +20,16 @@ void readPasswd()
 	}
 	if(passwd[strlen(passwd)-1]=='\n')
 		passwd[strlen(passwd)-1]=0;
-	printf("passwd:%s\n",passwd);
 }
 int main()
 {
 	readPasswd();
+	auto flag=chdir("./template");
+	if(flag!=0)
+	{
+		perror("chdir wrong");
+		return 0;
+	}
 	HttpServer server(5200,true);//input the port bound
 	server.setMiddleware(middleware);
 	server.post("/message*",nowPwdFile);

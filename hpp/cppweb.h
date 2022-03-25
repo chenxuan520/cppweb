@@ -249,7 +249,6 @@ private:
 	unsigned defaultSize;
 	Object* obj;
 	std::unordered_map<char*,unsigned> memory;
-	/* std::unordered_map<std::string,Object*> hashMap; */
 	std::unordered_map<char*,char*> bracket;
 public:
 	Json()
@@ -394,12 +393,104 @@ public:
 			return addKeyVal(obj,FLOAT,key,value);
 		else if(std::is_same<T,char*>::value)
 			return addKeyVal(obj,OBJ,key,value);
-		else if(std::is_same<T,const char*>::value)
+		else if(std::is_same<T,const char*>::value||std::is_same<T,std::string>::value)
 			return addKeyVal(obj,STRING,key,value);
 		else if(std::is_same<T,bool>::value)
 			return addKeyVal(obj,BOOL,key,value);
 		else 
 			return addKeyVal(obj,EMPTY,key,NULL);
+	}
+	template<typename T>
+	bool addKeyVal(std::string& obj,const char* key,T value)
+	{
+		if(std::is_same<T,int>::value)
+			return addKeyVal(obj,INT,key,value);
+		else if(std::is_same<T,double>::value)
+			return addKeyVal(obj,FLOAT,key,value);
+		else if(std::is_same<T,char*>::value)
+			return addKeyVal(obj,OBJ,key,value);
+		else if(std::is_same<T,const char*>::value||std::is_same<T,std::string>::value)
+			return addKeyVal(obj,STRING,key,value);
+		else if(std::is_same<T,bool>::value)
+			return addKeyVal(obj,BOOL,key,value);
+		else 
+			return addKeyVal(obj,EMPTY,key,NULL);
+	}
+	bool addKeyVal(std::string& obj,TypeJson type,const char* key,...)
+	{
+		char buffer[32]={0};
+		if(obj.size()==0)
+			obj="{}";
+		if(key==NULL)
+		{
+			error="key null";
+			return false;
+		}
+		va_list args;
+		va_start(args,key);
+		if(obj[obj.size()-1])
+		{
+			if(obj[obj.size()-2]!='{')
+				obj[obj.size()-1]=',';
+			else
+				obj.erase(obj.end()-1);
+		}
+		obj+='\"';
+		obj+=key;
+		obj+="\":";
+		int valInt=0;
+		char* valStr=NULL;
+		double valFlo=0;
+		bool valBool=false;
+		switch(type)
+		{
+		case INT:
+			valInt=va_arg(args,int);
+			obj+=std::to_string(valInt);
+			break;
+		case FLOAT:
+			valFlo=va_arg(args,double);
+			sprintf(buffer,"%.*lf",floNum,valFlo);
+			obj+=buffer;
+			break;
+		case STRING:
+			valStr=va_arg(args,char*);
+			if(valStr==NULL)
+			{
+				error="null input";
+				return false;
+			}
+			obj+='\"';
+			obj+=valStr;
+			obj+='\"';
+			break;
+		case EMPTY:
+			obj+="null";
+			break;
+		case BOOL:
+			valBool=va_arg(args,int);
+			if(valBool==true)
+				obj+="true";
+			else
+				obj+="false";
+			break;
+		case OBJ:
+		case ARRAY:
+			valStr=va_arg(args,char*);
+			if(valStr==NULL)
+			{
+				error="null input";
+				return false;
+			}
+			obj+=valStr;
+			break;
+		default:
+			error="can not insert this type";
+			obj+="}";
+			return false;
+		}
+		obj+="}";
+		return true;
 	}
 	bool addKeyVal(char*& obj,TypeJson type,const char* key,...)
 	{
@@ -507,6 +598,24 @@ public:
 		strcpy(now,"{}");
 		return now;
 	}
+	template<typename T>
+	char* createArray(std::vector<T>& arr)
+	{
+		char* result=NULL;
+		if(std::is_same<T,int>::value)
+			result=createArray(INT,arr.size(),&arr[0]);
+		else if(std::is_same<T,double>::value)
+			result=createArray(FLOAT,arr.size(),&arr[0]);
+		else if(std::is_same<T,std::string>::value)
+			result=createArray(STRUCT,arr.size(),&arr);
+		else if(std::is_same<T,const char*>::value)
+			result=createArray(OBJ,arr.size(),&arr[0]);
+		else if(std::is_same<T,bool>::value)
+			result=createArray(BOOL,arr.size(),&arr[0]);
+		else
+			error="wrong vector type";
+		return result;
+	}
 	char* createArray(TypeJson type,unsigned arrLen,void* arr)
 	{
 		if(arr==NULL)
@@ -528,6 +637,7 @@ public:
 		double* arrFlo=(double*)arr;
 		char** arrStr=(char**)arr;
 		bool* arrBool=(bool*)arr;
+		auto& pvect=*(std::vector<std::string>*)arr;
 		unsigned i=0;
 		switch(type)
 		{
@@ -553,6 +663,14 @@ public:
 				while(memory[now]-strlen(now)<strlen(arrStr[i])+5)
 					now=enlargeMemory(now);
 				sprintf(now,"%s\"%s\",",now,arrStr[i]);
+			}
+			break;
+		case STRUCT:
+			for(i=0;i<arrLen;i++)
+			{
+				while(memory[now]-strlen(now)<strlen(arrStr[i])+5)
+					now=enlargeMemory(now);
+				sprintf(now,"%s\"%s\",",now,pvect[i].c_str());
 			}
 			break;
 		case OBJ:
@@ -586,12 +704,9 @@ public:
 		now[strlen(now)]=0;
 		return now;
 	}
-	Object* operator[](const char* key)
+	inline Object* operator[](const char* key)
 	{
 		return (*obj)[key];
-		/* if(hashMap.find(std::string(key))==hashMap.end()) */
-		/* 	return NULL; */
-		/* return hashMap.find(std::string(key))->second; */
 	}
 	char*& operator()()
 	{
