@@ -152,6 +152,7 @@ struct Config{
 	int defaultMemory;
 	int threadNum;
 	std::string defaultFile;
+	std::string logPath;
 	std::string model;
 	std::string keyPath;
 	std::string certPath;
@@ -306,6 +307,8 @@ private:
 			server.redirect(now.first.c_str(),now.second.c_str());
 		for(auto& now:_config.proxyMap)
 			server.all(now.first.c_str(),proxy);
+		if(_config.logPath.size()>0)
+			LogSystem::defaultName=_config.logPath.c_str();
 		if(_config.isLog)
 		{
 			server.setLog(LogSystem::recordRequest,LogSystem::recordRequest);

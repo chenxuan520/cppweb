@@ -13,10 +13,12 @@
 	"guard":false,
 	//if open the log
 	"logger":true,
+	//log path
+	"log path":"./access.log",
 	//auto find the file
 	"auto":true,
 	//message print to stdout or not
-	"message print":false,
+	"message print":true,
 	//301 redirect,the arr must is a objext and have path and redirect,use as this
 	//	"rediect":[
 	// 	{"path":"/root","redirect":"./template"},

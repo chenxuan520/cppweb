@@ -58,6 +58,12 @@ void readSetting(LoadConfig& load)
 					else
 						con.isBack=false;
 					});
+	load.findConfig("log path",[](Json::Object* obj,Config& con){
+					if(obj!=NULL)
+						con.logPath=obj->strVal;
+					else
+						con.logPath="access.log";
+					});
 	load.findConfig("guard",[](Json::Object* obj,Config& con){
 					if(obj!=NULL)
 						con.isGuard=obj->boolVal;
