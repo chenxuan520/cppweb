@@ -1249,6 +1249,7 @@ private:
 			if(root->next[i]!=NULL)
 				cleanMemory(root->next[i]);
 		delete root;
+		root=NULL;
 	}
 public:
 	Trie() {
@@ -1308,6 +1309,11 @@ public:
 		if(temp->stop==true)
 			return false;
 		return true;
+	}
+	void clean()
+	{
+		cleanMemory(root);
+		root=new Node;
 	}
 };
 /***********************************************
@@ -3320,6 +3326,7 @@ private:
 	ThreadPool pool;
 	std::queue<char*> nowFree;
 public:
+	static const char* defaultName;
 	LogSystem(const char* name,size_t bufferLen=1024)\
 										   :fileName(name),now(NULL),pool(1)
 	{
@@ -3417,7 +3424,7 @@ public:
 	}
 	static void recordRequest(const void* text,int soc)
 	{
-		static LogSystem loger("access.log");
+		static LogSystem loger(defaultName);
 		loger.recordMessage(text,soc);
 	}
 	static bool recordFileError(const char* fileName)
@@ -3468,6 +3475,7 @@ private:
 		return NULL;
 	}
 };
+const char* LogSystem::defaultName="access.log";
 /*******************************
  * author:chenxuan
  * class:the main class for create server

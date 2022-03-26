@@ -13,6 +13,8 @@
 	"guard":false,
 	//if open the log
 	"logger":true,
+	//log path
+	"log path":"./access.log",
 	//auto find the file
 	"auto":true,
 	//message print to stdout or not
