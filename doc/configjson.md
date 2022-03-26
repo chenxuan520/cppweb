@@ -37,6 +37,10 @@
 
 - whether to enable logging
 
+### log path 
+
+- log save path
+
 ### auto
 
 - Whether to enable automatic path recognition

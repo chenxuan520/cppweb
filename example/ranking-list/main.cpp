@@ -83,8 +83,8 @@ int main()
 		std::cout<<server.lastError()<<std::endl;
 		return -1;
 	}
-	server.post(HttpServer::ONEWAY,"/add",addCLi);
-	server.get(HttpServer::ONEWAY,"/list",getList);
+	server.post("/add",addCLi);
+	server.get("/list",getList);
 	server.run("api.html");
     return 0; 
 }  

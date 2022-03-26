@@ -247,9 +247,9 @@ private:
 	unsigned maxLen;
 	unsigned floNum;
 	unsigned defaultSize;
+	bool isCheck;
 	Object* obj;
 	std::unordered_map<char*,unsigned> memory;
-	/* std::unordered_map<std::string,Object*> hashMap; */
 	std::unordered_map<char*,char*> bracket;
 public:
 	Json()
@@ -260,6 +260,7 @@ public:
 		word=NULL;
 		result=NULL;
 		nowKey=NULL;
+		isCheck=true;
 		maxLen=256;
 		floNum=3;
 		defaultSize=128;
@@ -274,6 +275,7 @@ public:
 	}
 	Json(std::initializer_list<std::pair<std::string,InitType>> initList):Json()
 	{
+		isCheck=false;
 		for(auto iter=initList.begin();iter!=initList.end();iter++)
 		{
 			if(iter->second.pval==NULL&&iter->second.type!=EMPTY)
@@ -320,6 +322,7 @@ public:
 				return;
 			}
 		}
+		isCheck=true;
 	}
 	Json(const char* jsonText):Json()
 	{
@@ -394,7 +397,7 @@ public:
 			return addKeyVal(obj,FLOAT,key,value);
 		else if(std::is_same<T,char*>::value)
 			return addKeyVal(obj,OBJ,key,value);
-		else if(std::is_same<T,const char*>::value)
+		else if(std::is_same<T,const char*>::value||std::is_same<T,std::string>::value)
 			return addKeyVal(obj,STRING,key,value);
 		else if(std::is_same<T,bool>::value)
 			return addKeyVal(obj,BOOL,key,value);
@@ -483,7 +486,15 @@ public:
 				error="null input";
 				return false;
 			}
-			sprintf(obj,"%s%s",obj,valStr);
+			if(isCheck)
+			{
+				if(memory.find(valStr)!=memory.end())
+					sprintf(obj,"%s%s",obj,valStr);
+				else
+					sprintf(obj,"%s\"%s\"",obj,valStr);
+			}
+			else
+				sprintf(obj,"%s%s",obj,valStr);
 			break;
 		default:
 			error="can not insert this type";
@@ -507,6 +518,26 @@ public:
 		strcpy(now,"{}");
 		return now;
 	}
+	template<typename T>
+	char* createArray(std::vector<T>& arr)
+	{
+		char* result=NULL;
+		if(std::is_same<T,int>::value)
+			result=createArray(INT,arr.size(),&arr[0]);
+		else if(std::is_same<T,double>::value)
+			result=createArray(FLOAT,arr.size(),&arr[0]);
+		else if(std::is_same<T,std::string>::value)
+			result=createArray(STRUCT,arr.size(),&arr);
+		else if(std::is_same<T,char*>::value)
+			result=createArray(OBJ,arr.size(),&arr[0]);
+		else if(std::is_same<T,const char*>::value)
+			result=createArray(STRING,arr.size(),&arr[0]);
+		else if(std::is_same<T,bool>::value)
+			result=createArray(BOOL,arr.size(),&arr[0]);
+		else
+			error="wrong vector type";
+		return result;
+	}
 	char* createArray(TypeJson type,unsigned arrLen,void* arr)
 	{
 		if(arr==NULL)
@@ -528,6 +559,7 @@ public:
 		double* arrFlo=(double*)arr;
 		char** arrStr=(char**)arr;
 		bool* arrBool=(bool*)arr;
+		auto& pvect=*(std::vector<std::string>*)arr;
 		unsigned i=0;
 		switch(type)
 		{
@@ -555,13 +587,29 @@ public:
 				sprintf(now,"%s\"%s\",",now,arrStr[i]);
 			}
 			break;
+		case STRUCT:
+			for(i=0;i<arrLen;i++)
+			{
+				while(memory[now]-strlen(now)<pvect[i].size()+5)
+					now=enlargeMemory(now);
+				sprintf(now,"%s\"%s\",",now,pvect[i].c_str());
+			}
+			break;
 		case OBJ:
 		case ARRAY:
 			for(i=0;i<arrLen;i++)
 			{
 				while(memory[now]-strlen(now)<strlen(arrStr[i])+4)
 					now=enlargeMemory(now);
-				sprintf(now,"%s%s,",now,arrStr[i]);
+				if(isCheck)
+				{
+					if(memory.find(arrStr[i])!=memory.end())
+						sprintf(now,"%s%s,",now,arrStr[i]);
+					else
+						sprintf(now,"%s\"%s\",",now,arrStr[i]);
+				}
+				else
+					sprintf(now,"%s%s,",now,arrStr[i]);
 			}
 			break;
 		case BOOL:
@@ -586,12 +634,9 @@ public:
 		now[strlen(now)]=0;
 		return now;
 	}
-	Object* operator[](const char* key)
+	inline Object* operator[](const char* key)
 	{
 		return (*obj)[key];
-		/* if(hashMap.find(std::string(key))==hashMap.end()) */
-		/* 	return NULL; */
-		/* return hashMap.find(std::string(key))->second; */
 	}
 	char*& operator()()
 	{
@@ -606,6 +651,13 @@ public:
 	Json& operator=(T value)
 	{
 		this->addKeyVal(this->result,nowKey,value);
+		return *this;
+	}
+	template<typename T>
+	Json& operator=(std::vector<T> value)
+	{
+		char* arr=this->createArray(value);
+		this->addKeyVal(this->result,nowKey,arr);
 		return *this;
 	}
 	inline Object* getRootObj()
@@ -1197,6 +1249,7 @@ private:
 			if(root->next[i]!=NULL)
 				cleanMemory(root->next[i]);
 		delete root;
+		root=NULL;
 	}
 public:
 	Trie() {
@@ -1256,6 +1309,11 @@ public:
 		if(temp->stop==true)
 			return false;
 		return true;
+	}
+	void clean()
+	{
+		cleanMemory(root);
+		root=new Node;
 	}
 };
 /***********************************************
@@ -2099,7 +2157,6 @@ public:
 ******************************/
 class DealHttp{
 public:
-	friend class HttpServer;
 	enum FileKind{
 		UNKNOWN=0,HTML=1,TXT=2,IMAGE=3,NOFOUND=4,CSS=5,JS=6,ZIP=7,JSON=8,
 	};
@@ -2163,16 +2220,6 @@ private:
 	inline char* findFirst(void* message,const char* ptofind)
 	{
 		return strstr((char*)message,ptofind);
-	}
-	const char* getAskRoute(const void* message,const char* askWay,char* buffer,unsigned int bufferLen)
-	{
-		char* temp=strstr((char*)message,askWay);
-		if(temp==NULL)
-			return NULL;
-		char format[20]={0};
-		sprintf(format,"%%%us",bufferLen);
-		sscanf(temp+strlen(askWay)+1,format,buffer);
-		return buffer;
 	}
 	void createTop(FileKind kind,char* ptop,unsigned int bufLen,int* topLen,unsigned int fileLen)
 	{
@@ -2710,11 +2757,7 @@ public:
 		{
 		case UNKNOWN:
 			if(gram.typeName.size()==0||gram.typeName.size()>200)
-			{
-				error="type name wrong";
-				strcat((char*)buffer,"\r\n");
-				return strlen((char*)buffer);
-			}
+				break;
 			sprintf(temp,"Content-Type:%s\r\n",gram.typeName.c_str());
 			break;
 		case NOFOUND:
@@ -2758,6 +2801,16 @@ public:
 			for(auto iter=cookie.begin();iter!=cookie.end();iter++)
 				setCookie(buffer,bufferLen,iter->first.c_str(),iter->second.c_str());
 		return customizeAddBody(buffer,bufferLen,gram.body.c_str(),gram.fileLen);
+	}
+	const char* getAskRoute(const void* message,const char* askWay,char* buffer,unsigned int bufferLen)
+	{
+		char* temp=strstr((char*)message,askWay);
+		if(temp==NULL)
+			return NULL;
+		char format[20]={0};
+		sprintf(format,"%%%us",bufferLen);
+		sscanf(temp+strlen(askWay)+1,format,buffer);
+		return buffer;
 	}
 	void changeSetting(const char* connectStatus,const char* serverName)
 	{
@@ -3273,6 +3326,7 @@ private:
 	ThreadPool pool;
 	std::queue<char*> nowFree;
 public:
+	static const char* defaultName;
 	LogSystem(const char* name,size_t bufferLen=1024)\
 										   :fileName(name),now(NULL),pool(1)
 	{
@@ -3370,7 +3424,7 @@ public:
 	}
 	static void recordRequest(const void* text,int soc)
 	{
-		static LogSystem loger("access.log");
+		static LogSystem loger(defaultName);
 		loger.recordMessage(text,soc);
 	}
 	static bool recordFileError(const char* fileName)
@@ -3421,6 +3475,7 @@ private:
 		return NULL;
 	}
 };
+const char* LogSystem::defaultName="access.log";
 /*******************************
  * author:chenxuan
  * class:the main class for create server
@@ -3534,6 +3589,7 @@ public:
 			signal(SIGCHLD,sigCliDeal);
 #endif
 	}
+	HttpServer(const HttpServer& server)=delete;
 	~HttpServer()
 	{
 		if(arrRoute!=NULL)
