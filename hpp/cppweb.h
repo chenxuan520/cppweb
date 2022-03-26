@@ -247,6 +247,7 @@ private:
 	unsigned maxLen;
 	unsigned floNum;
 	unsigned defaultSize;
+	bool isCheck;
 	Object* obj;
 	std::unordered_map<char*,unsigned> memory;
 	std::unordered_map<char*,char*> bracket;
@@ -259,6 +260,7 @@ public:
 		word=NULL;
 		result=NULL;
 		nowKey=NULL;
+		isCheck=true;
 		maxLen=256;
 		floNum=3;
 		defaultSize=128;
@@ -273,6 +275,7 @@ public:
 	}
 	Json(std::initializer_list<std::pair<std::string,InitType>> initList):Json()
 	{
+		isCheck=false;
 		for(auto iter=initList.begin();iter!=initList.end();iter++)
 		{
 			if(iter->second.pval==NULL&&iter->second.type!=EMPTY)
@@ -319,6 +322,7 @@ public:
 				return;
 			}
 		}
+		isCheck=true;
 	}
 	Json(const char* jsonText):Json()
 	{
@@ -399,98 +403,6 @@ public:
 			return addKeyVal(obj,BOOL,key,value);
 		else 
 			return addKeyVal(obj,EMPTY,key,NULL);
-	}
-	template<typename T>
-	bool addKeyVal(std::string& obj,const char* key,T value)
-	{
-		if(std::is_same<T,int>::value)
-			return addKeyVal(obj,INT,key,value);
-		else if(std::is_same<T,double>::value)
-			return addKeyVal(obj,FLOAT,key,value);
-		else if(std::is_same<T,char*>::value)
-			return addKeyVal(obj,OBJ,key,value);
-		else if(std::is_same<T,const char*>::value||std::is_same<T,std::string>::value)
-			return addKeyVal(obj,STRING,key,value);
-		else if(std::is_same<T,bool>::value)
-			return addKeyVal(obj,BOOL,key,value);
-		else 
-			return addKeyVal(obj,EMPTY,key,NULL);
-	}
-	bool addKeyVal(std::string& obj,TypeJson type,const char* key,...)
-	{
-		char buffer[32]={0};
-		if(obj.size()==0)
-			obj="{}";
-		if(key==NULL)
-		{
-			error="key null";
-			return false;
-		}
-		va_list args;
-		va_start(args,key);
-		if(obj[obj.size()-1])
-		{
-			if(obj[obj.size()-2]!='{')
-				obj[obj.size()-1]=',';
-			else
-				obj.erase(obj.end()-1);
-		}
-		obj+='\"';
-		obj+=key;
-		obj+="\":";
-		int valInt=0;
-		char* valStr=NULL;
-		double valFlo=0;
-		bool valBool=false;
-		switch(type)
-		{
-		case INT:
-			valInt=va_arg(args,int);
-			obj+=std::to_string(valInt);
-			break;
-		case FLOAT:
-			valFlo=va_arg(args,double);
-			sprintf(buffer,"%.*lf",floNum,valFlo);
-			obj+=buffer;
-			break;
-		case STRING:
-			valStr=va_arg(args,char*);
-			if(valStr==NULL)
-			{
-				error="null input";
-				return false;
-			}
-			obj+='\"';
-			obj+=valStr;
-			obj+='\"';
-			break;
-		case EMPTY:
-			obj+="null";
-			break;
-		case BOOL:
-			valBool=va_arg(args,int);
-			if(valBool==true)
-				obj+="true";
-			else
-				obj+="false";
-			break;
-		case OBJ:
-		case ARRAY:
-			valStr=va_arg(args,char*);
-			if(valStr==NULL)
-			{
-				error="null input";
-				return false;
-			}
-			obj+=valStr;
-			break;
-		default:
-			error="can not insert this type";
-			obj+="}";
-			return false;
-		}
-		obj+="}";
-		return true;
 	}
 	bool addKeyVal(char*& obj,TypeJson type,const char* key,...)
 	{
@@ -574,7 +486,15 @@ public:
 				error="null input";
 				return false;
 			}
-			sprintf(obj,"%s%s",obj,valStr);
+			if(isCheck)
+			{
+				if(memory.find(valStr)!=memory.end())
+					sprintf(obj,"%s%s",obj,valStr);
+				else
+					sprintf(obj,"%s\"%s\"",obj,valStr);
+			}
+			else
+				sprintf(obj,"%s%s",obj,valStr);
 			break;
 		default:
 			error="can not insert this type";
@@ -608,8 +528,10 @@ public:
 			result=createArray(FLOAT,arr.size(),&arr[0]);
 		else if(std::is_same<T,std::string>::value)
 			result=createArray(STRUCT,arr.size(),&arr);
-		else if(std::is_same<T,const char*>::value)
+		else if(std::is_same<T,char*>::value)
 			result=createArray(OBJ,arr.size(),&arr[0]);
+		else if(std::is_same<T,const char*>::value)
+			result=createArray(STRING,arr.size(),&arr[0]);
 		else if(std::is_same<T,bool>::value)
 			result=createArray(BOOL,arr.size(),&arr[0]);
 		else
@@ -668,7 +590,7 @@ public:
 		case STRUCT:
 			for(i=0;i<arrLen;i++)
 			{
-				while(memory[now]-strlen(now)<strlen(arrStr[i])+5)
+				while(memory[now]-strlen(now)<pvect[i].size()+5)
 					now=enlargeMemory(now);
 				sprintf(now,"%s\"%s\",",now,pvect[i].c_str());
 			}
@@ -679,7 +601,15 @@ public:
 			{
 				while(memory[now]-strlen(now)<strlen(arrStr[i])+4)
 					now=enlargeMemory(now);
-				sprintf(now,"%s%s,",now,arrStr[i]);
+				if(isCheck)
+				{
+					if(memory.find(arrStr[i])!=memory.end())
+						sprintf(now,"%s%s,",now,arrStr[i]);
+					else
+						sprintf(now,"%s\"%s\",",now,arrStr[i]);
+				}
+				else
+					sprintf(now,"%s%s,",now,arrStr[i]);
 			}
 			break;
 		case BOOL:
@@ -721,6 +651,13 @@ public:
 	Json& operator=(T value)
 	{
 		this->addKeyVal(this->result,nowKey,value);
+		return *this;
+	}
+	template<typename T>
+	Json& operator=(std::vector<T> value)
+	{
+		char* arr=this->createArray(value);
+		this->addKeyVal(this->result,nowKey,arr);
 		return *this;
 	}
 	inline Object* getRootObj()
@@ -3644,6 +3581,7 @@ public:
 			signal(SIGCHLD,sigCliDeal);
 #endif
 	}
+	HttpServer(const HttpServer& server)=delete;
 	~HttpServer()
 	{
 		if(arrRoute!=NULL)

@@ -4,6 +4,11 @@
 char* passwd=NULL;
 #include "./route.h"
 using namespace cppweb;
+/***********************************************
+* Author: chenxuan-1607772321@qq.com
+* change time:2022-03-26 15:03:52
+* description:read password,that's all
+***********************************************/
 void readPasswd()
 {
 	passwd=(char*)malloc(sizeof(char)*128);
@@ -24,6 +29,7 @@ void readPasswd()
 int main()
 {
 	readPasswd();
+	/* ProcessCtrl::backGround(); */
 	auto flag=chdir("./template");
 	if(flag!=0)
 	{
@@ -32,6 +38,7 @@ int main()
 	}
 	HttpServer server(5200,true);//input the port bound
 	server.setMiddleware(middleware);
+	server.setLog(LogSystem::recordRequest,LogSystem::recordRequest);
 	server.post("/message*",nowPwdFile);
 	server.post("/upload*",upload);
 	server.post("/mkdir*",mkdirNow);

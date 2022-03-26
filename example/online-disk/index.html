@@ -123,6 +123,28 @@
 		padding:10px;
 		font-size:15px;
 	}
+
+	#contact button[id="update"] {
+		cursor:pointer;
+		width:100%;
+		border:none;
+		background:#FAAC58;
+		color:#000;
+		margin:0 0 5px;
+		padding:10px;
+		font-size:15px;
+	}
+	#contact button[id="back"] {
+		cursor:pointer;
+		width:100%;
+		border:none;
+		background:#00FF80;
+		color:#000;
+		margin:0 0 5px;
+		padding:10px;
+		font-size:15px;
+	}
+
 	#contact input[type="file"] {
 		cursor:pointer;
 		width:100%;
@@ -179,6 +201,8 @@
 		  	<input type="text" id="mkdir">
 		  	<button type="button" id="submit" onclick="mkdir();">mkdir</button>
 		  	<button type="button" id="delete" onclick="remove();">delete</button>
+		  	<button type="button" id="update" onclick="update();">update</button>
+		  	<button type="button" id="back" onclick="back();">back</button>
 			<form action="/upload" method="post" enctype="multipart/form-data" id="sen">
 				 	<h4>点击按钮选择文件</h4><input type="file" class="file1" name="file1" />
 				 <button type="submit" class="but1">upload</button>
@@ -189,6 +213,8 @@
   <script>
   	var url=window.location.pathname;
   	var allUrl=window.location.href;
+  	if(url.search("login")!=-1)
+  		window.location.replace("/");
   	var sen=document.getElementById("sen");
   	sen.action+=url;
   	sen.action+="/";
@@ -224,6 +250,8 @@
 		}).then(function (response) {
 			var status=JSON.parse(JSON.stringify(response.data))['status'];
 			alert(status);
+			location.reload();
+			sen.value="";
 		});
   	}
   	function remove()
@@ -235,7 +263,17 @@
 		}).then(function (response) {
 			var status=JSON.parse(JSON.stringify(response.data))['status'];
 			alert(status);
+			location.reload();
+			sen.value="";
 		});
+  	}
+  	function update()
+  	{
+  		location.reload();
+  	}
+   	function back()
+  	{
+  		window.history.back(-1);
   	}
   </script>
 </html>

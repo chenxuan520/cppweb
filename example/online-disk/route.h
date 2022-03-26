@@ -48,23 +48,18 @@ void nowPwdFile(HttpServer& server,DealHttp& http,int)
 	{
 		Json json={{"status","ok"}};
 		dir=opendir(req.askPath.c_str());
-		vector<char*> file;
+		vector<string> file;
 		while((ptr=readdir(dir))!=NULL)
 		{
 			//jump if file begin with '.'
 			if(ptr->d_name[0] == '.')
 				continue;
-			char* temp=(char*)malloc(sizeof(char)*256);
-			file.push_back(temp);
-			strcpy(temp,ptr->d_name);
-			cout << ptr->d_name << endl;
+			file.push_back(ptr->d_name);
 		}
 		char* arr=NULL;
-		if(file.size()>0)
-			arr=json.createArray(Json::STRING,file.size(),&file[0]);
+		arr=json.createArray(file);
 		json.addKeyVal(json(),"list",arr);
-		for(auto& ptr:file)
-			free(ptr);
+		printf("json:%s\n",json());
 		http.gram.typeFile=DealHttp::JSON;
 		http.gram.body=json();
 	}
@@ -96,9 +91,7 @@ void sendHtml(HttpServer& server,DealHttp& http,int)
 	if(now<0)
 	{
 		FileGet file;
-		int len=file.getFileLen("./index.html");
-		http.gram.body=string(file.getFileBuff("./index.html"),len);
-		http.gram.fileLen=len;
+		http.gram.body=file.getFileBuff("../index.html");
 		http.gram.typeFile=DealHttp::HTML;
 		return;
 	}
@@ -114,8 +107,8 @@ void sendHtml(HttpServer& server,DealHttp& http,int)
 	else
 	{
 		FileGet file;
-		int len=file.getFileLen("./index.html");
-		http.gram.body=string(file.getFileBuff("./index.html"),len);
+		int len=file.getFileLen("../index.html");
+		http.gram.body=string(file.getFileBuff("../index.html"),len);
 		http.gram.fileLen=len;
 		http.gram.typeFile=DealHttp::HTML;
 		return;
@@ -160,8 +153,10 @@ void upload(HttpServer& server,DealHttp& http,int soc)
 	req.askPath+=name;
 	cout<<"file:"<<req.askPath<<endl;
     FileGet::writeToFile(req.askPath.c_str(),(char*)temp,flen);
-	http.gram.typeFile=DealHttp::JSON;
-	http.gram.body="{\"status\":\"ok\"}";
+	http.gram.typeFile=DealHttp::HTML;
+	FileGet file;
+	http.gram.body=file.getFileBuff("../jump.html");
+	http.gram.typeFile=DealHttp::HTML;
 	free(temp);
 }
 /***********************************************
@@ -198,21 +193,24 @@ void mkdirNow(HttpServer& server,DealHttp& http,int)
 		flag=remove(req.askPath.c_str());
 	else
 	{
-		Json json={{"status",errno}};
+		Json json={{"status",(const char*)strerror(errno)}};
 		http.gram.typeFile=DealHttp::JSON;
 		http.gram.body=json();
 		return;
 	}
 	if(flag==0)
 	{
+		Json json={{"status","ok"}};
+		http.gram.statusCode=DealHttp::STATUSOK;
 		http.gram.typeFile=DealHttp::JSON;
-		http.gram.body="{\"status\":\"ok\"}";
+		http.gram.body=json();
 		return;
 	}
 	else
 	{
+		Json json={{"status",(const char*)strerror(errno)}};
 		http.gram.typeFile=DealHttp::JSON;
-		http.gram.body="{\"status\":\"wrong\"}";
+		http.gram.body=json();
 		return;
 	}
 }
@@ -236,10 +234,13 @@ void loginIn(HttpServer& server,DealHttp& http,int)
 	}
 	else
 	{
-		Json json={{"status","ok"}};
-		http.gram.cookie["disk"]=http.designCookie(passwd,120);
-		http.gram.body=json();
 		http.gram.statusCode=DealHttp::STATUSOK;
+		http.gram.typeFile=DealHttp::HTML;
+		http.gram.cookie["disk"]=http.designCookie(passwd,120);
+		FileGet file;
+		http.gram.body=file.getFileBuff("../index.html");
+		if(http.gram.body.size()==0)
+			printf("index wrong\n");
 		return;
 	}
 }
@@ -257,7 +258,7 @@ void middleware(HttpServer& server,DealHttp& http,int soc)
 	else if(NULL==http.getCookie(server.recText(),"disk",value,128)||strcmp(value,passwd)!=0)
 	{
 		int len=0;
-		http.createSendMsg(DealHttp::HTML,(char*)server.getSenBuffer(),server.getMaxSenLen(),"./login.html",&len);
+		http.createSendMsg(DealHttp::HTML,(char*)server.getSenBuffer(),server.getMaxSenLen(),"../login.html",&len);
 		server.httpSend(soc,server.getSenBuffer(),len);
 		return;
 	}
