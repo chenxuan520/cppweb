@@ -18,6 +18,7 @@
 #include<sys/types.h>
 #include<unistd.h>
 #include<netdb.h>
+
 #else
 #include<winsock2.h>
 #endif
@@ -32,6 +33,7 @@
 #include<vector>
 #include<stack>
 #include<string>
+#include<regex>
 #include<functional>
 #include<type_traits>
 #include<unordered_map>
@@ -1331,6 +1333,10 @@ public:
 	enum Thing{
 		CPPOUT=0,CPPIN=1,CPPSAY=2,
 	};
+private:
+	enum Mode{
+		MODESEL,MODEEPO,MODEP2P
+	};
 protected:
 	int sizeAddr;//sizeof(sockaddr_in) connect with addr_in;
 	int backwait;//the most waiting clients ;
@@ -1345,6 +1351,7 @@ protected:
 	sockaddr_in addr;//IPv4 of host;
 	sockaddr_in client;//IPv4 of client;
 	fd_set  fdClients;//file descriptor
+	Mode runMode;
 #ifndef _WIN32
 	epoll_event nowEvent;//a temp event to get event
 	epoll_event* pevent;//all the event
@@ -1436,6 +1443,7 @@ public:
 		else
 			memset(hostname,0,sizeof(char)*300);
 		FD_ZERO(&fdClients);//clean fdClients;
+		runMode=MODEP2P;
 #ifndef _WIN32
 		epfd=epoll_create(epollNum);
 		if((pevent=(epoll_event*)malloc(512*sizeof(epoll_event)))==NULL)
@@ -1648,12 +1656,29 @@ public:
 		return closeSSL(socCli);
 #endif
 	}
+	int cleanSocket(int socCli)
+	{
+		if(runMode==MODEEPO)
+		{
+#ifndef _WIN32
+			epoll_ctl(epfd,socCli,EPOLL_CTL_DEL,NULL);
+#endif
+		}
+		else if(runMode==MODESEL)
+		{
+			FD_CLR(socCli,&fdClients);
+		}
+		else
+			return closeSocket(socCli);
+		return closeSocket(socCli);
+	}
 	inline const char* lastError()
 	{
 		return this->error;
 	}
 	void selectModel(int (*pfunc)(Thing,int,ServerTcpIp&,void*),void* argv)
 	{
+		runMode=MODESEL;
 		fd_set temp=fdClients;
 #ifndef _WIN32
 		int sign=select(fd_count+1,&temp,NULL,NULL,NULL);
@@ -1760,6 +1785,7 @@ public:
 	{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
 		fd_set temp=fdClients;
 		Thing pthing=CPPOUT;
+		runMode=MODESEL;
 		int sign=select(fd_count+1,&temp,NULL,NULL,NULL);
 		if(sign>0)
 		{
@@ -1855,6 +1881,7 @@ public:
 	void epollModel(int (*pfunc)(Thing,int,ServerTcpIp&,void*),void* argv)
 	{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
 #ifndef _WIN32
+		runMode=MODEEPO;
 		int eventNum=epoll_wait(epfd,pevent,512,-1),numGet=0;
 		for(int i=0;i<eventNum;i++)
 		{
@@ -1897,6 +1924,7 @@ public:
 	bool epollModel(void* pget,int len,void* pneed,int (*pfunc)(Thing,int ,int ,void* ,void*,ServerTcpIp& ))
 	{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
 		Thing thing=CPPSAY;
+		runMode=MODEEPO;
 		int eventNum=epoll_wait(epfd,pevent,512,-1);
 		for(int i=0;i<eventNum;i++)
 		{
@@ -3506,6 +3534,32 @@ public://main class for http server2.0
 		char pathExtra[128];
 		void (*pfunc)(HttpServer&,DealHttp&,int);
 	};
+	struct Group{
+		std::string group;
+		HttpServer& server;
+		Group(HttpServer& ser,const char* gropa):group(gropa),server(ser){};
+		Group(const Group& old):group(old.group),server(old.server){}
+		inline bool get(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
+		{
+			std::string group=this->group+route;
+			return server.get(group.c_str(),pfunc);
+		}
+		inline bool post(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
+		{
+			std::string group=this->group+route;
+			return server.post(group.c_str(),pfunc);
+		}
+		inline bool all(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
+		{
+			std::string group=this->group+route;
+			return server.all(group.c_str(),pfunc);
+		}
+		inline bool routeHandle(AskType ask,const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
+		{
+			std::string group=this->group+route;
+			return server.routeHandle(ask,group.c_str(),pfunc);
+		}
+	};
 private:
 	RouteFuntion* arrRoute;
 	RouteFuntion* pnowRoute;
@@ -3734,6 +3788,11 @@ public:
 		}
 		return true;
 	}
+	inline Group createGroup(const char* route)
+	{
+		Group temp(*this,route);
+		return temp;
+	}
 	inline bool get(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
 	{//add routeHandle and ask type is get
 		return routeHandle(GET,route,pfunc);
@@ -3891,8 +3950,8 @@ public:
 		return error;
 	}
 	inline void disconnect(int soc)
-	{
-		this->closeSocket(soc);
+	{//active dicconnect socket
+		this->cleanSocket(soc);
 	}
 	inline void selfCreate(unsigned senLen)
 	{//use getSenBuff to create task by self
@@ -4788,6 +4847,24 @@ public:
 			fputc(buffer[i],fp);
 		fclose(fp);
 		return true;
+	}
+	static std::string renderHtml(const char* fileName,\
+								  std::unordered_map<std::string,std::string> hashMap,\
+								  std::pair<std::string,std::string> range={"\\{\\{","\\}\\}"})
+	{
+		FileGet file;
+		const char* temp=file.getFileBuff(fileName);
+		if(temp==NULL)
+			return "";
+		std::string result(temp),regStr;
+		for(auto& now:hashMap)
+		{
+			regStr.clear();
+			regStr=range.first+" *\\."+now.first+" *"+range.second;
+			std::regex reg(regStr);
+			result=std::regex_replace(result,reg,now.second);
+		}
+		return result;
 	}
 };
 }

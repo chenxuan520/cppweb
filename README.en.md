@@ -12,7 +12,7 @@ When I was building a C++ server, I found that the boost library was too large a
 
 ## Official website
 
-http://chenxuanweb.top/cppweb
+[http://chenxuanweb.top/cppweb](http://chenxuanweb.top/cppweb)
 
 ## Framework Features
 
@@ -54,27 +54,29 @@ http://chenxuanweb.top/cppweb
 
 3. Support cookie generation and reading
 
-4. Contains a [json parsing and formatting library](https://gitee.com/chenxuan520/cppjson)  (also written by the author)
+4. Contains a [json parsing and formatting library] (https://gitee.com/chenxuan520/cppjson) (also written by the author)
 
 5. Contains the email class, which can be called to send emails
 
-6. Support for managing requests through routing
+6. Support HTML rendering
+
+7. Support for managing requests through routing and routing groups
    
    > Support lam expressions
 
-7. Support log generation and implementation, the log system is about 300,000 per second
+8. Support log generation and implementation, the log system is about 300,000 per second
 
-8. With io multiplexing, multi-process, thread pool three modes
+9. With io multiplexing, multi-process, thread pool three modes
    
    > io multiplexing supports epoll (epoll only supports linux) and select models
 
-9. Contains thread pools and thread pool servers
+10. Contains thread pools and thread pool servers
 
-10. Support https connection
+11. Support https connection
     
     > Including server and client
 
-11. Comes with a server written by the framework
+12. Comes with a server written by the framework
     
     1. Support route 301 forwarding
     
@@ -97,7 +99,7 @@ http://chenxuanweb.top/cppweb
 
 ## Build the server
 
-- Under linux, ./install.sh is the installation script, you can install it by running.
+- Under linux, ./install.sh is the installation script, you can install it by running
 - [doc introduction](./doc/serverbuild.md)
 
 ## Framework introduction
@@ -156,7 +158,32 @@ int main()
 
 - Supports lam expressions and normal functions
 
-- *Extensions to support routing
+- *Extensions* to support routing
+
+#### html rendering
+
+```cpp
+void func(HttpServer&,DealHttp&http,int)
+{
+    unordered_map<string,string> hash;
+    hash["name"]="chenxuan";
+    hash["lover"]="xiaozhu";
+    http.gram.body=FileGet::renderHtml("./test.html",hash);
+    http.gram.typeFile=DealHttp::HTML;
+}
+int main()
+{
+    HttpServer server(5200, true);
+    auto group=server.createGroup("/temp");
+    group.get("/",func);
+    server.run();
+    return 0;
+}
+```
+
+- Generate html by regular search and replace
+
+- The default format is {{.name}}, and the left and right borders can be customized
 
 #### Middleware settings
 
@@ -247,8 +274,7 @@ void cookie(HttpServer& server, DealHttp& http, int)
 int main()
 {
     HttpServer server(5200, true);
-    server.get("/cookie",cookie);
-    server.run("index.html");
+    server.get("/cookie",cotml");
     return 0;
 }
 ```
