@@ -58,23 +58,25 @@
 
 5. 包含email类,可以调用发送邮件
 
-6. 支持通过路由管理请求
+6. 支持html渲染
+
+7. 支持通过路由和路由组管理请求
    
    > 支持lam表达式
 
-7. 支持日志生成和实现,日志系统约为30万条每秒
+8. 支持日志生成和实现,日志系统约为30万条每秒
 
-8. 具有io复用,多进程,线程池三种模式
+9. 具有io复用,多进程,线程池三种模式
    
    > io复用支持epoll(epoll只支持linux)和select模型
 
-9. 包含线程池和线程池服务器
+10. 包含线程池和线程池服务器
 
-10. 支持https连接
+11. 支持https连接
     
     > 包括服务端和客户端
 
-11. 自带由框架编写的服务器
+12. 自带由框架编写的服务器
     
     1. 支持路由301转发
     
@@ -156,7 +158,32 @@ int main()
 
 - 支持lam表达式和普通函数
 
-- 支持路由的*扩展
+- 支持路由的*扩展*
+
+#### html渲染
+
+```cpp
+void func(HttpServer&,DealHttp& http,int)
+{
+    unordered_map<string,string> hash;
+    hash["name"]="chenxuan";
+    hash["lover"]="xiaozhu";
+    http.gram.body=FileGet::renderHtml("./test.html",hash);
+    http.gram.typeFile=DealHttp::HTML;
+}
+int main()
+{
+    HttpServer server(5200,true);
+    auto group=server.createGroup("/temp");
+    group.get("/",func);
+    server.run();
+    return 0;
+}
+```
+
+- 通过正则查找替换生成html
+
+- 默认格式为{{.name}},可自定义左右边界
 
 #### 中间件设置
 
