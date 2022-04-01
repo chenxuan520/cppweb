@@ -228,6 +228,12 @@ static void _dealSignalKill(int)
 #endif
 	exit(0);
 }
+// description:restart the server
+bool _restart=false;
+static void _dealSignalRestart(int)
+{
+	_restart=true;
+}
 /***********************************************
 * Author: chenxuan-1607772321@qq.com
 * change time:2022-03-19 11:56:49

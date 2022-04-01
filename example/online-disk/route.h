@@ -252,10 +252,11 @@ void loginIn(HttpServer& server,DealHttp& http,int)
 void middleware(HttpServer& server,DealHttp& http,int soc)
 {
 	char value[128]={0},path[128]={0};
+	string getpwd=http.getCookie(server.recText(),"disk");
 	sscanf((char*)server.recText(),"%s%s",value,path);
 	if(strcmp(value,"POST")==0&&strstr(path,"login")!=NULL)
 		server.continueNext(soc);
-	else if(NULL==http.getCookie(server.recText(),"disk",value,128)||strcmp(value,passwd)!=0)
+	else if(getpwd!=passwd)
 	{
 		int len=0;
 		http.createSendMsg(DealHttp::HTML,(char*)server.getSenBuffer(),server.getMaxSenLen(),"../login.html",&len);

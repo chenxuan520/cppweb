@@ -214,7 +214,9 @@ void dealArgc(int argc,char** argv)
 		if(fp==NULL)
 			return;
 		int pid=0;
-		fscanf(fp,"%d",&pid);
+		auto flag=fscanf(fp,"%d",&pid);
+		if(flag<=0)
+			return;
 		printf("dealing %d process\n",pid);
 		if(pid<=66)
 			exit(0);
