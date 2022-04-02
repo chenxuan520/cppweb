@@ -218,6 +218,108 @@ void proxy(HttpServer& server,DealHttp& http,int soc)
 	else
 		http.gram.statusCode=DealHttp::STATUSNOFOUND;
 }
+class Proxy
+{
+public:
+	static void proxyTemp(HttpServer &server, DealHttp &http, int soc)
+	{
+		DealHttp::Request req;
+		http.analysisRequest(req, server.recText());
+		char top[128] = {0}, end[128] = {0}, ip[32] = {0};
+		DealHttp::dealUrl(req.askPath.c_str(), top, end, 128, 128);
+		req.askPath = end;
+		http.createAskRequest(req, server.getSenBuffer(), server.getMaxSenLen());
+		ClientTcpIp::getDnsIp(top, ip, 32);
+		printf("ip=%s\n%s\n", ip, server.getSenBuffer());
+		char *sen = (char *)server.getSenBuffer();
+		ClientTcpIp client(ip, 80);
+		if (client.tryConnect() == false)
+		{
+			http.gram.statusCode = DealHttp::STATUSNOFOUND;
+			return;
+		}
+		if (client.sendHost(sen, strlen(sen)) <= 0)
+		{
+			http.gram.statusCode = DealHttp::STATUSNOFOUND;
+			return;
+		}
+		int len = 0;
+		std::string rec;
+		if ((len = client.receiveHost(rec)) <= 0)
+		{
+			http.gram.statusCode = DealHttp::STATUSNOFOUND;
+			return;
+		}
+		if (server.getMaxSenLen() < rec.size())
+		{
+			server.enlagerSenBuffer();
+		}
+		memcpy(server.getSenBuffer(), rec.c_str(), rec.size());
+		server.selfCreate(rec.size());
+	}
+	static void *sendCli(void *arg)
+	{
+		printf("sendCli\n");
+		std::pair<int, int> &_arg = *(std::pair<int, int> *)arg;
+		int soc = _arg.first;
+		char *buffer = (char *)malloc(sizeof(char) * 1024 * 512);
+		if (buffer == NULL)
+		{
+			printf("malloc error\n");
+			return NULL;
+		}
+		int len = 0;
+		while (true)
+		{
+			memset(buffer, 0, 1024 * 512);
+			len = recv(_arg.second, buffer, sizeof(char) * 1024 * 512, 0);
+			if (len <= 0)
+				break;
+			if (send(soc, buffer, len, 0) <= 0)
+				break;
+		}
+		printf("sendCli end\n");
+		free(buffer);
+		return NULL;
+	}
+	static void https(HttpServer &server, DealHttp &http, int soc)
+	{
+		DealHttp::Request req;
+		int port = 0;
+		http.analysisRequest(req, server.recText());
+		char buffer[2048] = {0}, ip[32] = {0};
+		sscanf(req.askPath.c_str(), "%[^:]:%d", buffer, &port);
+		printf("httpsurl:%s\n", buffer);
+		ClientTcpIp::getDnsIp(buffer, ip, 32);
+		printf("get ip:%s %d\n", ip, port);
+		ClientTcpIp client(ip, port);
+		if (false == client.tryConnect())
+		{
+			http.gram.statusCode = DealHttp::STATUSNOFOUND;
+			printf("connect error\n");
+			return;
+		}
+		auto len = sprintf((char *)buffer, "HTTP/1.1 200 Connection Established\r\n"
+										   "Connection:close\r\n\r\n");
+		server.httpSend(soc, buffer, len);
+		printf("send:%s\n", buffer);
+		std::pair<int, int> now = {soc, client.getSocket()};
+		ThreadPool::createDetachPthread(&now, sendCli);
+		char *temp = (char *)server.getSenBuffer();
+		int maxLen = server.getMaxSenLen();
+		while (true)
+		{
+			len = server.httpRecv(soc, temp, maxLen);
+			if (len <= 0)
+				break;
+			len = client.sendHost(temp, len);
+			if (len <= 0)
+				break;
+		}
+		printf("end\n");
+		server.selfCreate(-1);
+	}
+};
 // description:deal kill signal
 static void _dealSignalKill(int)
 {
@@ -277,6 +379,8 @@ public:
 		HttpServer server(_config.port,_config.isDebug,model);
 		pserver=&server;
 		configServer(server);
+		// server.all("http://*",Proxy::proxyTemp);
+		// server.routeHandle(HttpServer::CONNECT,"*",Proxy::https);
 		if(pfunc!=NULL)
 			pfunc(server);
 		if(_config.defaultFile.size()>0)

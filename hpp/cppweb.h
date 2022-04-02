@@ -1281,6 +1281,8 @@ public:
 	}
 	T* search(const char* word,std::function<bool(const T*,bool isLast)> func) {
 		Node* temp=root;
+		if(temp->stop&&func(temp->data,false))
+			return temp->data;
 		for(unsigned i=0;word[i]!=0;i++)
 		{
 			if(word[i]-46<0||word[i]-46>76)
@@ -2052,6 +2054,10 @@ public:
 		if(connect(sock,(sockaddr*)&addrC,sizeof(sockaddr))==-1)
 			return false;
 		return true;
+	}
+	int getSocket()
+	{
+		return sock;
 	}
 	inline int receiveHost(void* prec,int len,int flag=0)
 	{
@@ -4299,7 +4305,7 @@ private:
 			http.createSendMsg(DealHttp::NOFOUND,(char*)this->senText,senLen,NULL,&len);
 		if(len==0)
 			http.createSendMsg(DealHttp::NOFOUND,(char*)this->senText,senLen,NULL,&len);
-		if(0>=this->sendSocket(num,this->senText,len))
+		if(len>=0&&0>=this->sendSocket(num,this->senText,len))
 		{
 			if(isDebug)
 				perror("send wrong");
