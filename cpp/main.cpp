@@ -46,6 +46,10 @@ void readSetting(LoadConfig& load)
 					if(obj!=NULL)
 						con.isDebug=obj->boolVal;
 					});
+	load.findConfig("forward proxy",[](Json::Object* obj,Config& con){
+					if(obj!=NULL)
+						con.isProxy=obj->boolVal;
+					});
 	load.findConfig("default file",[](Json::Object* obj,Config& con){
 					if(obj!=NULL)
 						con.defaultFile=obj->strVal;

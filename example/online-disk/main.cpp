@@ -1,48 +1,25 @@
 #include <iostream>  
 #include "../../hpp/cppweb.h"
-
-char* passwd=NULL;
+#include "./config.h"
 #include "./route.h"
 using namespace cppweb;
-/***********************************************
-* Author: chenxuan-1607772321@qq.com
-* change time:2022-03-26 15:03:52
-* description:read password,that's all
-***********************************************/
-void readPasswd()
-{
-	passwd=(char*)malloc(sizeof(char)*128);
-	if(passwd==NULL)
-	{
-		printf("init passwd wrong\n");
-		exit(0);
-	}
-	memset(passwd,0,sizeof(char)*128);
-	if(false==FileGet::getFileMsg("passwd.txt",passwd,128))
-	{
-		printf("init passwd wrong\n");
-		exit(0);
-	}
-	if(passwd[strlen(passwd)-1]=='\n')
-		passwd[strlen(passwd)-1]=0;
-}
 int main()
 {
-	readPasswd();
 	/* ProcessCtrl::backGround(); */
-	auto flag=chdir("./template");
-	if(flag!=0)
+	if(false==configServer("./config.json"))
 	{
-		perror("chdir wrong");
+		printf("find config.json wrong\n");
 		return 0;
 	}
-	HttpServer server(5200,true);//input the port bound
+	HttpServer server(_config.port,true);//input the port bound
+	if(_config.isLog)
+		server.setLog(LogSystem::recordRequest,LogSystem::recordRequest);
 	server.setMiddleware(middleware);
-	server.setLog(LogSystem::recordRequest,LogSystem::recordRequest);
 	server.post("/message*",nowPwdFile);
 	server.post("/upload*",upload);
 	server.post("/mkdir*",mkdirNow);
 	server.post("/delete*",mkdirNow);
+	server.post("/move*",moveFile);
 	server.post("/login",loginIn);
 	server.get("/*",sendHtml);
 	server.run();

@@ -377,6 +377,45 @@ public:
 			if(iter->first!=NULL)
 				free(iter->first);
 	}
+	bool analyseText(const char* jsonText)
+	{
+		if(jsonText==NULL||strlen(jsonText)==0)
+		{
+			error="message error";
+			return false;
+		}
+		if(text!=NULL)
+			free(text);
+		text=(char*)malloc(strlen(jsonText)+10);
+		if(text==NULL)
+		{
+			error="malloc wrong";
+			return false;
+		}
+		memset(text,0,strlen(jsonText)+10);
+		strcpy(text,jsonText);
+		deleteComment();
+		deleteSpace();
+		if(false==pairBracket())
+		{
+			error="pair bracket wrong";
+			return false;
+		}
+		if(text[0]!='{')
+		{
+			error="text wrong";
+			return false;
+		}
+		if(obj!=NULL)
+			deleteNode(obj);
+		obj=analyseObj(text,bracket[text]);
+		if(obj==NULL)
+		{
+			error="malloc wrong";
+			return false;
+		}
+		return true;
+	}
 	const char* formatPrint(const Object* exmaple)
 	{
 		char* buffer=(char*)malloc(sizeof(char)*defaultSize*10);
@@ -1281,7 +1320,9 @@ public:
 	}
 	T* search(const char* word,std::function<bool(const T*,bool isLast)> func) {
 		Node* temp=root;
-		if(temp->stop&&func(temp->data,false))
+		if(word==NULL)
+			return NULL;
+		if(temp->stop&&func(temp->data,strlen(word)==0))
 			return temp->data;
 		for(unsigned i=0;word[i]!=0;i++)
 		{
@@ -2055,7 +2096,7 @@ public:
 			return false;
 		return true;
 	}
-	int getSocket()
+	inline int getSocket()
 	{
 		return sock;
 	}
@@ -2199,7 +2240,8 @@ public:
 		STATUSBADREQUEST=400,STATUSFORBIDDEN=403,
 		STATUSNOFOUND=404,STATUSNOIMPLEMENT=501,
 	};
-	struct Datagram{
+	class Datagram{
+	public:
 		Status statusCode;
 		FileKind typeFile;
 		unsigned fileLen;
@@ -2208,6 +2250,48 @@ public:
 		std::string typeName;
 		std::string body;
 		Datagram():statusCode(STATUSOK),typeFile(TXT),fileLen(0){};
+		inline void json(Status staCode,const std::string& data)
+		{
+			typeFile=FileKind::JSON;
+			this->createData(staCode,data);
+		}
+		inline void html(Status staCode,const std::string& data)
+		{
+			typeFile=FileKind::HTML;
+			this->createData(staCode,data);
+		}
+		inline void js(Status staCode,const std::string& data)
+		{
+			typeFile=FileKind::JS;
+			this->createData(staCode,data);
+		}
+		inline void css(Status staCode,const std::string& data)
+		{
+			typeFile=FileKind::CSS;
+			this->createData(staCode,data);
+		}
+		inline void txt(Status staCode,const std::string& data)
+		{
+			typeFile=FileKind::TXT;
+			this->createData(staCode,data);
+		}
+		inline void image(Status staCode,const std::string& data)
+		{
+			typeFile=FileKind::IMAGE;
+			this->createData(staCode,data);
+		}
+		inline void zip(Status staCode,const std::string& data)
+		{
+			typeFile=FileKind::ZIP;
+			this->createData(staCode,data);
+		}
+	private:
+		void createData(Status staCode,const std::string& data)
+		{
+			statusCode=staCode;
+			body=data;
+			fileLen=data.size();
+		}
 	};
 	struct Request{
 		std::string method;
@@ -3632,7 +3716,7 @@ private:
 	unsigned int maxNum;
 	unsigned int now;
 	unsigned int boundPort;
-	unsigned int selfLen;
+	int selfLen;
 	int textLen;
 	bool isDebug;
 	bool isLongCon;
@@ -4016,7 +4100,7 @@ public:
 	{//active dicconnect socket
 		this->cleanSocket(soc);
 	}
-	inline void selfCreate(unsigned senLen)
+	inline void selfCreate(int senLen)
 	{//use getSenBuff to create task by self
 		selfCtrl=true;
 		selfLen=senLen;
@@ -4901,6 +4985,14 @@ public:
 			return NULL;
 		getFileMsg(fileName,pbuffer,sizeof(char)*getFileLen(fileName)+10);
 		return pbuffer;
+	}
+	static std::string getFileString(const char* fileName)
+	{
+		int len=getFileLen(fileName);
+		if(len==-1)
+			return "";
+		FileGet file;
+		return file.getFileBuff(fileName);
 	}
 	static bool writeToFile(const char* fileName,const char* buffer,unsigned int writeLen,bool isCat=false)
 	{
