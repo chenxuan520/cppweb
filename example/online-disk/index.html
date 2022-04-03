@@ -2,6 +2,7 @@
   <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
   <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
   <head>
+  	<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css" crossorigin="anonymous">
     <meta name="generator">
     <title>online disk</title>
 	<style>
@@ -25,7 +26,7 @@
 		font-size: 12px;
 		line-height:30px;
 		color:#777;
-		background:#0CF;
+		background:#F6CECE;
 	}
 
 	.container {
@@ -34,7 +35,6 @@
 		margin:0 auto;
 		position:relative;
 	}
-
 	#contact input[type="text"], #contact input[type="email"], #contact input[type="tel"], #contact input[type="url"], #contact textarea, #contact button[type="submit"], #contact button[type="button"] { font:400 12px/16px Microsoft Yahei,"Open Sans", Helvetica, Arial, sans-serif; }
 
 	#contact {
@@ -43,16 +43,22 @@
 		margin:5px 0;
 	}
 
+	#contact1 {
+		background:#F9F9F9;
+		padding:25px;
+		margin:0px 0;
+	}
+
 	#div {
 		background:#F9F9F9;
-		padding:20px;
-		margin:5px 0;
+		padding:0px;
+		margin:10px 0;
 	}
 
 	#contact h3 {
 		color: #F96;
 		display: block;
-		font-size: 30px;
+		font-size: 20px;
 		font-weight: 400;
 	}
 
@@ -83,12 +89,6 @@
 		-moz-transition:border-color 0.3s ease-in-out;
 		transition:border-color 0.3s ease-in-out;
 		border:1px solid #AAA;
-	}
-
-	#contact textarea {
-		height:100px;
-		max-width:100%;
-	  resize:none;
 	}
 
 	#contact button[type="submit"] {
@@ -144,6 +144,16 @@
 		padding:10px;
 		font-size:15px;
 	}
+	#contact button[id="move"] {
+		cursor:pointer;
+		width:100%;
+		border:none;
+		background:#58FAF4;
+		color:#000;
+		margin:0 0 5px;
+		padding:10px;
+		font-size:15px;
+	}
 
 	#contact input[type="file"] {
 		cursor:pointer;
@@ -158,10 +168,11 @@
 
 	#contact a {
 		outline:0;
-		border:1px solid #999;
-		color:#000;
+		/*border:1px solid #999;*/
+		color:#642EFE;
 		text-align: center;
-		font-size: 1.5em;
+		font-size: 1.6em;
+		line-height:1.3em;
 	}
 
 	#contact button[type="submit"]:hover {
@@ -177,57 +188,74 @@
 		outline:0;
 		border:1px solid #999;
 	}
-	::-webkit-input-placeholder {
-	 color:#888;
-	}
-	:-moz-placeholder {
-	 color:#888;
-	}
-	::-moz-placeholder {
-	 color:#888;
-	}
-	:-ms-input-placeholder {
-	 color:#888;
-	}
 	</style>
   </head>
   <body>
   	<div class="container">
   		<div id="contact">
+  			<h5>welcome to online disk,now your path is</h3>
+  			<ol class="breadcrumb" id="travel">	
+			</ol>
 		  	<div id="div">
-		  		<h3>当前目录文件</h3>
+		  		<h3 class="glyphicon glyphicon-cloud">当前目录文件</h3>
 		  	</div>
-		  	<h4>选择操作文件明或目录名</h4>
+		  	<h4 class="glyphicon glyphicon-log-in"> 选择操作文件名或目录名</h4>
 		  	<input type="text" id="mkdir">
 		  	<button type="button" id="submit" onclick="mkdir();">mkdir</button>
 		  	<button type="button" id="delete" onclick="remove();">delete</button>
 		  	<button type="button" id="update" onclick="update();">update</button>
 		  	<button type="button" id="back" onclick="back();">back</button>
+		  	<button type="button" id="move" onclick="move();">move</button>
 			<form action="/upload" method="post" enctype="multipart/form-data" id="sen">
-				 	<h4>点击按钮选择文件</h4><input type="file" class="file1" name="file1" />
+				 	<h4 class="glyphicon glyphicon-floppy-disk" >点击按钮选择文件</h4><input type="file" class="file1" name="file1" />
 				 <button type="submit" class="but1">upload</button>
 			</form>
   		</div>
 	</div>
   </body>
   <script>
+  	function createTravel()
+  	{
+  		var url=window.location.pathname;
+	  	var travel=document.getElementById("travel");
+        var arr = url.split('/');
+        var str="";
+        for(var i=0;i<arr.length;i++)
+        {
+        	str+=arr[i]+"/";
+			var temp=document.createElement("lo");
+			var path=document.createElement("a");
+			if(i!=0)  	
+	  			path.innerText=arr[i]+"/";
+	  		else
+	  			path.innerText="Home/";
+	  		path.href=str;
+	  		if(path.innerText!="/")
+	  		{
+			  	temp.appendChild(path);
+			  	travel.appendChild(temp);
+	  		}
+        }
+  	}
+  </script>
+  <script>
   	var url=window.location.pathname;
   	var allUrl=window.location.href;
   	if(url.search("login")!=-1)
   		window.location.replace("/");
   	var sen=document.getElementById("sen");
+  	createTravel();
   	sen.action+=url;
   	sen.action+="/";
 	console.log(sen.action);
 	axios.post("/message"+url, {
 	}).then(function (response) {
-	    // console.log(response.data);
 	    var arr=JSON.parse(JSON.stringify(response.data))['list'];
   		var div = document.getElementById("div");
 	    for(var i in arr)
 	    {
   			var linkTmp = document.createElement("a");
-  			linkTmp.innerText=arr[i];
+  			linkTmp.innerText=" "+arr[i];
   			linkTmp.href =allUrl;
   			var len=linkTmp.href.length;
   			if(linkTmp.href[len-1]=='/')
@@ -235,6 +263,10 @@
   			else
   				linkTmp.href+="/"+arr[i];
 	    	console.log(arr[i]);
+  			if(arr[i].indexOf(".")==-1)
+  				linkTmp.className=" glyphicon glyphicon-folder-open";
+  			else
+  				linkTmp.className="glyphicon glyphicon-file";
 	    	div.appendChild(linkTmp);
 	    	div.appendChild(document.createElement("br"));
 	    }
@@ -256,7 +288,7 @@
   	}
   	function remove()
   	{
-  		 var sen=document.getElementById("mkdir");
+  		var sen=document.getElementById("mkdir");
   		var url=window.location.pathname+"/"+sen.value;
   		console.log(url);
 	  	axios.post("/delete"+url, {
@@ -266,6 +298,23 @@
 			location.reload();
 			sen.value="";
 		});
+  	}
+  	function move()
+  	{
+   		var sen=document.getElementById("mkdir");
+  		var url=window.location.pathname+"/"+sen.value;
+  		var person=prompt("please input the way you move",window.location.pathname+"/");
+  		if(person!=null&&person!="")
+  		{
+	  	  	axios.post("/move"+url, {
+	  	  		"newpath":person
+			}).then(function (response) {
+				var status=JSON.parse(JSON.stringify(response.data))['status'];
+				alert(status);
+				location.reload();
+				sen.value="";
+			});
+  		}
   	}
   	function update()
   	{

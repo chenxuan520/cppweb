@@ -5,132 +5,8 @@
 * description:this file is for server config,do not change it
 ***********************************************/
 #include "./cppweb.h"
+#include "./proxy.h"
 using namespace cppweb;
-/***********************************************
-* Author: chenxuan-1607772321@qq.com
-* change time:2022-03-17 19:20:18
-* description:class for Reverse proxy
-* example:{ LoadBalance load(RANDOM)
-* load.addServer("127.0.0.1:5200")
-* char* getIp=load.getServer();
-* }
-***********************************************/
-class LoadBalance{
-public:
-	enum Model{
-		POLLING,//one by one 
-		POLLRAN,//polling by random
-		RANDOM,//random find
-		HASH,//use hash
-		TEMPNO//a temp model do not use it
-	};
-private:
-	Model model;
-	std::vector<std::string> ipAddr;
-	std::vector<int> ipWeight;
-	unsigned int pollingNum;
-	unsigned int widghtAll;
-public:
-	LoadBalance(Model choice)
-	{
-		this->model=choice;
-		pollingNum=0;
-		widghtAll=0;
-		char* ptemp=(char*)malloc(0);
-		srand((unsigned int)((long long int)ptemp));
-		free(ptemp);
-	}
-	bool addModel(Model choice)
-	{
-		if(model!=TEMPNO)
-			return false;
-		model=choice;
-		return true;
-	}
-	void addServer(const char* ip,int weight)
-	{
-		switch(model)
-		{
-			case HASH:
-			case POLLING:
-			case POLLRAN:
-				for(int i=0;i<weight;i++)
-					ipAddr.push_back(ip);
-				break;
-			case RANDOM:
-				ipWeight.push_back(weight);
-				ipAddr.push_back(ip);
-				widghtAll+=weight;
-				break;
-			default:
-				break;
-		}
-	}
-	const char* getServer()
-	{
-		const char* temp=NULL;
-		int num=0;
-		if(ipAddr.size()==0)
-			return NULL;
-		switch(model)
-		{
-			case POLLING:
-				if(pollingNum>=ipAddr.size())
-					pollingNum=0;
-				temp=ipAddr[pollingNum++].c_str();
-				break;
-			case POLLRAN:
-				temp=ipAddr[rand()%ipAddr.size()].c_str();
-				break;
-			case RANDOM:
-				num=rand()%widghtAll;
-				for(unsigned int i=0;i<ipAddr.size();i++)
-					if(ipWeight[i]>num)
-					{
-						temp=ipAddr[i].c_str();
-						break;
-					}
-					else
-						num-=ipWeight[i];
-				break;
-			case HASH:
-			case TEMPNO:
-				break;
-		}
-		return temp;
-	}
-	bool deleteServer(const char* ip)
-	{
-		bool flag=false;
-		std::vector<std::string>::iterator temp=ipAddr.begin();
-		for(;temp<ipAddr.end();temp++)
-			if(strcmp(ip,temp->c_str())==0)
-			{
-				if(model==RANDOM)
-				{
-					widghtAll-=ipWeight[temp-ipAddr.begin()];
-					std::vector<int>::iterator ptemp=ipWeight.begin();
-					ptemp+=temp-ipAddr.begin();
-					ipWeight.erase(ptemp);
-				}
-				ipAddr.erase(temp);
-				temp--;
-				flag=true;
-			}
-		return flag;
-	}
-	const char* getHashServer(const char* clientIp)
-	{
-		unsigned int one=0,two=0,three=0,four=0;
-		if(0>=sscanf(clientIp,"%d.%d.%d.%d",&one,&two,&three,&four))
-			return NULL;
-		return ipAddr[(one+two+three+four)%ipAddr.size()].c_str();
-	}
-	inline Model getNowModel()
-	{
-		return model;
-	}
-}loadBanlance(LoadBalance::TEMPNO);
 /***********************************************
 * Author: chenxuan-1607772321@qq.com
 * change time:2022-03-17 19:29:17
@@ -148,6 +24,7 @@ struct Config{
 	bool isLog;
 	bool isAuto;
 	bool isDebug;
+	bool isProxy;
 	int port;
 	int defaultMemory;
 	int threadNum;
@@ -161,7 +38,7 @@ struct Config{
 	std::vector<std::pair<std::string,std::string>> replacePath;
 	std::vector<std::pair<std::string,std::string>> redirectPath;
 	std::unordered_map<std::string,Proxy> proxyMap;
-	Config():isLongConnect(true),isBack(false),isGuard(false),isLog(false),isAuto(true),isDebug(true),port(5200),defaultMemory(1),threadNum(0){};
+	Config():isLongConnect(true),isBack(false),isGuard(false),isLog(false),isAuto(true),isDebug(true),isProxy(false),port(5200),defaultMemory(1),threadNum(0){};
 }_config;
 /***********************************************
 * Author: chenxuan-1607772321@qq.com
@@ -227,6 +104,12 @@ static void _dealSignalKill(int)
 		kill(ProcessCtrl::childPid,2);
 #endif
 	exit(0);
+}
+// description:restart the server
+bool _restart=false;
+static void _dealSignalRestart(int)
+{
+	_restart=true;
 }
 /***********************************************
 * Author: chenxuan-1607772321@qq.com
@@ -297,6 +180,11 @@ private:
 	void configServer(HttpServer& server)
 	{
 		server.changeSetting(_config.isDebug,_config.isLongConnect,_config.isAuto,_config.defaultMemory);
+		if(_config.isProxy&&_config.model=="THREAD")
+		{
+			server.all("http://*",ForwardProxy::httpProxy);
+			server.routeHandle(HttpServer::CONNECT,"*",ForwardProxy::httpsProxy);
+		}
 		if(_config.model=="THREAD"&&_config.threadNum!=0)
 			server.changeModel(HttpServer::THREAD,_config.threadNum);
 		for(auto& now:_config.deletePath)

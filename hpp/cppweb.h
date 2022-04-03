@@ -377,6 +377,45 @@ public:
 			if(iter->first!=NULL)
 				free(iter->first);
 	}
+	bool analyseText(const char* jsonText)
+	{
+		if(jsonText==NULL||strlen(jsonText)==0)
+		{
+			error="message error";
+			return false;
+		}
+		if(text!=NULL)
+			free(text);
+		text=(char*)malloc(strlen(jsonText)+10);
+		if(text==NULL)
+		{
+			error="malloc wrong";
+			return false;
+		}
+		memset(text,0,strlen(jsonText)+10);
+		strcpy(text,jsonText);
+		deleteComment();
+		deleteSpace();
+		if(false==pairBracket())
+		{
+			error="pair bracket wrong";
+			return false;
+		}
+		if(text[0]!='{')
+		{
+			error="text wrong";
+			return false;
+		}
+		if(obj!=NULL)
+			deleteNode(obj);
+		obj=analyseObj(text,bracket[text]);
+		if(obj==NULL)
+		{
+			error="malloc wrong";
+			return false;
+		}
+		return true;
+	}
 	const char* formatPrint(const Object* exmaple)
 	{
 		char* buffer=(char*)malloc(sizeof(char)*defaultSize*10);
@@ -1281,6 +1320,10 @@ public:
 	}
 	T* search(const char* word,std::function<bool(const T*,bool isLast)> func) {
 		Node* temp=root;
+		if(word==NULL)
+			return NULL;
+		if(temp->stop&&func(temp->data,strlen(word)==0))
+			return temp->data;
 		for(unsigned i=0;word[i]!=0;i++)
 		{
 			if(word[i]-46<0||word[i]-46>76)
@@ -2053,6 +2096,10 @@ public:
 			return false;
 		return true;
 	}
+	inline int getSocket()
+	{
+		return sock;
+	}
 	inline int receiveHost(void* prec,int len,int flag=0)
 	{
 		return recv(sock,(char*)prec,len,flag);
@@ -2193,7 +2240,8 @@ public:
 		STATUSBADREQUEST=400,STATUSFORBIDDEN=403,
 		STATUSNOFOUND=404,STATUSNOIMPLEMENT=501,
 	};
-	struct Datagram{
+	class Datagram{
+	public:
 		Status statusCode;
 		FileKind typeFile;
 		unsigned fileLen;
@@ -2202,6 +2250,48 @@ public:
 		std::string typeName;
 		std::string body;
 		Datagram():statusCode(STATUSOK),typeFile(TXT),fileLen(0){};
+		inline void json(Status staCode,const std::string& data)
+		{
+			typeFile=FileKind::JSON;
+			this->createData(staCode,data);
+		}
+		inline void html(Status staCode,const std::string& data)
+		{
+			typeFile=FileKind::HTML;
+			this->createData(staCode,data);
+		}
+		inline void js(Status staCode,const std::string& data)
+		{
+			typeFile=FileKind::JS;
+			this->createData(staCode,data);
+		}
+		inline void css(Status staCode,const std::string& data)
+		{
+			typeFile=FileKind::CSS;
+			this->createData(staCode,data);
+		}
+		inline void txt(Status staCode,const std::string& data)
+		{
+			typeFile=FileKind::TXT;
+			this->createData(staCode,data);
+		}
+		inline void image(Status staCode,const std::string& data)
+		{
+			typeFile=FileKind::IMAGE;
+			this->createData(staCode,data);
+		}
+		inline void zip(Status staCode,const std::string& data)
+		{
+			typeFile=FileKind::ZIP;
+			this->createData(staCode,data);
+		}
+	private:
+		void createData(Status staCode,const std::string& data)
+		{
+			statusCode=staCode;
+			body=data;
+			fileLen=data.size();
+		}
 	};
 	struct Request{
 		std::string method;
@@ -2368,6 +2458,38 @@ private:
 		return word;
 	}
 public:
+	std::string findKeyValue(const std::string& key,const char* text,unsigned len=0)
+	{
+		if(text==NULL)
+			return "";
+		std::string result;
+		std::string temp=key+"\\s*[:=]\\s*([\\\\\\w\\%\\.\\?\\+\\-]+)";
+		std::string	temp1=key+"\\s*[:=]\\s*\\\"([^\\\"]+)\\\"";
+		std::string* pstr=NULL;
+		if(len>0)
+			pstr=new std::string(text,len);
+		else
+			pstr=new std::string(text);
+		std::cmatch getArr,getArr1;
+		auto flag=std::regex_search(pstr->c_str(),getArr,std::regex(temp));
+		if(!flag)
+		{
+			flag=std::regex_search(pstr->c_str(),getArr1,std::regex(temp1));
+			if(!flag)
+			{
+				if(pstr!=NULL)
+					delete pstr;
+				return result;
+			}
+			else
+				result=getArr1[1];
+		}
+		else
+			result=getArr[1];
+		if(pstr!=NULL)
+			delete pstr;
+		return result;
+	}
 	int createSendMsg(FileKind kind,char* buffer,unsigned int bufferLen,const char* pfile,int* plong)
 	{
 		int temp=0;
@@ -2539,6 +2661,19 @@ public:
 		*temp='\r';
 		return value;
 	}
+	std::string getCookie(void* recText,const char* key)
+	{
+		if(recText==NULL||key==NULL)
+			return "";
+		char* cookie=NULL,*end=NULL;
+		cookie=strstr((char*)recText,"Cookie");
+		if(cookie==NULL)
+			return "";
+		end=strstr(cookie,"\r\n");
+		if(end==NULL)
+			return "";
+		return findKeyValue(key,cookie,end-cookie);
+	}
 	int autoAnalysisGet(const char* message,char* psend,unsigned int bufferLen,const char* pfirstFile,int* plen)
 	{
 		if(bufferLen<128)
@@ -2614,6 +2749,14 @@ public:
 			return NULL;
 		return this->findBackString(temp,strlen(key),value,valueLen);
 	}
+	std::string getRouteKeyValue(const void* message,const char* key)
+	{
+		if(message==NULL||key==NULL)
+			return "";
+		char temp[256]={0},method[32]={0};
+		sscanf((char*)message,"%32s%256s",method,temp);
+		return this->findKeyValue(key,temp);
+	}
 	const char* getWildUrl(const void* getText,const char* route,char* buffer,unsigned int maxLen)
 	{
 		char* temp=strstr((char*)getText,route);
@@ -2663,7 +2806,7 @@ public:
 		buffer[i+1]=0;
 		return result;
 	}
-	bool analysisRequest(Request& req,const void* recvText)
+	bool analysisRequest(Request& req,const void* recvText,bool onlyTop=false)
 	{
 		char one[100]={0},two[512]={0},three[512]={0};
 		const char* now=(char*)recvText,*end=strstr(now,"\r\n\r\n");
@@ -2678,17 +2821,18 @@ public:
 		req.askPath=two;
 		req.version=three;
 		req.body=end+4;
-		while(end>now)
-		{
-			sscanf(now,"%512[^:]: %512[^\r]",two,three);
-			if(strlen(two)==512||strlen(three)==512)
+		if(!onlyTop)
+			while(end>now)
 			{
-				error="head too long";
-				return false;
+				sscanf(now,"%512[^:]: %512[^\r]",two,three);
+				if(strlen(two)==512||strlen(three)==512)
+				{
+					error="head too long";
+					return false;
+				}
+				now+=strlen(two)+strlen(three)+4;
+				req.head.insert(std::pair<std::string,std::string>{two,three});
 			}
-			now+=strlen(two)+strlen(three)+4;
-			req.head.insert(std::pair<std::string,std::string>{two,three});
-		}
 		return true;
 	}
 	bool createAskRequest(Request& req,void* buffer,unsigned buffLen)
@@ -3572,7 +3716,7 @@ private:
 	unsigned int maxNum;
 	unsigned int now;
 	unsigned int boundPort;
-	unsigned int selfLen;
+	int selfLen;
 	int textLen;
 	bool isDebug;
 	bool isLongCon;
@@ -3834,7 +3978,7 @@ public:
 		logFunc=pfunc;
 		logError=errorFunc;
 	}
-	void run(const char* defaultFile=NULL)
+	void run(const char* defaultFile=NULL,bool restart=false)
 	{//server begin to run
 		char* getT=(char*)malloc(sizeof(char)*recLen);
 		char* sen=(char*)malloc(sizeof(char)*senLen);
@@ -3847,19 +3991,22 @@ public:
 		}
 		memset(getT,0,sizeof(char)*recLen);
 		memset(sen,0,sizeof(char)*senLen);
-		if(false==this->bondhost())
+		if(!restart)
 		{
-			this->error="server:bound wrong";
-			if(logError!=NULL)
-				logError(error,0);
-			return;
-		}
-		if(false==this->setlisten())
-		{
-			this->error="server:set listen wrong";
-			if(logError!=NULL)
-				logError(error,0);
-			return;
+			if(false==this->bondhost())
+			{
+				this->error="server:bound wrong";
+				if(logError!=NULL)
+					logError(error,0);
+				return;
+			}
+			if(false==this->setlisten())
+			{
+				this->error="server:set listen wrong";
+				if(logError!=NULL)
+					logError(error,0);
+				return;
+			}
 		}
 		if(logFunc!=NULL)
 			logFunc("server start",0);
@@ -3953,7 +4100,7 @@ public:
 	{//active dicconnect socket
 		this->cleanSocket(soc);
 	}
-	inline void selfCreate(unsigned senLen)
+	inline void selfCreate(int senLen)
 	{//use getSenBuff to create task by self
 		selfCtrl=true;
 		selfLen=senLen;
@@ -3969,6 +4116,11 @@ public:
 	inline void stopServer()
 	{//stop server run;
 		this->isContinue=false;
+	}
+	inline void resetServer()
+	{
+		this->trie.clean();
+		this->now=0;
 	}
 	inline RouteFuntion* getNowRoute()
 	{//get the now route;
@@ -4237,7 +4389,7 @@ private:
 			http.createSendMsg(DealHttp::NOFOUND,(char*)this->senText,senLen,NULL,&len);
 		if(len==0)
 			http.createSendMsg(DealHttp::NOFOUND,(char*)this->senText,senLen,NULL,&len);
-		if(0>=this->sendSocket(num,this->senText,len))
+		if(len>=0&&0>=this->sendSocket(num,this->senText,len))
 		{
 			if(isDebug)
 				perror("send wrong");
@@ -4833,6 +4985,14 @@ public:
 			return NULL;
 		getFileMsg(fileName,pbuffer,sizeof(char)*getFileLen(fileName)+10);
 		return pbuffer;
+	}
+	static std::string getFileString(const char* fileName)
+	{
+		int len=getFileLen(fileName);
+		if(len==-1)
+			return "";
+		FileGet file;
+		return file.getFileBuff(fileName);
 	}
 	static bool writeToFile(const char* fileName,const char* buffer,unsigned int writeLen,bool isCat=false)
 	{
