@@ -46,6 +46,10 @@ void readSetting(LoadConfig& load)
 					if(obj!=NULL)
 						con.isDebug=obj->boolVal;
 					});
+	load.findConfig("forward proxy",[](Json::Object* obj,Config& con){
+					if(obj!=NULL)
+						con.isProxy=obj->boolVal;
+					});
 	load.findConfig("default file",[](Json::Object* obj,Config& con){
 					if(obj!=NULL)
 						con.defaultFile=obj->strVal;
@@ -214,7 +218,9 @@ void dealArgc(int argc,char** argv)
 		if(fp==NULL)
 			return;
 		int pid=0;
-		fscanf(fp,"%d",&pid);
+		auto flag=fscanf(fp,"%d",&pid);
+		if(flag<=0)
+			return;
 		printf("dealing %d process\n",pid);
 		if(pid<=66)
 			exit(0);

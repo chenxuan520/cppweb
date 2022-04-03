@@ -1,0 +1,8 @@
+{
+	"port":5200,
+	"log":true,
+	"log path":"./access.log",
+	"token time":120,
+	"store":"./template",
+	"passwd":"123456789"
+}

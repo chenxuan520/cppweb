@@ -1,5 +1,5 @@
 #include <iostream>
-#include "../hpp/cppweb.h"
+#include "../../hpp/cppweb.h"
 using namespace std;
 using namespace cppweb;
 void func(HttpServer&,DealHttp& http,int)
@@ -12,7 +12,8 @@ void func(HttpServer&,DealHttp& http,int)
 }
 int main()
 {
-	DealHttp http;
-	cout<<http.findBackString("haha","haha : ok o")<<endl;;
+	HttpServer server(5200,true);
+	server.get("/",func);
+	server.run();
 	return 0;
 }

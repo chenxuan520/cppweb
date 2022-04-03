@@ -1,4 +1,6 @@
 {
+	//this file config the server
+	//change server by change this file
 	//set the bound port
 	"port":5200,
 	//default file when ask /
@@ -19,6 +21,8 @@
 	"auto":true,
 	//message print to stdout or not
 	"message print":true,
+	//forward proxy,only be useful if model is fork or thread
+	"forward proxy":false,
 	//301 redirect,the arr must is a objext and have path and redirect,use as this
 	//	"rediect":[
 	// 	{"path":"/root","redirect":"./template"},

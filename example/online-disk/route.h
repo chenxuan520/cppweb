@@ -1,9 +1,9 @@
 #include "../../hpp/cppweb.h"
+#include "./config.h"
 #include <dirent.h>
 #include <sys/stat.h>
 using namespace cppweb;
 using namespace std;
-extern char* passwd;
 /***********************************************
 * Author: chenxuan-1607772321@qq.com
 * change time:2022-03-24 09:07:41
@@ -216,6 +216,44 @@ void mkdirNow(HttpServer& server,DealHttp& http,int)
 }
 /***********************************************
 * Author: chenxuan-1607772321@qq.com
+* change time:2022-04-02 21:00:23
+* description:deal move file or dir ask
+***********************************************/
+void moveFile(HttpServer& server,DealHttp& http,int)
+{
+	DealHttp::Request req;
+	if(false==http.analysisRequest(req,server.recText()))
+	{
+		Json json={{"status","analysisHttpAsk wrong"}};
+		http.gram.typeFile=DealHttp::JSON;
+		http.gram.body=json();
+		return;
+	}
+	bool isDelete=false;
+	isDelete=strstr(req.askPath.c_str(),"delete")!=NULL;
+	char path[128]={0};
+	http.getWildUrl(server.recText(),server.getNowRoute()->route,path,sizeof(char)*128);
+	req.askPath=".";
+	req.askPath+=path;
+	Json json(req.body);
+	string newStr;
+	if(json["newpath"]!=NULL)
+		newStr=json["newpath"]->strVal;
+	if(newStr.find("..")!=newStr.npos||req.askPath.find("..")!=req.askPath.npos)
+		json("status")="wrong path";
+	else
+	{
+		newStr.insert(newStr.begin(),1,'.');
+		auto flag=rename(req.askPath.c_str(),newStr.c_str());
+		if(flag!=0)
+			json("status")=(const char*)strerror(errno);
+		else
+			json("status")="ok";
+	}
+	http.gram.json(DealHttp::STATUSOK,json());
+}
+/***********************************************
+* Author: chenxuan-1607772321@qq.com
 * change time:2022-03-25 12:03:24
 * description:login in 
 ***********************************************/
@@ -227,7 +265,7 @@ void loginIn(HttpServer& server,DealHttp& http,int)
 		http.gram.body="Verify identity wrong";
 		return;
 	}
-	if(strcmp(passwd,value)!=0)
+	if(_config.passwd!=value)
 	{
 		http.gram.body="Verify passwd wrong";
 		return;
@@ -236,7 +274,7 @@ void loginIn(HttpServer& server,DealHttp& http,int)
 	{
 		http.gram.statusCode=DealHttp::STATUSOK;
 		http.gram.typeFile=DealHttp::HTML;
-		http.gram.cookie["disk"]=http.designCookie(passwd,120);
+		http.gram.cookie["disk"]=http.designCookie(_config.passwd.c_str(),_config.tokenTime);
 		FileGet file;
 		http.gram.body=file.getFileBuff("../index.html");
 		if(http.gram.body.size()==0)
@@ -251,11 +289,12 @@ void loginIn(HttpServer& server,DealHttp& http,int)
 ***********************************************/
 void middleware(HttpServer& server,DealHttp& http,int soc)
 {
-	char value[128]={0},path[128]={0};
-	sscanf((char*)server.recText(),"%s%s",value,path);
-	if(strcmp(value,"POST")==0&&strstr(path,"login")!=NULL)
+	static DealHttp::Request req;
+	string getpwd=http.getCookie(server.recText(),"disk");
+	http.analysisRequest(req,server.recText(),true);
+	if(req.method=="POST"&&req.askPath.find("login")!=req.askPath.npos)
 		server.continueNext(soc);
-	else if(NULL==http.getCookie(server.recText(),"disk",value,128)||strcmp(value,passwd)!=0)
+	else if(getpwd!=_config.passwd)
 	{
 		int len=0;
 		http.createSendMsg(DealHttp::HTML,(char*)server.getSenBuffer(),server.getMaxSenLen(),"../login.html",&len);
