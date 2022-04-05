@@ -251,7 +251,7 @@ private:
 	unsigned defaultSize;
 	bool isCheck;
 	Object* obj;
-	std::unordered_map<char*,unsigned> memory;
+	std::unordered_map<char*,int> memory;
 	std::unordered_map<char*,char*> bracket;
 public:
 	Json()
@@ -360,6 +360,7 @@ public:
 			return;
 		}
 	}
+	Json(const Json& old)=delete;
 	~Json()
 	{
 		deleteNode(obj);
@@ -425,7 +426,7 @@ public:
 			return NULL;
 		}
 		memset(buffer,0,sizeof(char)*defaultSize*10);
-		memory.insert(std::pair<char*,unsigned>{buffer,sizeof(char)*defaultSize*10});
+		memory.insert(std::pair<char*,int>{buffer,sizeof(char)*defaultSize*10});
 		printObj(buffer,exmaple);
 		return buffer;
 	}
@@ -482,13 +483,13 @@ public:
 		{
 		case INT:
 			valInt=va_arg(args,int);
-			while(memory[obj]-strlen(obj)<15)
+			while(memory[obj]-(int)strlen(obj)<30)
 				obj=enlargeMemory(obj);
 			sprintf(obj,"%s%d",obj,valInt);
 			break;
 		case FLOAT:
 			valFlo=va_arg(args,double);
-			while(memory[obj]-strlen(obj)<15)
+			while(memory[obj]-(int)strlen(obj)<32+(int)floNum)
 				obj=enlargeMemory(obj);
 			sprintf(obj,"%s%.*lf",obj,floNum,valFlo);
 			break;
@@ -499,18 +500,18 @@ public:
 				error="null input";
 				return false;
 			}
-			while(memory[obj]-strlen(obj)<strlen(obj)+5)
+			while(memory[obj]-(int)strlen(obj)<(int)strlen(valStr)+32)
 				obj=enlargeMemory(obj);
 			sprintf(obj,"%s\"%s\"",obj,valStr);
 			break;
 		case EMPTY:
-			while(memory[obj]-strlen(obj)<5)
+			while(memory[obj]-strlen(obj)<32)
 				obj=enlargeMemory(obj);
 			strcat(obj,"null");
 			break;
 		case BOOL:
 			valBool=va_arg(args,int);
-			while(memory[obj]-strlen(obj)<5)
+			while(memory[obj]-(int)strlen(obj)<32)
 				obj=enlargeMemory(obj);
 			if(valBool==true)
 				strcat(obj,"true");
@@ -520,7 +521,7 @@ public:
 		case OBJ:
 		case ARRAY:
 			valStr=va_arg(args,char*);
-			while(memory[obj]-strlen(obj)<strlen(obj)+5)
+			while(memory[obj]-(int)strlen(obj)<(int)strlen(valStr)+32)
 				obj=enlargeMemory(obj);
 			if(valStr==NULL)
 			{
@@ -554,7 +555,7 @@ public:
 			return NULL;
 		}
 		else
-			memory.insert(std::pair<char*,unsigned>{now,defaultSize});
+			memory.insert(std::pair<char*,int>{now,defaultSize});
 		memset(now,0,sizeof(char)*defaultSize);
 		strcpy(now,"{}");
 		return now;
@@ -607,7 +608,7 @@ public:
 		case INT:
 			for(i=0;i<arrLen;i++)
 			{
-				while(memory[now]-strlen(now)<std::to_string(arrInt[i]).size()+3)
+				while(memory[now]-(int)strlen(now)<(int)std::to_string(arrInt[i]).size()+32)
 					now=enlargeMemory(now);
 				sprintf(now,"%s%d,",now,arrInt[i]);
 			}
@@ -615,7 +616,7 @@ public:
 		case FLOAT:
 			for(i=0;i<arrLen;i++)
 			{
-				while(memory[now]-strlen(now)<std::to_string(arrInt[i]).size()+3)
+				while(memory[now]-(int)strlen(now)<(int)std::to_string(arrInt[i]).size()+32)
 					now=enlargeMemory(now);
 				sprintf(now,"%s%.*lf,",now,floNum,arrFlo[i]);
 			}
@@ -623,7 +624,7 @@ public:
 		case STRING:
 			for(i=0;i<arrLen;i++)
 			{
-				while(memory[now]-strlen(now)<strlen(arrStr[i])+5)
+				while(memory[now]-(int)strlen(now)<(int)strlen(arrStr[i])+32)
 					now=enlargeMemory(now);
 				sprintf(now,"%s\"%s\",",now,arrStr[i]);
 			}
@@ -631,7 +632,7 @@ public:
 		case STRUCT:
 			for(i=0;i<arrLen;i++)
 			{
-				while(memory[now]-strlen(now)<pvect[i].size()+5)
+				while(memory[now]-(int)strlen(now)<(int)pvect[i].size()+32)
 					now=enlargeMemory(now);
 				sprintf(now,"%s\"%s\",",now,pvect[i].c_str());
 			}
@@ -640,7 +641,7 @@ public:
 		case ARRAY:
 			for(i=0;i<arrLen;i++)
 			{
-				while(memory[now]-strlen(now)<strlen(arrStr[i])+4)
+				while(memory[now]-(int)strlen(now)<(int)strlen(arrStr[i])+32)
 					now=enlargeMemory(now);
 				if(isCheck)
 				{
@@ -656,7 +657,7 @@ public:
 		case BOOL:
 			for(i=0;i<arrLen;i++)
 			{
-				while(memory[now]-strlen(now)<6)
+				while(memory[now]-(int)strlen(now)<16)
 					now=enlargeMemory(now);
 				if(arrBool[i])
 					strcat(now,"true,");
@@ -720,13 +721,13 @@ private:
 	{
 		if(memory.find(old)==memory.end())
 			return old;
-		unsigned temp=memory[old];
+		int temp=memory[old];
 		temp*=2;
 		void* strTemp=realloc(old,temp);
 		if(strTemp==NULL)
 			return old;
 		memory.erase(memory.find(old));
-		memory.insert(std::pair<char*,unsigned>{(char*)strTemp,temp});
+		memory.insert(std::pair<char*,int>{(char*)strTemp,temp});
 		return (char*)strTemp;
 	}
 	Object* analyseObj(char* begin,char* end)
@@ -1108,7 +1109,7 @@ private:
 		Object* now=obj->nextObj;
 		while(now!=NULL)
 		{
-			while(memory[buffer]-strlen(buffer)<now->key.size()+now->strVal.size()+20+deep*5)
+			while(memory[buffer]-(int)strlen(buffer)<(int)now->key.size()+(int)now->strVal.size()+64+(int)deep*5)
 				buffer=enlargeMemory(buffer);
 			for(unsigned i=0;i<deep+4;i++)
 				strcat(buffer," ");
@@ -1167,10 +1168,10 @@ private:
 		strcat(buffer,"[\n");
 		for(unsigned i=0;i<arr.size();i++)
 		{
+			while(memory[buffer]-(int)strlen(buffer)<(int)arr[i]->strVal.size()+64+(int)deep*5)
+				buffer=enlargeMemory(buffer);
 			for(unsigned i=0;i<deep+4;i++)
 				strcat(buffer," ");
-			while(memory[buffer]-strlen(buffer)<arr[i]->strVal.size()+20+deep*5)
-				buffer=enlargeMemory(buffer);
 			switch(type)
 			{
 			case INT:

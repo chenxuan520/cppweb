@@ -54,8 +54,9 @@ void nowPwdFile(HttpServer& server,DealHttp& http,int)
 			//jump if file begin with '.'
 			if(ptr->d_name[0] == '.')
 				continue;
-			file.push_back(ptr->d_name);
+			file.push_back((char*)ptr->d_name);
 		}
+		closedir(dir);
 		char* arr=NULL;
 		arr=json.createArray(file);
 		json.addKeyVal(json(),"list",arr);
@@ -239,6 +240,12 @@ void moveFile(HttpServer& server,DealHttp& http,int)
 	string newStr;
 	if(json["newpath"]!=NULL)
 		newStr=json["newpath"]->strVal;
+	else
+	{
+		json("status")="wrong";
+		http.gram.json(DealHttp::STATUSOK,json());
+		return;
+	}
 	if(newStr.find("..")!=newStr.npos||req.askPath.find("..")!=req.askPath.npos)
 		json("status")="wrong path";
 	else
