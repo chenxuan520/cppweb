@@ -72,6 +72,81 @@ public:
 	}
 }_wsaInit;
 #endif
+/***********************************************
+* Author: chenxuan-1607772321@qq.com
+* change time:2022-04-06 11:29:41
+* description:define defalut api for socket
+***********************************************/
+class SocketApi{
+private:
+	SocketApi()=delete;
+	SocketApi(const SocketApi&)=delete;
+public:
+	static inline int receiveSocket(int fd,void* buffer,size_t len,int flag=0)
+	{
+		return recv(fd,(char*)buffer,len,flag);
+	}
+	static int receiveSocket(int fd,std::string& buffer,int flag=0)
+	{
+		char temp[1024]={0};
+		int len=0;
+		buffer.clear();
+		do{
+			memset(temp,0,sizeof(char)*1024);
+			len=recv(fd,(char*)temp,1024,flag);
+			if(len>0)
+				buffer+=std::string(temp,len);
+			else
+				break;
+		}while(len==1024);
+		return buffer.size()>0?buffer.size():len;
+	}
+	static inline int sendSocket(int fd,const void* buffer,size_t len,int flag=0)
+	{
+		return send(fd,(const char*)buffer,len,flag);
+	}
+	static inline int tryConnect(int fd,const sockaddr* addr,socklen_t len)
+	{
+		return connect(fd,addr,len);
+	}
+	static inline int acceptSocket(int fd,sockaddr* addr,socklen_t* plen)
+	{
+		return accept(fd,addr,plen);
+	}
+	static inline int closeSocket(int fd)
+	{
+#ifndef _WIN32
+		return close(fd);
+#else
+		return closesocket(fd);
+#endif
+	}
+#ifdef CPPWEB_OPENSSL
+	static inline int sendSSL(SSL* ssl,const void* buffer,size_t len,int=0)
+	{
+		return SSL_write(ssl,buffer,len);
+	}
+	static inline int recvSSL(SSL* ssl,void* buffer,size_t len,int=0)
+	{
+		return SSL_read(ssl,buffer,len);
+	}
+	static int recvSSL(SSL* ssl,std::string& buffer,int=0)
+	{
+		char temp[1024]={0};
+		int len=0;
+		buffer.clear();
+		do{
+			memset(temp,0,sizeof(char)*1024);
+			len=SSL_read(ssl,temp,1024);
+			if(len>0)
+				buffer+=std::string(temp,len);
+			else
+				break;
+		}while(len==1024);
+		return buffer.size()>0?buffer.size():len;
+	}
+#endif
+};
 /*******************************
  * author:chenxuan
  * class:class for analyse json and create json text 
@@ -2025,6 +2100,7 @@ private:
 	char* hostname;//host name
 	char selfIp[128];
 	const char* error;
+	bool isHttps;
 #ifdef CPPWEB_OPENSSL
 	SSL* ssl;
 	SSL_CTX* ctx;
@@ -2035,6 +2111,7 @@ public:
 		memset(ip,0,128);
 		memset(selfIp,0,128);
 		error=NULL;
+		isHttps=false;
 		hostip=(char*)malloc(sizeof(char)*50);
 		if(hostip==NULL)
 		{
@@ -2093,7 +2170,7 @@ public:
 	}
 	bool tryConnect()
 	{
-		if(connect(sock,(sockaddr*)&addrC,sizeof(sockaddr))==-1)
+		if(SocketApi::tryConnect(sock,(sockaddr*)&addrC,sizeof(sockaddr))==-1)
 			return false;
 		return true;
 	}
@@ -2103,25 +2180,30 @@ public:
 	}
 	inline int receiveHost(void* prec,int len,int flag=0)
 	{
-		return recv(sock,(char*)prec,len,flag);
+#ifdef CPPWEB_OPENSSL
+		if(isHttps)
+			return SocketApi::recvSSL(ssl,prec,len,flag);
+		else
+#endif
+			return SocketApi::receiveSocket(sock,prec,len,flag);
 	}
 	int receiveHost(std::string& buffer,int flag=0)
 	{
-		char temp[1024]={0};
-		buffer.clear();
-		int len=receiveHost(temp,1024,flag);
-		if(len<=0)
-			return len;
-		while(len==1024)
-		{
-			buffer.append(temp,1024);
-			len=receiveHost(temp,1024,flag);
-		}
-		return buffer.size();
+#ifdef CPPWEB_OPENSSL
+		if(isHttps)
+			return SocketApi::recvSSL(ssl,buffer,flag);
+		else
+#endif
+			return SocketApi::receiveSocket(sock,buffer,flag);
 	}
-	inline int sendHost(const void* ps,int len)
+	inline int sendHost(const void* ps,int len,int flag=0)
 	{
-		return send(sock,(char*)ps,len,0);
+#ifdef CPPWEB_OPENSSL
+		if(isHttps)
+			return SocketApi::sendSSL(ssl,ps,len,flag);
+		else
+#endif
+			return SocketApi::sendSocket(sock,(char*)ps,len,flag);
 	}
 	bool disconnectHost()
 	{
@@ -2171,6 +2253,7 @@ public:
 #ifdef CPPWEB_OPENSSL
 	bool tryConnectSSL()
 	{
+		isHttps=true;
 		const SSL_METHOD* meth=SSLv23_client_method();
 		if(false==this->tryConnect())
 		{
@@ -2203,15 +2286,8 @@ public:
 		}
 		return true;
 	}
-	inline int sendHostSSL(const void* psen,int len)
-	{
-		return SSL_write(ssl,psen,len);
-	}
-	inline int receiveHostSSL(void* buffer,int len)
-	{
-		return SSL_read(ssl,buffer,len);
-	}
 #endif
+public:
 	static bool getDnsIp(const char* name,char* ip,unsigned int ipMaxLen)
 	{
 		hostent* phost=gethostbyname(name);
@@ -2294,13 +2370,110 @@ public:
 			fileLen=data.size();
 		}
 	};
-	struct Request{
+	class Request{
+	public:
 		std::string method;
 		std::string askPath;
 		std::string version;
 		std::unordered_map<std::string,std::string> head;
 		const char* body;
-		Request():body(NULL){};
+		const char* error;
+		Request():body(NULL),error(NULL){};
+		Request(const char* recvText,bool onlyTop=false)
+		{
+			this->analysisRequest(recvText,onlyTop);
+		}
+		bool analysisRequest(const void* recvText,bool onlyTop=false)
+		{
+			Request& req=*this;
+			char one[128]={0},two[512]={0},three[512]={0};
+			const char* now=(char*)recvText,*end=strstr(now,"\r\n\r\n");
+			if(strstr(now,"\r\n\r\n")==NULL)
+			{
+				this->error="error request";
+				return false;
+			}
+			sscanf(now,"%100s %100s %100s",one,two,three);
+			now+=strlen(one)+strlen(two)+strlen(three)+4;
+			req.method=one;
+			req.askPath=two;
+			req.version=three;
+			req.body=end+4;
+			if(!onlyTop)
+				while(end>now)
+				{
+					sscanf(now,"%512[^:]: %512[^\r]",two,three);
+					if(strlen(two)==512||strlen(three)==512)
+					{
+						error="head too long";
+						return false;
+					}
+					now+=strlen(two)+strlen(three)+4;
+					req.head.insert(std::pair<std::string,std::string>{two,three});
+				}
+			return true;
+		}
+		bool createAskRequest(void* buffer,unsigned buffLen)
+		{
+			Request& req=*this;
+			if(buffLen<200)
+			{
+				error="buffer too short";
+				return false;
+			}
+			if(req.head.find("Host")==req.head.end())
+			{
+				error="cannot find host";
+				return false;
+			}
+			if(req.method.size()==0)
+				req.method="GET";
+			if(req.askPath.size()==0)
+				req.askPath="/";
+			if(req.version.size()==0)
+				req.version="HTTP/1.1";
+			sprintf((char*)buffer,"%s %s %s\r\n",req.method.c_str(),req.askPath.c_str(),req.version.c_str());
+			for(auto iter=req.head.begin();iter!=req.head.end();iter++)
+			{
+				if(strlen((char*)buffer)+iter->first.size()+iter->second.size()+2>buffLen)
+				{
+					error="buffer is too short";
+					return false;
+				}
+				strcat((char*)buffer,iter->first.c_str());
+				strcat((char*)buffer,": ");
+				strcat((char*)buffer,iter->second.c_str());
+				strcat((char*)buffer,"\r\n");
+			}
+			if(req.head.find("Connection")==req.head.end())
+				strcat((char*)buffer,"Connection: Close\r\n");
+			strcat((char*)buffer,"\r\n");
+			if(req.body!=NULL)
+				strcat((char*)buffer,req.body);
+			return true;
+		}
+		std::string createAskRequest()
+		{
+			Request& req=*this;
+			if(req.head.find("Host")==req.head.end())
+			{
+				error="cannot find host";
+				return "";
+			}
+			if(req.method.size()==0)
+				req.method="GET";
+			if(req.askPath.size()==0)
+				req.askPath="/";
+			if(req.version.size()==0)
+				req.version="HTTP/1.1";
+			std::string result=req.method+" "+req.askPath+" "+req.version+"\r\n";
+			for(auto& now:req.head)
+				result+=now.first+": "+now.second+"\r\n";
+			result+="\r\n";
+			if(req.body!=NULL)
+				result+=req.body;
+			return result;
+		}
 	};
 private:
 	char ask[512];
@@ -2321,6 +2494,7 @@ public:
 		connect="keep-alive";
 		serverName="LCserver/1.1";
 	}
+	DealHttp(const DealHttp&)=delete;
 private:
 	bool cutLineAsk(char* message,const char* pcutIn)
 	{
@@ -2809,70 +2983,29 @@ public:
 	}
 	bool analysisRequest(Request& req,const void* recvText,bool onlyTop=false)
 	{
-		char one[100]={0},two[512]={0},three[512]={0};
-		const char* now=(char*)recvText,*end=strstr(now,"\r\n\r\n");
-		if(strstr(now,"\r\n\r\n")==NULL)
+		bool flag=req.analysisRequest(recvText,onlyTop);
+		if(flag)
+			return true;
+		else
 		{
-			this->error="error request";
+			this->error=req.error;
 			return false;
 		}
-		sscanf(now,"%100s %100s %100s",one,two,three);
-		now+=strlen(one)+strlen(two)+strlen(three)+4;
-		req.method=one;
-		req.askPath=two;
-		req.version=three;
-		req.body=end+4;
-		if(!onlyTop)
-			while(end>now)
-			{
-				sscanf(now,"%512[^:]: %512[^\r]",two,three);
-				if(strlen(two)==512||strlen(three)==512)
-				{
-					error="head too long";
-					return false;
-				}
-				now+=strlen(two)+strlen(three)+4;
-				req.head.insert(std::pair<std::string,std::string>{two,three});
-			}
-		return true;
 	}
-	bool createAskRequest(Request& req,void* buffer,unsigned buffLen)
+	inline bool createAskRequest(Request& req,void* buffer,unsigned buffLen)
 	{
-		if(buffLen<200)
+		bool flag=req.createAskRequest(buffer,buffLen);
+		if(flag)
+			return true;
+		else
 		{
-			error="buffer len too short";
+			this->error=req.error;
 			return false;
 		}
-		if(req.head.find("Host")==req.head.end())
-		{
-			error="cannot not find host";
-			return false;
-		}
-		if(req.method.size()==0)
-			req.method="GET";
-		if(req.askPath.size()==0)
-			req.askPath="/";
-		if(req.version.size()==0)
-			req.version="HTTP/1.1";
-		sprintf((char*)buffer,"%s %s %s\r\n",req.method.c_str(),req.askPath.c_str(),req.version.c_str());
-		for(auto iter=req.head.begin();iter!=req.head.end();iter++)
-		{
-			if(strlen((char*)buffer)+iter->first.size()+iter->second.size()+2>buffLen)
-			{
-				error="buffer len too short";
-				return false;
-			}
-			strcat((char*)buffer,iter->first.c_str());
-			strcat((char*)buffer,": ");
-			strcat((char*)buffer,iter->second.c_str());
-			strcat((char*)buffer,"\r\n");
-		}
-		if(req.head.find("Connection")==req.head.end())
-			strcat((char*)buffer,"Connection: Close\r\n");
-		strcat((char*)buffer,"\r\n");
-		if(req.body!=NULL)
-			strcat((char*)buffer,req.body);
-		return true;
+	}
+	inline std::string createAskRequest(Request& req)
+	{
+		return req.createAskRequest();
 	}
 	int createDatagram(const Datagram& gram,void* buffer,unsigned bufferLen)
 	{
