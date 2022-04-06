@@ -5126,7 +5126,7 @@ public:
 		if(len==-1)
 			return "";
 		FileGet file;
-		return file.getFileBuff(fileName);
+		return std::string(file.getFileBuff(fileName),len);
 	}
 	static bool writeToFile(const char* fileName,const char* buffer,unsigned int writeLen,bool isCat=false)
 	{

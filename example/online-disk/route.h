@@ -85,6 +85,11 @@ void sendHtml(HttpServer& server,DealHttp& http,int)
 		http.gram.statusCode=DealHttp::STATUSNOFOUND;
 		return;
 	}
+	if(req.askPath=="/edit")
+	{
+		http.gram.html(DealHttp::STATUSOK,FileGet::getFileString("../edit.html"));
+		return;
+	}
 	struct stat temp;
 	cout<<"get:"<<req.askPath<<endl;
 	req.askPath="."+req.askPath;
@@ -288,6 +293,56 @@ void loginIn(HttpServer& server,DealHttp& http,int)
 			printf("index wrong\n");
 		return;
 	}
+}
+/***********************************************
+* Author: chenxuan-1607772321@qq.com
+* change time:2022-04-06 20:36:18
+* description:post method to change edit
+***********************************************/
+void saveEdit(HttpServer& server,DealHttp& http,int)
+{
+	DealHttp::Request req;
+	Json json;
+	if(false==req.analysisRequest(server.recText()))
+	{
+		json("status")=req.error;
+		http.gram.json(DealHttp::STATUSOK,json());
+		return;
+	}
+	json.analyseText(req.body);
+	if(json.lastError()!=NULL||json["content"]==NULL)
+	{
+		json("status")=json.lastError();
+		http.gram.json(DealHttp::STATUSOK,json());
+	}
+	std::string& content=json["content"]->strVal;
+	FileGet::writeToFile("../text.txt",content.c_str(),content.size());
+	json("status")="ok";
+	http.gram.json(DealHttp::STATUSOK,json());
+}
+/***********************************************
+* Author: chenxuan-1607772321@qq.com
+* change time:2022-04-06 21:12:39
+* description:get file message
+***********************************************/
+void getEdit(HttpServer& server,DealHttp& http,int)
+{
+	DealHttp::Request req;
+	Json json;
+	if(false==req.analysisRequest(server.recText()))
+	{
+		json("status")=req.error;
+		json("content")=nullptr;
+		http.gram.json(DealHttp::STATUSOK,json());
+		return;
+	}
+	json("status")="ok";
+	FileGet file;
+	/* printf("con:%s\n",file.getFileString("../text.txt").c_str()); */
+	json("content")=file.getFileString("../text.txt").c_str();
+	printf("result:%s\n",json());
+	http.gram.json(DealHttp::STATUSOK,json());
+	return;
 }
 /***********************************************
 * Author: chenxuan-1607772321@qq.com
