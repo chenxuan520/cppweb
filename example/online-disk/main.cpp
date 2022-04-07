@@ -22,6 +22,11 @@ int main()
 	server.post("/move*",moveFile);
 	server.post("/login",loginIn);
 	server.get("/*",sendHtml);
+	auto group=server.createGroup("/edit");
+	{
+		group.post("/save",saveEdit);
+		group.post("/get",getEdit);
+	}
 	server.run();
 	if(server.lastError()!=NULL)
 	{
