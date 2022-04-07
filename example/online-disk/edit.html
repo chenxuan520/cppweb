@@ -57,14 +57,11 @@
 	}
 
 	#contact h4 {
-		margin:5px 0 15px;
-		display:block;
 		font-size:13px;
 	}
 
 	fieldset {
 		border: medium none !important;
-		margin: 0 0 10px;
 		min-width: 100%;
 		padding: 0;
 		width: 100%;
@@ -88,14 +85,32 @@
 		cursor:pointer;
 		width:100%;
 		border:none;
-		background:#58FAF4;
+		background:#ffff66;
 		color:#000;
 		margin:0 0 5px;
 		padding:10px;
 		font-size:15px;
 	}
-
-
+	#contact button[id="update"] {
+		cursor:pointer;
+		width:100%;
+		border:none;
+		background:#FAAC58;
+		color:#000;
+		margin:0 0 5px;
+		padding:10px;
+		font-size:15px;
+	}
+	#contact button[id="back"] {
+		cursor:pointer;
+		width:100%;
+		border:none;
+		background:#00FF80;
+		color:#000;
+		margin:0 0 5px;
+		padding:10px;
+		font-size:15px;
+	}
 	#contact textarea {
 		height:300px;
 		max-width:100%;
@@ -110,20 +125,17 @@
 <body>
 	<div class="container">
 		<div id="contact">
+			<h3>edit online</h3>
+			<h4>commit button is save the edit text<br>update button is get the lastest file message<br>back button is back to home</h4>
 			<form>
-				<textarea id="text">scdsc</textarea>
+				<textarea id="text"></textarea>
 				<button type="button" id="commit" onclick="saveText()">commit</button>
+				<button type="button" id="update" onclick="updateText()">update</button>
+				<button type="button" id="back" onclick="backLast()">back</button>
 			</form>	
 		</div>
 	</div>
 </body>
-<script type="text/javascript">
-	var temp=document.getElementById("text");
-  	axios.post("/edit/get", {
-	}).then(function (response) {
-		temp.value=JSON.parse(JSON.stringify(response.data))['content'];
-	});
-</script>
 <script type="text/javascript">
 	function saveText(){
 		var value=document.getElementById("text").value;
@@ -135,5 +147,17 @@
 			location.reload();
 		});
 	}
+	function updateText(){
+		var temp=document.getElementById("text");
+	  	axios.post("/edit/get", {
+		}).then(function (response) {
+			temp.value=JSON.parse(JSON.stringify(response.data))['content'];
+		});
+	}
+	function backLast()
+	{
+		location.href="/"
+	}
+	updateText();
 </script>
 </html>

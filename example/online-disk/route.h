@@ -339,7 +339,7 @@ void getEdit(HttpServer& server,DealHttp& http,int)
 	json("status")="ok";
 	FileGet file;
 	/* printf("con:%s\n",file.getFileString("../text.txt").c_str()); */
-	json("content")=file.getFileString("../text.txt").c_str();
+	json("content")=file.getFileString("../text.txt");
 	printf("result:%s\n",json());
 	http.gram.json(DealHttp::STATUSOK,json());
 	return;
