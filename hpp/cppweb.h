@@ -86,6 +86,70 @@ public:
 	{
 		return recv(fd,(char*)buffer,len,flag);
 	}
+	static int recvSockBorder(int fd,std::string& buffer,const char* border,int flag=0)
+	{
+		if(border==NULL||strlen(border)==0)
+			return -1;
+		char firstCh=border[0],now=0,temp[1024]={0};
+		char* left=(char*)malloc(sizeof(char)*strlen(border));
+		if(left==NULL)
+			return -1;
+		memset(left,0,sizeof(char)*strlen(border));
+		int len=0,all=0,leftsize=strlen(border)-1;
+		while(1)
+		{
+			len=recv(fd,(char*)&now,1,flag);
+			temp[all]=now;
+			all+=1;
+			if(all>=1024)
+			{
+				buffer+=std::string(temp,1024);
+				all=0;
+			}
+			if(len<=0)
+				break;
+			if(now==firstCh)
+			{
+				len=recv(fd,(char*)left,leftsize,MSG_PEEK);
+				if(len<=0)
+					break;
+				if(strncmp(left,border+1,leftsize)==0)
+				{
+					len=recv(fd,(char*)left,leftsize,flag);
+					buffer+=std::string(temp,all);
+					buffer+=now;
+					buffer+=left;
+					break;
+				}
+			}
+		}
+		free(left);
+		return buffer.size();
+	}
+	static int recvSockSize(int fd,std::string& buffer,size_t needSize,int flag=0)
+	{
+		char now=0,temp[1024]={0};
+		unsigned all=0;
+		int len=0,size=0;
+		while(all<needSize)
+		{
+			len=recv(fd,(char*)&now,1,flag);
+			if(len<=0)
+				break;
+			temp[size]=now;
+			size++;
+			if(size>=1024)
+			{
+				buffer+=std::string(temp,size);
+				size=0;
+			}
+			all+=1;
+			if(all>=needSize)
+				break;
+		}
+		buffer+=std::string(temp,size);
+		return all;
+	}
 	static int receiveSocket(int fd,std::string& buffer,int flag=0)
 	{
 		char temp[1024]={0};
@@ -2428,8 +2492,9 @@ public:
 						error="head too long";
 						return false;
 					}
-					now+=strlen(two)+strlen(three)+4;
 					req.head.insert(std::pair<std::string,std::string>{two,three});
+					now=strchr(now,'\r');
+					now+=2;
 				}
 			return true;
 		}

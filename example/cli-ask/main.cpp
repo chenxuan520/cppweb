@@ -71,13 +71,13 @@ void wget(const char* str)
 			printf("connect wrong\n");
 			exit(0);
 		}
-		if(0>client.sendHostSSL(buffer,strlen(buffer)))
+		if(0>client.sendHost(buffer,strlen(buffer)))
 		{
 			printf("%d",errno);
 			printf("send wrong");
 			exit(0);
 		}
-		client.receiveHostSSL(rec,5000);
+		client.receiveHost(rec,5000);
 		printf("%s\n\n",rec);
 	}
 }
