@@ -14,17 +14,11 @@ void pfuncTwo(HttpServer&,DealHttp& http,int)
 void pfunc(HttpServer& server,DealHttp& http,int)
 {
 	char url[100]={0};
-	Json json;
-	char* strJson=json.createObject();
 	http.getWildUrl(server.recText(),"/root/",url,100);//get url wild
 	/* http.getRouteValue(url,"name",value,30);//get name value */
 	/* printf("value:%s\n",value); */
-	json.addKeyVal(strJson,Json::STRING,"name",url);
-	json.addKeyVal(strJson,Json::STRING,"welcome","you");
-	http.gram.typeFile=DealHttp::JSON;
-	http.gram.body=strJson;
-	http.gram.statusCode=DealHttp::STATUSOK;
-	http.gram.fileLen=strlen(strJson);
+	Json json={{"name",url},{"welcome","you"}};
+	http.gram.json(DealHttp::STATUSOK,json());
 }
 void pfuncThree(HttpServer& server,DealHttp& http,int)
 {
