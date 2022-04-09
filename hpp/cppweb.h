@@ -351,6 +351,10 @@ private:
 				*(T*)pval=val;
 			}
 		}
+		InitType(std::string strVal)
+		{
+			initChar(STRING,strVal.c_str());
+		}
 		InitType(const char* pt)
 		{
 			initChar(STRING,pt);
