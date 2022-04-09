@@ -1,5 +1,7 @@
 # cppweb framework introduction
 
+#### 中文 [介绍](./README.md)
+
 ## author
 
 **chenxuan**
