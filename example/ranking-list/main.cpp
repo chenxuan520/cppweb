@@ -45,35 +45,31 @@ void addCLi(HttpServer& server,DealHttp& http,int)
 			tree.insert(pair<int,string>{score,name});
 		}
 	}
-	Json json;
-	char* str=json.createObject();
-	json.addKeyVal(str,Json::STRING,"name",name);
-	json.addKeyVal(str,Json::INT,"sco",score);
-	json.addKeyVal(str,Json::STRING,"status","ok");
-	http.gram.body=str;
+	Json json={
+		{"name",name},
+		{"sco",score},
+		{"status","ok"}
+	};
+	http.gram.body=json();
 }
 void getList(HttpServer&,DealHttp& http,int)
 {
 	auto begin=tree.begin();
 	http.gram.typeFile=DealHttp::JSON;
-	char* buf[9]={0};
-	Json json;
-	auto str1=json.createObject();
-	json.addKeyVal(str1,Json::STRING,"status","ok");
-	unsigned int i=0;
+	vector<Json::Node> buf;
+	Json json={{"status","ok"}};
 	while(begin!=tree.end())
 	{
+		Json::Node node={
+			{"name",begin->second.c_str()},
+			{"score",begin->first}
+		};
 		printf("%d %s\n",begin->first,begin->second.c_str());
-		buf[i]=json.createObject();
-		json.addKeyVal(buf[i],Json::STRING,"name",begin->second.c_str());
-		json.addKeyVal(buf[i],Json::INT,"score",begin->first);
-		cout<<buf[i]<<endl;
+		buf.push_back(node);
 		begin++;
-		i++;
 	}
-	auto arr=json.createArray(Json::OBJ,i,buf);
-	json.addKeyVal(str1,Json::ARRAY,"array",arr);
-	http.gram.body=str1;
+	json("array")=buf;
+	http.gram.body=json();
 }
 int main()  
 {  

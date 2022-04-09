@@ -57,9 +57,7 @@ void nowPwdFile(HttpServer& server,DealHttp& http,int)
 			file.push_back((char*)ptr->d_name);
 		}
 		closedir(dir);
-		char* arr=NULL;
-		arr=json.createArray(file);
-		json.addKeyVal(json(),"list",arr);
+		json("list")=file;
 		printf("json:%s\n",json());
 		http.gram.typeFile=DealHttp::JSON;
 		http.gram.body=json();

@@ -139,6 +139,11 @@
 <script type="text/javascript">
 	function saveText(){
 		var value=document.getElementById("text").value;
+		if(value.length>128)
+		{
+			alert("the text is too long(only ok less then 128");
+			return;
+		}
 	  	axios.post("/edit/save", {
 	  		"content":value
 		}).then(function (response) {
