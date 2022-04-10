@@ -154,7 +154,6 @@ public:
 	{
 		char temp[1024]={0};
 		int len=0;
-		buffer.clear();
 		do{
 			memset(temp,0,sizeof(char)*1024);
 			len=recv(fd,(char*)temp,1024,flag);
@@ -262,57 +261,18 @@ public:
 			return NULL;
 		}
 	};
+	class Node;
 private:
 	struct InitType{//struct for ctreate such as {{"as","ds"}} in init;
-		TypeJson type=STRING;
-		void* pval=NULL;
-		const char* error=NULL;
-		unsigned len=0;
-		~InitType()
-		{
-			if(pval)
-			{
-				free(pval);
-				pval=NULL;
-			}
-		}
-		InitType(const InitType& old)
-		{
-			this->type=old.type;
-			this->error=old.error;
-			if(old.pval!=NULL)
-			{
-				pval=malloc(sizeof(char)*old.len);
-				if(pval==NULL)
-				{
-					error="malloc worng";
-					type=EMPTY;
-					return;
-				}
-				memcpy(pval,old.pval,old.len);
-			}
-		}
+		std::string val;
 		InitType(std::initializer_list<std::pair<std::string,InitType>> listInit)
 		{
-			type=OBJ;
-			std::string result="";
-			Json json(listInit);
-			result+=json();
-			pval=malloc(sizeof(char)*(result.size()+10));
-			len=sizeof(char)*(result.size()+10);
-			memset(pval,0,sizeof(char)*(result.size()+10));
-			if(pval==NULL)
-			{
-				error="malloc wrong";
-				type=EMPTY;
-				return;
-			}
-			strcpy((char*)pval,result.c_str());
+			Json::Node node(listInit);
+			val=node();
 		}
 		template<typename T>
 		InitType(std::initializer_list<T> listInit)
 		{
-			type=ARRAY;
 			std::vector<T> arr(listInit.size());
 			int i=0;
 			for(auto iter=listInit.begin();iter!=listInit.end();iter++)
@@ -322,67 +282,52 @@ private:
 			}
 			int arrlen=listInit.size();
 			Json::Node node(arr,arrlen);
-			pval=malloc(node.getLen()+10);
-			len=node.getLen()+10;
-			memset(pval,0,node.getLen()+10);
-			strcpy((char*)pval,node());
+			val=node();
+		}
+		InitType(const Json::Node& val)
+		{
+			Json::Node temp=val;
+			this->val=temp();
 		}
 		template<typename T>
 		InitType(T val)
 		{
-			if(std::is_same<T,int>::value)
-				type=INT;
-			else if(std::is_same<T,double>::value)
-				type=FLOAT;
-			else if(std::is_same<T,bool>::value)
-				type=BOOL;
+			this->val=std::to_string(val);
+		}
+		InitType(bool val)
+		{
+			if(val)
+				this->val="true";
 			else
-				type=EMPTY;
-			pval=malloc(sizeof(T));
-			if(pval==NULL)
-			{
-				type=EMPTY;
-				error="malloc wrong";
-			}
-			else
-			{
-				len=sizeof(T);
-				memset(pval,0,sizeof(T));
-				*(T*)pval=val;
-			}
+				this->val="false";
+		}
+		InitType(std::nullptr_t)
+		{
+			this->val="null";
+		}
+		template<typename T>
+		InitType(const std::vector<T> data)
+		{
+			Json::Node node(data);
+			val=node();
 		}
 		InitType(std::string strVal)
 		{
-			initChar(STRING,strVal.c_str());
+			val+='\"';
+			val+=strVal;
+			val+='\"';
 		}
 		InitType(const char* pt)
 		{
-			initChar(STRING,pt);
+			val+='\"';
+			val+=pt;
+			val+='\"';
 		}
 		InitType(char* pt)
 		{
-			initChar(STRING,pt);
-		}
-		void initChar(TypeJson ptype,const char* pt)
-		{
-			if(pt==nullptr)
-				type=EMPTY;
-			else
-			{
-				type=ptype;
-				pval=malloc(sizeof(char)*strlen(pt)+10);
-				len=sizeof(sizeof(char)*strlen(pt)+10);
-				if(pval==NULL)
-				{
-					type=EMPTY;
-					error="malloc worng";
-				}
-				else
-				{
-					memset(pval,0,sizeof(char)*strlen(pt)+10);
-					strcpy((char*)pval,pt);
-				}
-			}
+			val+='\"';
+			val+=pt;
+			val+='\"';
 		}
 	};
 public:
@@ -430,51 +375,7 @@ public:
 		void initWithList(std::initializer_list<std::pair<std::string,InitType>> initList)
 		{
 			for(auto iter=initList.begin();iter!=initList.end();iter++)
-			{
-				if(iter->second.pval==NULL&&iter->second.type!=EMPTY)
-				{
-					error="init wrong";
-					return;
-				}
-				if(iter->second.error!=NULL)
-				{
-					error="init wrong";
-					return;
-				}
-				switch(iter->second.type)
-				{
-				case STRING:
-					if(false==addKeyValue(STRING,iter->first.c_str(),iter->second.pval))
-						return;
-					break;
-				case INT:
-					if(false==addKeyValue(INT,iter->first.c_str(),*(int*)iter->second.pval))
-						return;
-					break;
-				case FLOAT:
-					if(false==addKeyValue(FLOAT,iter->first.c_str(),*(double*)iter->second.pval))
-						return;
-					break;
-				case BOOL:
-					if(false==addKeyValue(BOOL,iter->first.c_str(),*(bool*)iter->second.pval))
-						return;
-					break;
-				case EMPTY:
-					if(false==addKeyValue(EMPTY,iter->first.c_str(),NULL))
-						return;
-					break;
-				case OBJ:
-					if(false==addKeyValue(OBJ,iter->first.c_str(),(char*)iter->second.pval))
-						return;
-					break;
-				case ARRAY:
-					if(false==addKeyValue(ARRAY,iter->first.c_str(),(char*)iter->second.pval))
-						return;
-					break;
-				default:
-					return;
-				}
-			}
+				addKeyValue(ARRAY,iter->first.c_str(),iter->second.val.c_str());
 		}
 		inline const char* operator()()
 		{
@@ -2519,6 +2420,34 @@ public:
 		{
 			this->analysisRequest(recvText,onlyTop);
 		}
+		bool routePairing(const char* recvText,std::string key,std::unordered_map<std::string,std::string>& pairMap)
+		{
+			this->analysisRequest(recvText,true);
+			unsigned pos=0,word=0,value2=0;
+			auto value1=key.find(':');
+			if(strncmp(this->askPath.c_str(),key.c_str(),value1-1)!=0)
+				return false;
+			while(pos!=key.size())
+			{
+				while(pos<key.size()&&key[pos]!=':')
+					pos++;
+				pos++;
+				word=pos;
+				if(pos==key.size())
+					return false;
+				while(word<key.size()&&key[word]!='/')
+					word++;
+				value2=value1;
+				while(value1<this->askPath.size()&&askPath[value1]!='/')
+					value1++;
+				pairMap.insert({std::string(key.begin()+pos,key.begin()+word),\
+							   std::string(askPath.begin()+value2,askPath.begin()+value1)});
+				if(value1==askPath.size()||word==key.size())
+					break;
+				value1++;
+			}
+			return true;
+		}
 		bool analysisRequest(const void* recvText,bool onlyTop=false)
 		{
 			Request& req=*this;
@@ -3949,7 +3878,7 @@ public://main class for http server2.0
 		char pathExtra[128];
 		void (*pfunc)(HttpServer&,DealHttp&,int);
 	};
-	struct Group{
+	struct Group{//group class for group api
 		std::string group;
 		HttpServer& server;
 		Group(HttpServer& ser,const char* gropa):group(gropa),server(ser){};

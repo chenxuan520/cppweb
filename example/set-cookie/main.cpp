@@ -3,16 +3,15 @@
 using namespace cppweb;
 void cookie(HttpServer& server,DealHttp& http,int)
 {
-	char buffer[100]={0};
-	http.getCookie(server.recText(),"key",buffer,100);
-	if(strlen(buffer)==0)
+	auto buf=http.getCookie(server.recText(),"key");
+	if(buf.size()==0)
 	{
 		http.gram.body="ready to setting cookie";
 		http.gram.cookie["key"]=http.designCookie("cookie ok",10);
 		return;
 	}
 	Json json={
-		{"key",(const char*)buffer},
+		{"key",buf},
 		{"status","ok"}
 	};
 	http.gram.body=json();
