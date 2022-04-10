@@ -15,16 +15,21 @@ void pfunc(HttpServer& server,DealHttp& http,int)
 {
 	char url[100]={0};
 	http.getWildUrl(server.recText(),"/root/",url,100);//get url wild
-	/* http.getRouteValue(url,"name",value,30);//get name value */
-	/* printf("value:%s\n",value); */
 	Json json={{"name",url},{"welcome","you"}};
 	http.gram.json(DealHttp::STATUSOK,json());
 }
 void pfuncThree(HttpServer& server,DealHttp& http,int)
 {
+	DealHttp::Request req;
+	unordered_map<string,string> tree;
+	req.routePairing((char*)server.recText(),"/try/:id/:name",tree);
+	Json json={
+		{"id",tree["id"]},
+		{"name",tree["name"]}
+	};
 	char* sen=(char*)server.getSenBuffer();
-	http.customizeAddTop(sen,1024*1024,200,strlen("{\"as\":1}"));
-	int len=http.customizeAddBody(sen,1024*1024,"{\"as\":1}",strlen("{\"as\":1}"));
+	http.customizeAddTop(sen,1024*1024,200,strlen(json()));
+	int len=http.customizeAddBody(sen,1024*1024,json(),strlen(json()));
 	server.selfCreate(len);
 }
 int main()  

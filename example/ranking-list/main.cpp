@@ -61,7 +61,7 @@ void getList(HttpServer&,DealHttp& http,int)
 	while(begin!=tree.end())
 	{
 		Json::Node node={
-			{"name",begin->second.c_str()},
+			{"name",begin->second},
 			{"score",begin->first}
 		};
 		printf("%d %s\n",begin->first,begin->second.c_str());
