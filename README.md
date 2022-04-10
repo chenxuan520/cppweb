@@ -253,6 +253,21 @@ int main()
 - 通过http内置的结构体来解析
 - DealHttp类[介绍](./doc/DealHttp.md)
 
+#### 获取路由key值
+
+```cpp
+    DealHttp::Request req;
+    unordered_map<string,string> tree;
+    req.routePairing((char*)server.recText(),"/try/:id/:name",tree);
+    Json json={
+        {"id",tree["id"]},
+        {"name",tree["name"]}
+    };
+```
+
+> 通过: 分割key
+> 结果保存在第三个参数中
+
 #### 设置cookie
 
 ```cpp
@@ -267,7 +282,7 @@ void cookie(HttpServer& server,DealHttp& http,int)
         return;
     }
     Json json={
-        {"key",(const char*)buffer},
+        {"key",buffer},
         {"status","ok"}
     };
     http.gram.body=json();

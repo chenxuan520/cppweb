@@ -253,6 +253,8 @@ int main()
 - Parse through http built-in structure
 - DealHttp class [introduction](./doc/DealHttp.en.md)
 
+#### Gets the routing key value
+
 #### set cookies
 
 ```cpp
@@ -379,6 +381,9 @@ msecs/first-response: 334.025 mean, 13735.1 max, 21.481 min
 HTTP response codes:
   code 200 -- 1792
 ```
+
+> By: Split key
+> results are saved in the third parameter
 
 ## more documentation
 

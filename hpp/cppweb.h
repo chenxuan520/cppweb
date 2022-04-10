@@ -154,7 +154,6 @@ public:
 	{
 		char temp[1024]={0};
 		int len=0;
-		buffer.clear();
 		do{
 			memset(temp,0,sizeof(char)*1024);
 			len=recv(fd,(char*)temp,1024,flag);
@@ -2420,6 +2419,34 @@ public:
 		Request(const char* recvText,bool onlyTop=false)
 		{
 			this->analysisRequest(recvText,onlyTop);
+		}
+		bool routePairing(const char* recvText,std::string key,std::unordered_map<std::string,std::string>& pairMap)
+		{
+			this->analysisRequest(recvText,true);
+			unsigned pos=0,word=0,value2=0;
+			auto value1=key.find(':');
+			if(strncmp(this->askPath.c_str(),key.c_str(),value1-1)!=0)
+				return false;
+			while(pos!=key.size())
+			{
+				while(pos<key.size()&&key[pos]!=':')
+					pos++;
+				pos++;
+				word=pos;
+				if(pos==key.size())
+					return false;
+				while(word<key.size()&&key[word]!='/')
+					word++;
+				value2=value1;
+				while(value1<this->askPath.size()&&askPath[value1]!='/')
+					value1++;
+				pairMap.insert({std::string(key.begin()+pos,key.begin()+word),\
+							   std::string(askPath.begin()+value2,askPath.begin()+value1)});
+				if(value1==askPath.size()||word==key.size())
+					break;
+				value1++;
+			}
+			return true;
 		}
 		bool analysisRequest(const void* recvText,bool onlyTop=false)
 		{
