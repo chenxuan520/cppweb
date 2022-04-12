@@ -313,20 +313,21 @@ private:
 		}
 		InitType(std::string strVal)
 		{
-			val+='\"';
-			val+=strVal;
-			val+='\"';
+			createChar(strVal);
 		}
 		InitType(const char* pt)
 		{
-			val+='\"';
-			val+=pt;
-			val+='\"';
+			createChar(pt);
 		}
 		InitType(char* pt)
 		{
+			createChar(pt);
+		}
+		template<typename T>
+		void createChar(T data)
+		{
 			val+='\"';
-			val+=pt;
+			val+=data;
 			val+='\"';
 		}
 	};
@@ -398,9 +399,15 @@ public:
 			addKeyValue(key.c_str(),data);
 			return *this;
 		}
-		Node& operator=(std::string& data)
+		Node& operator=(std::string data)
 		{
 			addKeyValue(key.c_str(),data.c_str());
+			return *this;
+		}
+		Node& operator=(std::initializer_list<std::pair<std::string,InitType>> initList)
+		{
+			Node node(initList);
+			addKeyValue(key.c_str(),node);
 			return *this;
 		}
 		unsigned inline getLen()
@@ -493,7 +500,7 @@ public:
 				for(unsigned i=0;i<len;i++)
 				{
 					result+='\"';
-					result+=+arrStr[i];
+					result+=arrStr[i];
 					result+='\"';
 					result+=',';
 				}
@@ -642,13 +649,13 @@ private:
 	char* text;
 	const char* error;
 	const char* nowKey;
-	char* word;
 	unsigned maxLen;
 	unsigned floNum;
 	unsigned defaultSize;
 	bool isCheck;
 	Object* obj;
 	Node node;
+	std::string wordStr;
 	std::unordered_map<char*,int> memory;
 	std::unordered_map<char*,char*> bracket;
 public:
@@ -657,19 +664,11 @@ public:
 		error=NULL;
 		obj=NULL;
 		text=NULL;
-		word=NULL;
 		nowKey=NULL;
 		isCheck=true;
 		maxLen=256;
 		floNum=3;
 		defaultSize=128;
-		word=(char*)malloc(sizeof(char)*maxLen);
-		if(word==NULL)
-		{
-			error="malloc wrong";
-			return;
-		}
-		memset(word,0,sizeof(char)*maxLen);
 	}
 	Json(std::initializer_list<std::pair<std::string,InitType>> initList):Json()
 	{
@@ -704,20 +703,12 @@ public:
 		}
 		obj=analyseObj(text,bracket[text]);
 		if(obj==NULL)
-		{
-			error="malloc wrong";
 			return;
-		}
 	}
 	Json(const Json& old)=delete;
 	~Json()
 	{
 		deleteNode(obj);
-		if(word!=NULL)
-		{
-			free(word);
-			word=NULL;
-		}
 		if(text!=NULL)
 			free(text);
 		for(auto iter=memory.begin();iter!=memory.end();iter++)
@@ -757,10 +748,7 @@ public:
 			deleteNode(obj);
 		obj=analyseObj(text,bracket[text]);
 		if(obj==NULL)
-		{
-			error="malloc wrong";
 			return false;
-		}
 		return true;
 	}
 	const char* formatPrint(const Object* exmaple)
@@ -848,47 +836,29 @@ private:
 		root->type=STRUCT;
 		char* now=begin+1,*next=now;
 		char temp=*end;
-		if(word==NULL)
-		{
-			error="malloc wrong";
-			return NULL;
-		}
-		memset(word,0,sizeof(char)*maxLen);
 		*end=0;
 		while(now<end)
 		{
 			Object* nextObj=new Object;
-			memset(word,0,sizeof(char)*maxLen);
-			findString(now,word,maxLen);
-			nextObj->key=word;
-			/* hashMap.insert(std::pair<std::string,Object*>{word,nextObj}); */
-			now+=strlen(word)+3;
-			memset(word,0,sizeof(char)*maxLen);
+			now=findString(now,wordStr);
+			if(now==NULL)
+			{
+				error="find key wrong";
+				return NULL;
+			}
+			nextObj->key=wordStr;
+			now+=2;
 			if(*now=='\"')
 			{
 				nextObj->type=STRING;
-				next=strchr(now+1,'\"');
-				while(next!=NULL&&*(next-1)=='\\')
-					next=strchr(next+1,'\"');
-				if(next==NULL)
+				now=findString(now,wordStr);
+				if(now==NULL)
 				{
-					error="string wrong";
+					error="string judge wrong";
 					return NULL;
 				}
-				if(next-now+3>maxLen)
-				{
-					char* tempStr=(char*)realloc(word,next-now+3);
-					if(tempStr!=NULL)
-					{
-						word=tempStr;
-						maxLen=next-now+3;
-					}
-				}
-				for(unsigned i=0;now+i+1<next&&i<maxLen;i++)
-					word[i]=*(now+i+1);
-				word[strlen(word)]=0;
-				nextObj->strVal=word;
-				now=next+1;
+				nextObj->strVal=wordStr;
+				now++;
 				if(*now==',')
 					now++;
 			}
@@ -973,12 +943,6 @@ private:
 	TypeJson analyseArray(char* begin,char* end,std::vector<Object*>& arr)
 	{
 		char* now=begin+1,*next=end;
-		if(word==NULL)
-		{
-			error="malloc wrong";
-			return INT;
-		}
-		memset(word,0,sizeof(char)*maxLen);
 		Object* nextObj=NULL;
 		if((*now>='0'&&*now<='9')||*now=='-')
 		{
@@ -1011,11 +975,16 @@ private:
 		{
 			while(now<end&&now!=NULL)
 			{
-				findString(now,word,maxLen);
+				now=findString(now,wordStr);
+				if(now==NULL)
+				{
+					error="fing string wrong";
+					return STRING;
+				}
 				nextObj=new Object;
 				nextObj->type=STRING;
 				nextObj->isData=true;
-				nextObj->strVal=word;
+				nextObj->strVal=wordStr;
 				arr.push_back(nextObj);
 				now=strchr(now+1,',');
 				if(now==NULL)
@@ -1081,29 +1050,22 @@ private:
 		}
 		return nextObj->type;
 	}
-	void findString(const char* begin,char*& buffer,unsigned& buffLen)
+	char* findString(char* begin,std::string& buffer)
 	{
-		const char* now=begin+1,*nextOne=now;
+		char* now=begin+1,*nextOne=now;
+		buffer.clear();
 		nextOne=strchr(now+1,'\"');
 		while(nextOne!=NULL&&*(nextOne-1)=='\\')
 			nextOne=strchr(nextOne+1,'\"');
 		if(nextOne==NULL)
 		{
+			printf("wrong:\n\%s\n\n",begin);
 			error="text wrong";
-			return;
+			return NULL;
 		}
-		if(buffLen<nextOne-now)
-		{
-			char* temp=(char*)realloc(buffer,sizeof(char)*(nextOne-now+10));
-			if(temp!=NULL)
-			{
-				buffer=temp;
-				buffLen=nextOne-now+10;
-			}
-		}
-		for(unsigned i=0;now+i<nextOne&&i<buffLen-1;i++)
-			buffer[i]=*(now+i);
-		buffer[strlen(buffer)]=0;
+		for(unsigned i=0;now+i<nextOne;i++)
+			buffer+=*(now+i);
+		return nextOne;
 	}
 	void findNum(const char* begin,TypeJson type,void* pnum)
 	{
@@ -1185,6 +1147,7 @@ private:
 	{
 		unsigned flag=0;
 		std::stack<char*> sta;
+		bracket.clear();
 		for(unsigned i=0;i<strlen(text);i++)
 		{
 			if((text[i]=='['||text[i]=='{')&&flag%2==0)
