@@ -57,7 +57,7 @@ void nowPwdFile(HttpServer& server,DealHttp& http,int)
 			file.push_back((char*)ptr->d_name);
 		}
 		closedir(dir);
-		json("list")=file;
+		json[ "list" ]=file;
 		printf("json:%s\n",json());
 		http.gram.typeFile=DealHttp::JSON;
 		http.gram.body=json();
@@ -241,24 +241,25 @@ void moveFile(HttpServer& server,DealHttp& http,int)
 	req.askPath+=path;
 	Json json(req.body);
 	string newStr;
-	if(json["newpath"]!=NULL)
-		newStr=json["newpath"]->strVal;
+	auto root=json.getRootObj();
+	if(root["newpath"]!=Json::npos)
+		newStr=root["newpath"].strVal;
 	else
 	{
-		json("status")="wrong";
+		json[ "status" ]="wrong";
 		http.gram.json(DealHttp::STATUSOK,json());
 		return;
 	}
 	if(newStr.find("..")!=newStr.npos||req.askPath.find("..")!=req.askPath.npos)
-		json("status")="wrong path";
+		json[ "status" ]="wrong path";
 	else
 	{
 		newStr.insert(newStr.begin(),1,'.');
 		auto flag=rename(req.askPath.c_str(),newStr.c_str());
 		if(flag!=0)
-			json("status")=(const char*)strerror(errno);
+			json[ "status" ]=(const char*)strerror(errno);
 		else
-			json("status")="ok";
+			json[ "status" ]="ok";
 	}
 	http.gram.json(DealHttp::STATUSOK,json());
 }
@@ -303,19 +304,20 @@ void saveEdit(HttpServer& server,DealHttp& http,int)
 	Json json;
 	if(false==req.analysisRequest(server.recText()))
 	{
-		json("status")=req.error;
+		json[ "status" ]=req.error;
 		http.gram.json(DealHttp::STATUSOK,json());
 		return;
 	}
 	json.analyseText(req.body);
-	if(json.lastError()!=NULL||json["content"]==NULL)
+	auto root=json.getRootObj();
+	if(json.lastError()!=NULL||root["content"]==Json::npos)
 	{
-		json("status")=json.lastError();
+		json[ "status" ]=json.lastError();
 		http.gram.json(DealHttp::STATUSOK,json());
 	}
-	std::string& content=json["content"]->strVal;
+	std::string& content=root["content"].strVal;
 	FileGet::writeToFile("../text.txt",content.c_str(),content.size());
-	json("status")="ok";
+	json[ "status" ]="ok";
 	http.gram.json(DealHttp::STATUSOK,json());
 }
 /***********************************************
@@ -329,15 +331,15 @@ void getEdit(HttpServer& server,DealHttp& http,int)
 	Json json;
 	if(false==req.analysisRequest(server.recText()))
 	{
-		json("status")=req.error;
-		json("content")=nullptr;
+		json[ "status" ]=req.error;
+		json[ "content" ]=nullptr;
 		http.gram.json(DealHttp::STATUSOK,json());
 		return;
 	}
-	json("status")="ok";
+	json[ "status" ]="ok";
 	FileGet file;
 	/* printf("con:%s\n",file.getFileString("../text.txt").c_str()); */
-	json("content")=file.getFileString("../text.txt");
+	json[ "content" ]=file.getFileString("../text.txt");
 	printf("result:%s\n",json());
 	http.gram.json(DealHttp::STATUSOK,json());
 	return;
