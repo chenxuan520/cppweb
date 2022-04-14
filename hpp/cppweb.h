@@ -193,15 +193,15 @@ public:
 #endif
 	}
 #ifdef CPPWEB_OPENSSL
-	static inline int sendSSL(SSL* ssl,const void* buffer,size_t len,int=0)
+	static inline int sendSocket(SSL* ssl,const void* buffer,size_t len,int=0)
 	{
 		return SSL_write(ssl,buffer,len);
 	}
-	static inline int recvSSL(SSL* ssl,void* buffer,size_t len,int=0)
+	static inline int receiveSocket(SSL* ssl,void* buffer,size_t len,int=0)
 	{
 		return SSL_read(ssl,buffer,len);
 	}
-	static int recvSSL(SSL* ssl,std::string& buffer,int=0)
+	static int receiveSocket(SSL* ssl,std::string& buffer,int=0)
 	{
 		char temp[1024]={0};
 		int len=0;
@@ -215,6 +215,30 @@ public:
 				break;
 		}while(len==1024);
 		return buffer.size()>0?buffer.size():len;
+	}
+	static int recvSockSize(SSL* ssl,std::string& buffer,size_t needSize,int=0)
+	{
+		char now=0,temp[1024]={0};
+		unsigned all=0;
+		int len=0,size=0;
+		while(all<needSize)
+		{
+			len=SSL_read(ssl,(char*)&now,1);
+			if(len<=0)
+				break;
+			temp[size]=now;
+			size++;
+			if(size>=1024)
+			{
+				buffer+=std::string(temp,size);
+				size=0;
+			}
+			all+=1;
+			if(all>=needSize)
+				break;
+		}
+		buffer+=std::string(temp,size);
+		return all;
 	}
 #endif
 };
@@ -2194,7 +2218,7 @@ public:
 	{
 #ifdef CPPWEB_OPENSSL
 		if(isHttps)
-			return SocketApi::recvSSL(ssl,prec,len,flag);
+			return SocketApi::receiveSocket(ssl,prec,len,flag);
 		else
 #endif
 			return SocketApi::receiveSocket(sock,prec,len,flag);
@@ -2203,7 +2227,7 @@ public:
 	{
 #ifdef CPPWEB_OPENSSL
 		if(isHttps)
-			return SocketApi::recvSSL(ssl,buffer,flag);
+			return SocketApi::receiveSocket(ssl,buffer,flag);
 		else
 #endif
 			return SocketApi::receiveSocket(sock,buffer,flag);
@@ -2212,7 +2236,7 @@ public:
 	{
 #ifdef CPPWEB_OPENSSL
 		if(isHttps)
-			return SocketApi::sendSSL(ssl,ps,len,flag);
+			return SocketApi::sendSocket(ssl,ps,len,flag);
 		else
 #endif
 			return SocketApi::sendSocket(sock,(char*)ps,len,flag);
@@ -2297,6 +2321,10 @@ public:
 			return false;
 		}
 		return true;
+	}
+	inline SSL* getSSL()
+	{
+		return ssl;
 	}
 #endif
 public:
@@ -2524,6 +2552,7 @@ private:
 	const char* serverName;
 public:
 	Datagram gram;//default gram to create gram
+	Request req;//default request to use by user
 	std::unordered_map<std::string,std::string> head;//default head toadd middleware
 	std::unordered_map<std::string,std::string> cookie;//default cookie to add middleware
 	DealHttp()
@@ -2674,7 +2703,7 @@ private:
 		return word;
 	}
 public:
-	std::string findKeyValue(const std::string& key,const char* text,unsigned len=0)
+	static std::string findKeyValue(const std::string& key,const char* text,unsigned len=0)
 	{
 		if(text==NULL)
 			return "";
