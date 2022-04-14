@@ -249,18 +249,39 @@ public:
 			nextObj=NULL;
 			objVal=NULL;
 		}
-		Object* operator[](const char* key)
+		bool operator==(const Object& old)
+		{
+			return &old==this;
+		}
+		bool operator!=(const Object& old)
+		{
+			return &old!=this;
+		}
+		Object& operator[](const char* key)
 		{
 			Object* now=this->nextObj;
 			while(now!=NULL)
 			{
 				if(now->key==key)
-					return now;
+				{
+					if(now->type==OBJ)
+						return *now->objVal;
+					else
+						return *now;
+				}
 				now=now->nextObj;
 			}
-			return NULL;
+			return Json::npos;
+		}
+		Object& operator[](unsigned pos)
+		{
+			if(this->type!=ARRAY||this->arr.size()<=pos)
+				return Json::npos;
+			else
+				return *this->arr[pos];
 		}
 	};
+	static Object npos;
 	class Node;
 private:
 	struct InitType{//struct for ctreate such as {{"as","ds"}} in init;
@@ -313,20 +334,21 @@ private:
 		}
 		InitType(std::string strVal)
 		{
-			val+='\"';
-			val+=strVal;
-			val+='\"';
+			createChar(strVal);
 		}
 		InitType(const char* pt)
 		{
-			val+='\"';
-			val+=pt;
-			val+='\"';
+			createChar(pt);
 		}
 		InitType(char* pt)
 		{
+			createChar(pt);
+		}
+		template<typename T>
+		void createChar(T data)
+		{
 			val+='\"';
-			val+=pt;
+			val+=data;
 			val+='\"';
 		}
 	};
@@ -381,7 +403,7 @@ public:
 		{
 			return result.c_str();
 		}
-		Node& operator()(const char* key)
+		Node& operator[](const char* key)
 		{
 			this->key=key;
 			return *this;
@@ -398,9 +420,15 @@ public:
 			addKeyValue(key.c_str(),data);
 			return *this;
 		}
-		Node& operator=(std::string& data)
+		Node& operator=(std::string data)
 		{
 			addKeyValue(key.c_str(),data.c_str());
+			return *this;
+		}
+		Node& operator=(std::initializer_list<std::pair<std::string,InitType>> initList)
+		{
+			Node node(initList);
+			addKeyValue(key.c_str(),node);
 			return *this;
 		}
 		unsigned inline getLen()
@@ -440,6 +468,14 @@ public:
 			else
 				return addArray(EMPTY,NULL,arr.size());
 			return true;
+		}
+		template<typename T>
+		bool addArray(const std::vector<std::vector<T>>& arr)
+		{
+			std::vector<Node> temp;
+			for(auto& now:arr)
+				temp.push_back(Node(now));
+			return addArray(temp);
 		}
 		bool addArray(const std::vector<bool>& arr)
 		{
@@ -493,7 +529,7 @@ public:
 				for(unsigned i=0;i<len;i++)
 				{
 					result+='\"';
-					result+=+arrStr[i];
+					result+=arrStr[i];
 					result+='\"';
 					result+=',';
 				}
@@ -642,35 +678,14 @@ private:
 	char* text;
 	const char* error;
 	const char* nowKey;
-	char* word;
-	unsigned maxLen;
-	unsigned floNum;
-	unsigned defaultSize;
-	bool isCheck;
 	Object* obj;
 	Node node;
-	std::unordered_map<char*,int> memory;
+	unsigned floNum;
+	std::string wordStr;
+	std::string formatStr;
 	std::unordered_map<char*,char*> bracket;
 public:
-	Json()
-	{
-		error=NULL;
-		obj=NULL;
-		text=NULL;
-		word=NULL;
-		nowKey=NULL;
-		isCheck=true;
-		maxLen=256;
-		floNum=3;
-		defaultSize=128;
-		word=(char*)malloc(sizeof(char)*maxLen);
-		if(word==NULL)
-		{
-			error="malloc wrong";
-			return;
-		}
-		memset(word,0,sizeof(char)*maxLen);
-	}
+	Json():text(NULL),error(NULL),nowKey(NULL),obj(NULL),floNum(3){}
 	Json(std::initializer_list<std::pair<std::string,InitType>> initList):Json()
 	{
 		node.initWithList(initList);
@@ -704,25 +719,14 @@ public:
 		}
 		obj=analyseObj(text,bracket[text]);
 		if(obj==NULL)
-		{
-			error="malloc wrong";
 			return;
-		}
 	}
 	Json(const Json& old)=delete;
 	~Json()
 	{
 		deleteNode(obj);
-		if(word!=NULL)
-		{
-			free(word);
-			word=NULL;
-		}
 		if(text!=NULL)
 			free(text);
-		for(auto iter=memory.begin();iter!=memory.end();iter++)
-			if(iter->first!=NULL)
-				free(iter->first);
 	}
 	bool analyseText(const char* jsonText)
 	{
@@ -757,24 +761,16 @@ public:
 			deleteNode(obj);
 		obj=analyseObj(text,bracket[text]);
 		if(obj==NULL)
-		{
-			error="malloc wrong";
 			return false;
-		}
 		return true;
 	}
-	const char* formatPrint(const Object* exmaple)
+	const char* formatPrint(Object& example)
 	{
-		char* buffer=(char*)malloc(sizeof(char)*defaultSize*10);
-		if(buffer==NULL)
-		{
-			error="malloc wrong";
+		formatStr.clear();
+		if(obj==NULL)
 			return NULL;
-		}
-		memset(buffer,0,sizeof(char)*defaultSize*10);
-		memory.insert(std::pair<char*,int>{buffer,sizeof(char)*defaultSize*10});
-		printObj(buffer,exmaple);
-		return buffer;
+		printObj(formatStr,&example);
+		return formatStr.c_str();
 	}
 	inline Node createObject()
 	{
@@ -794,15 +790,11 @@ public:
 	{
 		return Node(data);
 	}
-	inline Object* operator[](const char* key)
-	{
-		return (*obj)[key];
-	}
 	const char* operator()()
 	{
 		return node();
 	}
-	Json& operator()(const char* key)
+	Json& operator[](const char* key)
 	{
 		nowKey=key;
 		return *this;
@@ -810,85 +802,61 @@ public:
 	template<typename T>
 	Json& operator=(T value)
 	{
-		node(nowKey)=value;
+		node[nowKey]=value;
 		return *this;
 	}
-	inline Object* getRootObj()
+	inline Object& getRootObj()
 	{
-		return obj;
+		if(obj!=NULL)
+			return *obj;
+		else
+			return Json::npos;
 	}
 	inline const char* lastError()
 	{
 		return error;
 	}
-	inline void changeSetting(unsigned floNum=3,unsigned defaultSize=128,unsigned keyValMaxLen=256)
+	inline bool changeSetting(unsigned floNum)
 	{
-		this->defaultSize=defaultSize;
-		this->maxLen=keyValMaxLen>maxLen?keyValMaxLen:maxLen;
+		if(floNum>255)
+		{
+			error="float num max is 255";
+			return false;
+		}
 		this->floNum=floNum;
 		node.changeSetting(floNum);
+		return true;
 	}
 private:
-	char* enlargeMemory(char* old)
-	{
-		if(memory.find(old)==memory.end())
-			return old;
-		int temp=memory[old];
-		temp*=2;
-		void* strTemp=realloc(old,temp);
-		if(strTemp==NULL)
-			return old;
-		memory.erase(memory.find(old));
-		memory.insert(std::pair<char*,int>{(char*)strTemp,temp});
-		return (char*)strTemp;
-	}
 	Object* analyseObj(char* begin,char* end)
 	{
 		Object * root=new Object,*last=root;
 		root->type=STRUCT;
 		char* now=begin+1,*next=now;
 		char temp=*end;
-		if(word==NULL)
-		{
-			error="malloc wrong";
-			return NULL;
-		}
-		memset(word,0,sizeof(char)*maxLen);
 		*end=0;
 		while(now<end)
 		{
 			Object* nextObj=new Object;
-			memset(word,0,sizeof(char)*maxLen);
-			findString(now,word,maxLen);
-			nextObj->key=word;
-			/* hashMap.insert(std::pair<std::string,Object*>{word,nextObj}); */
-			now+=strlen(word)+3;
-			memset(word,0,sizeof(char)*maxLen);
+			now=findString(now,wordStr);
+			if(now==NULL)
+			{
+				error="find key wrong";
+				return NULL;
+			}
+			nextObj->key=wordStr;
+			now+=2;
 			if(*now=='\"')
 			{
 				nextObj->type=STRING;
-				next=strchr(now+1,'\"');
-				while(next!=NULL&&*(next-1)=='\\')
-					next=strchr(next+1,'\"');
-				if(next==NULL)
+				now=findString(now,wordStr);
+				if(now==NULL)
 				{
-					error="string wrong";
+					error="string judge wrong";
 					return NULL;
 				}
-				if(next-now+3>maxLen)
-				{
-					char* tempStr=(char*)realloc(word,next-now+3);
-					if(tempStr!=NULL)
-					{
-						word=tempStr;
-						maxLen=next-now+3;
-					}
-				}
-				for(unsigned i=0;now+i+1<next&&i<maxLen;i++)
-					word[i]=*(now+i+1);
-				word[strlen(word)]=0;
-				nextObj->strVal=word;
-				now=next+1;
+				nextObj->strVal=wordStr;
+				now++;
 				if(*now==',')
 					now++;
 			}
@@ -973,12 +941,6 @@ private:
 	TypeJson analyseArray(char* begin,char* end,std::vector<Object*>& arr)
 	{
 		char* now=begin+1,*next=end;
-		if(word==NULL)
-		{
-			error="malloc wrong";
-			return INT;
-		}
-		memset(word,0,sizeof(char)*maxLen);
 		Object* nextObj=NULL;
 		if((*now>='0'&&*now<='9')||*now=='-')
 		{
@@ -1011,11 +973,16 @@ private:
 		{
 			while(now<end&&now!=NULL)
 			{
-				findString(now,word,maxLen);
+				now=findString(now,wordStr);
+				if(now==NULL)
+				{
+					error="fing string wrong";
+					return STRING;
+				}
 				nextObj=new Object;
 				nextObj->type=STRING;
 				nextObj->isData=true;
-				nextObj->strVal=word;
+				nextObj->strVal=wordStr;
 				arr.push_back(nextObj);
 				now=strchr(now+1,',');
 				if(now==NULL)
@@ -1081,29 +1048,22 @@ private:
 		}
 		return nextObj->type;
 	}
-	void findString(const char* begin,char*& buffer,unsigned& buffLen)
+	char* findString(char* begin,std::string& buffer)
 	{
-		const char* now=begin+1,*nextOne=now;
-		nextOne=strchr(now+1,'\"');
+		char* now=begin+1,*nextOne=now;
+		buffer.clear();
+		nextOne=strchr(now,'\"');
 		while(nextOne!=NULL&&*(nextOne-1)=='\\')
 			nextOne=strchr(nextOne+1,'\"');
 		if(nextOne==NULL)
 		{
+			printf("wrong:\n\%s\n\n",begin);
 			error="text wrong";
-			return;
+			return NULL;
 		}
-		if(buffLen<nextOne-now)
-		{
-			char* temp=(char*)realloc(buffer,sizeof(char)*(nextOne-now+10));
-			if(temp!=NULL)
-			{
-				buffer=temp;
-				buffLen=nextOne-now+10;
-			}
-		}
-		for(unsigned i=0;now+i<nextOne&&i<buffLen-1;i++)
-			buffer[i]=*(now+i);
-		buffer[strlen(buffer)]=0;
+		for(unsigned i=0;now+i<nextOne;i++)
+			buffer+=*(now+i);
+		return nextOne;
 	}
 	void findNum(const char* begin,TypeJson type,void* pnum)
 	{
@@ -1185,6 +1145,7 @@ private:
 	{
 		unsigned flag=0;
 		std::stack<char*> sta;
+		bracket.clear();
 		for(unsigned i=0;i<strlen(text);i++)
 		{
 			if((text[i]=='['||text[i]=='{')&&flag%2==0)
@@ -1209,120 +1170,134 @@ private:
 			return false;
 		return true;
 	}
-	bool printObj(char*& buffer,const Object* obj)
+	void printObj(std::string& buffer,const Object* obj)
 	{
+		if(obj==NULL)
+		{
+			buffer+="{}";
+			error="message wrong";
+			return;
+		}
 		unsigned deep=0;
-		char* line=strrchr(buffer,'\n');
-		if(line==NULL)
+		char word[256]={0};
+		auto line=buffer.find_last_of('\n');
+		if(line==buffer.npos)
 			deep=1;
 		else
-			deep=buffer+strlen(buffer)-line;
-		strcat(buffer,"{\n");
+			deep=buffer.c_str()+buffer.size()-&buffer[line];
+		buffer+="{\n";
 		Object* now=obj->nextObj;
 		while(now!=NULL)
 		{
-			while(memory[buffer]-(int)strlen(buffer)<(int)now->key.size()+(int)now->strVal.size()+64+(int)deep*5)
-				buffer=enlargeMemory(buffer);
 			for(unsigned i=0;i<deep+4;i++)
-				strcat(buffer," ");
+				buffer+=' ';
+			buffer+='\"'+now->key+"\":";
 			switch(now->type)
 			{
 			case INT:
-				sprintf(buffer,"%s\"%s\":%d,",buffer,now->key.c_str(),now->intVal);
+				buffer+=std::to_string(now->intVal)+',';
 				break;
 			case FLOAT:
-				sprintf(buffer,"%s\"%s\":%.*lf,",buffer,now->key.c_str(),floNum,now->floVal);
+				sprintf(word,"%.*lf,",floNum,now->floVal);
+				buffer+=word;
 				break;
 			case STRING:
-				sprintf(buffer,"%s\"%s\":\"%s\",",buffer,now->key.c_str(),now->strVal.c_str());
+				buffer+='\"'+now->strVal+"\",";
 				break;
 			case BOOL:
 				if(now->boolVal)
-					sprintf(buffer,"%s\"%s\":true,",buffer,now->key.c_str());
+					buffer+="true,";
 				else
-					sprintf(buffer,"%s\"%s\":false,",buffer,now->key.c_str());
+					buffer+="false,";
 				break;
 			case OBJ:
-				sprintf(buffer,"%s\"%s\":",buffer,now->key.c_str());
 				printObj(buffer,now->objVal);
-				strcat(buffer,",");
+				buffer+=',';
 				break;
 			case ARRAY:
-				sprintf(buffer,"%s\"%s\":",buffer,now->key.c_str());
 				printArr(buffer,now->arrType,now->arr);
-				strcat(buffer,",");
+				buffer+=',';
 				break;
 			case EMPTY:
-				sprintf(buffer,"%s\"%s\":null",buffer,now->key.c_str());
+				buffer+="null,";
 				break;
 			default:
 				error="struct cannot print";
-				return false;
 			}
-			strcat(buffer,"\n");
+			buffer+='\n';
 			now=now->nextObj;
 			if(now==NULL)
-				*strrchr(buffer,',')=' ';
+			{
+				auto pos=buffer.find_last_of(',');
+				if(pos!=buffer.npos)
+					buffer[pos]=' ';
+			}
 		}
 		for(unsigned i=0;i<deep-1;i++)
-			strcat(buffer," ");
-		strcat(buffer,"}");
-		return true;
+			buffer+=" ";
+		buffer+="}";
+		return;
 	}
-	bool printArr(char*& buffer,TypeJson type,const std::vector<Object*>& arr)
+	void printArr(std::string& buffer,TypeJson type,const std::vector<Object*>& arr)
 	{
 		unsigned deep=0;
-		char* line=strrchr(buffer,'\n');
-		if(line==NULL)
-			deep=0;
+		char word[256]={0};
+		auto line=buffer.find_last_of('\n');
+		if(line==buffer.npos)
+			deep=1;
 		else
-			deep=buffer+strlen(buffer)-line;
-		strcat(buffer,"[\n");
+			deep=buffer.c_str()+buffer.size()-&buffer[line];
+		buffer+="[\n";
 		for(unsigned i=0;i<arr.size();i++)
 		{
-			while(memory[buffer]-(int)strlen(buffer)<(int)arr[i]->strVal.size()+64+(int)deep*5)
-				buffer=enlargeMemory(buffer);
 			for(unsigned i=0;i<deep+4;i++)
-				strcat(buffer," ");
+				buffer+=" ";
 			switch(type)
 			{
 			case INT:
-				sprintf(buffer,"%s%d,",buffer,arr[i]->intVal);
+				buffer+=std::to_string(arr[i]->intVal)+',';
 				break;
 			case FLOAT:
-				sprintf(buffer,"%s%.*lf,",buffer,floNum,arr[i]->floVal);
+				sprintf(word,"%.*lf,",floNum,arr[i]->floVal);
+				buffer+=word;
 				break;
 			case STRING:
-				sprintf(buffer,"%s\"%s\",",buffer,arr[i]->strVal.c_str());
+				buffer+='\"'+arr[i]->strVal+"\",";
 				break;
 			case BOOL:
 				if(arr[i]->boolVal)
-					strcat(buffer,"true,");
+					buffer+="true,";
 				else
-					strcat(buffer,"false,");
+					buffer+="false,";
 				break;
 			case OBJ:
 				printObj(buffer,arr[i]);
-				strcat(buffer,",");
+				buffer+=',';
 				break;
 			case ARRAY:
 				printArr(buffer,arr[i]->arrType,arr[i]->arr);
-				strcat(buffer,",");
+				buffer+=',';
+				break;
+			case EMPTY:
+				buffer+="null,";
 				break;
 			default:
 				error="struct cannot print";
-				return false;
 			}
-			strcat(buffer,"\n");
+			buffer+='\n';
 			if(i==arr.size()-1)
-				*strrchr(buffer,',')=' ';
+			{
+				auto pos=buffer.find_last_of(',');
+				if(pos!=buffer.npos)
+					buffer[pos]=' ';
+			}
 		}
 		for(unsigned i=0;i<deep-1;i++)
-			strcat(buffer," ");
-		strcat(buffer,"]");
-		return true;
+			buffer+=" ";
+		buffer+="]";
 	}
 };
+Json::Object Json::npos;
 /*******************************
  * author:chenxuan
  * class:class for run server in background and use guard
