@@ -4,10 +4,15 @@ using namespace cppweb;
 void cookie(HttpServer& server,DealHttp& http,int)
 {
 	auto buf=http.getCookie(server.recText(),"key");
+	std::unordered_map<std::string,std::string> temp;
+	http.req.routePairing((char*)server.recText(),"/cookie/:cookie",temp);
 	if(buf.size()==0)
 	{
 		http.gram.body="ready to setting cookie";
-		http.gram.cookie["key"]=http.designCookie("cookie ok",10);
+		if(temp.find("cookie")==temp.end())
+			http.gram.cookie["key"]=http.designCookie("cookie",10);
+		else
+			http.gram.cookie["key"]=http.designCookie(temp["cookie"].c_str(),10);
 		return;
 	}
 	Json json={
@@ -20,7 +25,7 @@ void cookie(HttpServer& server,DealHttp& http,int)
 int main()  
 {  
 	HttpServer server(5200,true);
-	server.get("/cookie",cookie);
+	server.get("/cookie/*",cookie);
 	server.run("index.html");
     return 0; 
 }  
