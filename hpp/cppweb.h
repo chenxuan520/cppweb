@@ -678,28 +678,14 @@ private:
 	char* text;
 	const char* error;
 	const char* nowKey;
-	unsigned maxLen;
-	unsigned floNum;
-	unsigned defaultSize;
-	bool isCheck;
 	Object* obj;
 	Node node;
+	unsigned floNum;
 	std::string wordStr;
 	std::string formatStr;
-	std::unordered_map<char*,int> memory;
 	std::unordered_map<char*,char*> bracket;
 public:
-	Json()
-	{
-		error=NULL;
-		obj=NULL;
-		text=NULL;
-		nowKey=NULL;
-		isCheck=true;
-		maxLen=256;
-		floNum=3;
-		defaultSize=128;
-	}
+	Json():text(NULL),error(NULL),nowKey(NULL),obj(NULL),floNum(3){}
 	Json(std::initializer_list<std::pair<std::string,InitType>> initList):Json()
 	{
 		node.initWithList(initList);
@@ -741,9 +727,6 @@ public:
 		deleteNode(obj);
 		if(text!=NULL)
 			free(text);
-		for(auto iter=memory.begin();iter!=memory.end();iter++)
-			if(iter->first!=NULL)
-				free(iter->first);
 	}
 	bool analyseText(const char* jsonText)
 	{
@@ -833,27 +816,18 @@ public:
 	{
 		return error;
 	}
-	inline void changeSetting(unsigned floNum=3,unsigned defaultSize=128,unsigned keyValMaxLen=256)
+	inline bool changeSetting(unsigned floNum)
 	{
-		this->defaultSize=defaultSize;
-		this->maxLen=keyValMaxLen>maxLen?keyValMaxLen:maxLen;
+		if(floNum>255)
+		{
+			error="float num max is 255";
+			return false;
+		}
 		this->floNum=floNum;
 		node.changeSetting(floNum);
+		return true;
 	}
 private:
-	char* enlargeMemory(char* old)
-	{
-		if(memory.find(old)==memory.end())
-			return old;
-		int temp=memory[old];
-		temp*=2;
-		void* strTemp=realloc(old,temp);
-		if(strTemp==NULL)
-			return old;
-		memory.erase(memory.find(old));
-		memory.insert(std::pair<char*,int>{(char*)strTemp,temp});
-		return (char*)strTemp;
-	}
 	Object* analyseObj(char* begin,char* end)
 	{
 		Object * root=new Object,*last=root;
