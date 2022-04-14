@@ -68,7 +68,7 @@ void getList(HttpServer&,DealHttp& http,int)
 		buf.push_back(node);
 		begin++;
 	}
-	json("array")=buf;
+	json[ "array" ]=buf;
 	http.gram.body=json();
 }
 int main()  

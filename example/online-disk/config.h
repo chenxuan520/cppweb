@@ -17,18 +17,19 @@ bool configServer(const char* configPath)
 		return false;
 	auto strGet=FileGet::getFileString(configPath);
 	Json json(strGet.c_str());
-	if(json["log"]!=NULL)
-		_config.isLog=json["log"]->boolVal;
-	if(json["port"]!=NULL)
-		_config.port=json["port"]->intVal;
-	if(json["passwd"]!=NULL)
-		_config.passwd=json["passwd"]->strVal;
-	if(json["log path"]!=NULL)
-		_config.logPath=json["log path"]->strVal;
-	if(json["store"]!=NULL)
-		_config.storePath=json["store"]->strVal;
-	if(json["token time"]!=NULL)
-		_config.tokenTime=json["token time"]->intVal;
+	auto root=json.getRootObj();
+	if(root["log"]!=Json::npos)
+		_config.isLog=root["log"].boolVal;
+	if(root["port"]!=Json::npos)
+		_config.port=root["port"].intVal;
+	if(root["passwd"]!=Json::npos)
+		_config.passwd=root["passwd"].strVal;
+	if(root["log path"]!=Json::npos)
+		_config.logPath=root["log path"].strVal;
+	if(root["store"]!=Json::npos)
+		_config.storePath=root["store"].strVal;
+	if(root["token time"]!=Json::npos)
+		_config.tokenTime=root["token time"].intVal;
 	if(_config.storePath.size()!=0)
 	{
 		auto flag=chdir(_config.storePath.c_str());

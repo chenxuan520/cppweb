@@ -120,26 +120,33 @@ static void _dealSignalRestart(int)
 class LoadConfig{
 private:
 	Json json;
+	Json::Object* rootObj;
 	HttpServer* pserver;
 	const char* error;
-	std::vector<std::pair<std::string,void (*)(Json::Object*,HttpServer&)>> arr;
+	std::vector<std::pair<std::string,void (*)(Json::Object&,HttpServer&)>> arr;
 public:
-	LoadConfig(const char* buffer):json(buffer),pserver(NULL),error(NULL)
+	LoadConfig(const char* buffer):json(buffer),rootObj(NULL),pserver(NULL),error(NULL)
 	{
 		if(json.lastError()!=NULL)
 		{
 			error=json.lastError();
 			return;
 		}
+		rootObj=&json.getRootObj();
+		if(*rootObj==Json::npos)
+		{
+			error=json.lastError();
+			return;
+		}
 	}
-	void findConfig(const char* key,void (*pfunc)(Json::Object*,Config&))
+	void findConfig(const char* key,void (*pfunc)(Json::Object&,Config&))
 	{
-		auto root=*json.getRootObj();
+		auto root=json.getRootObj();
 		pfunc(root[key],_config);
 	}
-	void findConfig(const char* key,void (*pfunc)(Json::Object*,HttpServer&))
+	void findConfig(const char* key,void (*pfunc)(Json::Object&,HttpServer&))
 	{
-		arr.push_back(std::pair<std::string,void (*)(Json::Object*,HttpServer&)>{key,pfunc});
+		arr.push_back(std::pair<std::string,void (*)(Json::Object&,HttpServer&)>{key,pfunc});
 	}
 	void runServer(void (*pfunc)(HttpServer&)=NULL)
 	{
@@ -206,8 +213,9 @@ private:
 			signal(SIGTERM,_dealSignalKill);
 #endif
 		}
-		for(auto& now:arr)
-			now.second(json[now.first.c_str()],server);
+		if(rootObj!=NULL)
+			for(auto& now:arr)
+				now.second((*rootObj)[now.first.c_str()],server);
 #ifdef CPPWEB_OPENSSL
 		if(FileGet::getFileLen(_config.certPath.c_str())<=0||
 		   FileGet::getFileLen(_config.keyPath.c_str())<=0)

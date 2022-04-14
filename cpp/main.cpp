@@ -23,123 +23,123 @@ void readExtraSetting(LoadConfig&)
 *********************************/
 void readSetting(LoadConfig& load)
 {
-	load.findConfig("port",[](Json::Object* obj,Config& con){
-					if(obj!=NULL)
-						con.port=obj->intVal;
+	load.findConfig("port",[](Json::Object& obj,Config& con){
+					if(obj!=Json::npos)
+						con.port=obj.intVal;
 					else
 					{
 						printf("Warning:port not define,use defalt 5200 port\n");
 						con.port=5200;
 					}
 					});
-	load.findConfig("memory",[](Json::Object* obj,Config& con){
-					if(obj!=NULL&&obj->intVal>0)
-						con.defaultMemory=obj->intVal;
+	load.findConfig("memory",[](Json::Object& obj,Config& con){
+					if(obj!=Json::npos&&obj.intVal>0)
+						con.defaultMemory=obj.intVal;
 					else
 						con.defaultMemory=1;
 					});
-	load.findConfig("thread num",[](Json::Object* obj,Config& con){
-					if(obj!=NULL&&obj->intVal>0)
-						con.threadNum=obj->intVal;
+	load.findConfig("thread num",[](Json::Object& obj,Config& con){
+					if(obj!=Json::npos&&obj.intVal>0)
+						con.threadNum=obj.intVal;
 					});
-	load.findConfig("message print",[](Json::Object* obj,Config& con){
-					if(obj!=NULL)
-						con.isDebug=obj->boolVal;
+	load.findConfig("message print",[](Json::Object& obj,Config& con){
+					if(obj!=Json::npos)
+						con.isDebug=obj.boolVal;
 					});
-	load.findConfig("forward proxy",[](Json::Object* obj,Config& con){
-					if(obj!=NULL)
-						con.isProxy=obj->boolVal;
+	load.findConfig("forward proxy",[](Json::Object& obj,Config& con){
+					if(obj!=Json::npos)
+						con.isProxy=obj.boolVal;
 					});
-	load.findConfig("default file",[](Json::Object* obj,Config& con){
-					if(obj!=NULL)
-						con.defaultFile=obj->strVal;
+	load.findConfig("default file",[](Json::Object& obj,Config& con){
+					if(obj!=Json::npos)
+						con.defaultFile=obj.strVal;
 					else
 						con.defaultFile="";
 					});
-	load.findConfig("background",[](Json::Object* obj,Config& con){
-					if(obj!=NULL)
-						con.isBack=obj->boolVal;
+	load.findConfig("background",[](Json::Object& obj,Config& con){
+					if(obj!=Json::npos)
+						con.isBack=obj.boolVal;
 					else
 						con.isBack=false;
 					});
-	load.findConfig("log path",[](Json::Object* obj,Config& con){
-					if(obj!=NULL)
-						con.logPath=obj->strVal;
+	load.findConfig("log path",[](Json::Object& obj,Config& con){
+					if(obj!=Json::npos)
+						con.logPath=obj.strVal;
 					else
 						con.logPath="access.log";
 					});
-	load.findConfig("guard",[](Json::Object* obj,Config& con){
-					if(obj!=NULL)
-						con.isGuard=obj->boolVal;
+	load.findConfig("guard",[](Json::Object& obj,Config& con){
+					if(obj!=Json::npos)
+						con.isGuard=obj.boolVal;
 					else
 						con.isGuard=false;
 					});
-	load.findConfig("auto",[](Json::Object* obj,Config& con){
-					if(obj!=NULL)
-						con.isAuto=obj->boolVal;
+	load.findConfig("auto",[](Json::Object& obj,Config& con){
+					if(obj!=Json::npos)
+						con.isAuto=obj.boolVal;
 					else
 						con.isAuto=true;
 					});
-	load.findConfig("model",[](Json::Object* obj,Config& con){
-					if(obj!=NULL)
-						con.model=obj->strVal;
+	load.findConfig("model",[](Json::Object& obj,Config& con){
+					if(obj!=Json::npos)
+						con.model=obj.strVal;
 					else
 					{
 						printf("Warning:model not define,use defalt MULTIPLEXING\n");
 						con.model="";
 					}
 					});
-	load.findConfig("long connect",[](Json::Object* obj,Config& con){
-					if(obj!=NULL)
-						con.isLongConnect=obj->boolVal;
+	load.findConfig("long connect",[](Json::Object& obj,Config& con){
+					if(obj!=Json::npos)
+						con.isLongConnect=obj.boolVal;
 					else
 						con.isLongConnect=true;
 					});
-	load.findConfig("logger",[](Json::Object* obj,Config& con){
-					if(obj!=NULL)
-						con.isLog=obj->boolVal;
+	load.findConfig("logger",[](Json::Object& obj,Config& con){
+					if(obj!=Json::npos)
+						con.isLog=obj.boolVal;
 					else
 						con.isLog=true;
 					});
-	load.findConfig("delete path",[](Json::Object* obj,Config& con){
-					if(obj!=NULL)
-						for(auto& now:obj->arr)
+	load.findConfig("delete path",[](Json::Object& obj,Config& con){
+					if(obj!=Json::npos)
+						for(auto& now:obj.arr)
 							con.deletePath.push_back(now->strVal);
 					});
-	load.findConfig("replace",[](Json::Object* obj,Config& con){
-					if(obj!=NULL)
-						for(auto& now:obj->arr)
+	load.findConfig("replace",[](Json::Object& obj,Config& con){
+					if(obj!=Json::npos)
+						for(auto& now:obj.arr)
 						{
-							if((*now)["path"]!=NULL&&(*now)["replace"]!=NULL)
+							if((*now)["path"]!=Json::npos&&(*now)["replace"]!=Json::npos)
 								con.replacePath.push_back(\
-												std::pair<std::string,std::string>{(*now)["path"]->strVal,(*now)["replace"]->strVal});
+												std::pair<std::string,std::string>{(*now)["path"].strVal,(*now)["replace"].strVal});
 							else
 								printf("Warning:define replace but format is wrong\n");
 						}
 					});
-	load.findConfig("redirect",[](Json::Object* obj,Config& con){
-					if(obj!=NULL)
-						for(auto& now:obj->arr)
+	load.findConfig("redirect",[](Json::Object& obj,Config& con){
+					if(obj!=Json::npos)
+						for(auto& now:obj.arr)
 						{
-							if((*now)["path"]!=NULL&&(*now)["redirect"]!=NULL)
+							if((*now)["path"]!=Json::npos&&(*now)["redirect"]!=Json::npos)
 								con.redirectPath.push_back(\
-												std::pair<std::string,std::string>{(*now)["path"]->strVal,(*now)["redirect"]->strVal});
+												std::pair<std::string,std::string>{(*now)["path"].strVal,(*now)["redirect"].strVal});
 							else
 								printf("Warning:define redirect but format is wrong\n");
 						}
 					});
-	load.findConfig("reverse proxy",[](Json::Object* obj,Config& con){
-					if(obj!=NULL)
-						for(auto& pnow:obj->arr)
+	load.findConfig("reverse proxy",[](Json::Object& obj,Config& con){
+					if(obj!=Json::npos)
+						for(auto& pnow:obj.arr)
 						{
 							auto now=*pnow;
-							if((now)["weight"]==NULL||(now)["host"]==NULL||(now)["path"]==NULL||(now)["model"]==NULL)
+							if((now)["weight"]==Json::npos||(now)["host"]==Json::npos||(now)["path"]==Json::npos||(now)["model"]==Json::npos)
 							{
 								printf("Warning:define proxy but format is wrong\n");
 								continue;
 							}
 							Config::Proxy temp(LoadBalance::TEMPNO);
-							auto& strNow=now["model"]->strVal;
+							auto& strNow=now["model"].strVal;
 							if(strNow=="HASH")
 								temp.load.addModel(LoadBalance::HASH);
 							else if(strNow=="POLLING")
@@ -148,32 +148,32 @@ void readSetting(LoadConfig& load)
 								temp.load.addModel(LoadBalance::POLLRAN);
 							else
 								temp.load.addModel(LoadBalance::RANDOM);
-							for(unsigned i=0;i<now["host"]->arr.size();i++)
+							for(unsigned i=0;i<now["host"].arr.size();i++)
 							{
-								auto arr=now["host"]->arr[i]->strVal; 
+								auto arr=now["host"].arr[i]->strVal; 
 								temp.host.push_back(arr);
-								temp.load.addServer(arr.c_str(),now["weight"]->arr[i]->intVal);
+								temp.load.addServer(arr.c_str(),now["weight"].arr[i]->intVal);
 							}
 							con.proxyMap.insert(std::pair<std::string,Config::Proxy>\
-												{now["path"]->strVal,temp});
+												{now["path"].strVal,temp});
 						}
 					});
 #ifdef CPPWEB_OPENSSL
-	load.findConfig("key path",[](Json::Object* obj,Config& con){
-					if(obj!=NULL)
-						con.keyPath=obj->strVal;
+	load.findConfig("key path",[](Json::Object& obj,Config& con){
+					if(obj!=Json::npos)
+						con.keyPath=obj.strVal;
 					else
 						printf("Warning:use ssl but not define key path,https cannot work!\n");
 					});
-	load.findConfig("cert path",[](Json::Object* obj,Config& con){
-					if(obj!=NULL)
-						con.certPath=obj->strVal;
+	load.findConfig("cert path",[](Json::Object& obj,Config& con){
+					if(obj!=Json::npos)
+						con.certPath=obj.strVal;
 					else
 						printf("Warning:use ssl but not define cert path,https cannot work!\n");
 					});
-	load.findConfig("cert password",[](Json::Object* obj,Config& con){
-					if(obj!=NULL)
-						con.passwd=obj->strVal;
+	load.findConfig("cert password",[](Json::Object& obj,Config& con){
+					if(obj!=Json::npos)
+						con.passwd=obj.strVal;
 					});
 #endif
 	readExtraSetting(load);
