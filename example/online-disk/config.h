@@ -6,10 +6,11 @@ struct _Config{
 	std::string storePath;
 	std::string logPath;
 	bool isLog;
+	bool isVerify;
 	int port;
 	int tokenTime;
 	_Config():passwd("123456"),storePath("./template"),\
-			  isLog(false),port(5200),tokenTime(120){};
+			  isLog(false),isVerify(true),port(5200),tokenTime(120){};
 }_config;
 bool configServer(const char* configPath)
 {
@@ -30,6 +31,8 @@ bool configServer(const char* configPath)
 		_config.storePath=root["store"].strVal;
 	if(root["token time"]!=Json::npos)
 		_config.tokenTime=root["token time"].intVal;
+	if(root["verify"]!=Json::npos)
+		_config.isVerify=root["verify"].boolVal;
 	if(_config.storePath.size()!=0)
 	{
 		auto flag=chdir(_config.storePath.c_str());
