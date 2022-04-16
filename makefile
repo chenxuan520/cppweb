@@ -10,19 +10,15 @@ obj=main
 obj_source=./cpp/main.cpp
 pro_source=./hpp/cppweb.h
 source=./cpp/main.cpp ./hpp/cppweb.h ./hpp/proxy.h ./hpp/config.h ./hpp/route.h
-install_dir=/usr/local/include/cppweb
 link=-lpthread
 link_ssl=-lpthread -lssl -lcrypto
 macro=-D CPPWEB_OPENSSL
+install_dir=/usr/local/include/cppweb
 
 main: $(source)
 	$(cc) -O2 $(obj_source) -o $(obj) $(link) 
 clean:
 	rm -f *.o 
-sql: sql.o
-	ar rcs ./lib/libsql.a $^
-sql.o: ./cpp/sql.cpp
-	$(cc) -c $^ -o $@
 ssl: $(source)
 	$(cc) -O2 $(obj_source) -o $(obj) $(macro) $(link_ssl)
 debug:
