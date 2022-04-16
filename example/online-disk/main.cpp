@@ -14,7 +14,8 @@ int main()
 	HttpServer server(_config.port,true);//input the port bound
 	if(_config.isLog)
 		server.setLog(LogSystem::recordRequest,LogSystem::recordRequest);
-	server.setMiddleware(middleware);
+	if(_config.isVerify)
+		server.setMiddleware(middleware);
 	server.post("/message*",nowPwdFile);
 	server.post("/upload*",upload);
 	server.post("/mkdir*",mkdirNow);
