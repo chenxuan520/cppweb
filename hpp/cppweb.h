@@ -2402,6 +2402,14 @@ public:
 			typeFile=FileKind::ZIP;
 			this->createData(staCode,data);
 		}
+		void redirect(const std::string& location,bool forever=false)
+		{
+			if(forever)
+				statusCode=STATUSMOVED;
+			else
+				statusCode=STATUSMOVTEMP;
+			this->head["Location"]=location;
+		}
 	private:
 		void createData(Status staCode,const std::string& data)
 		{
@@ -4698,7 +4706,7 @@ private:
 			int newClient=acceptSocket(newaddr);
 			if(newClient==-1)
 				continue;
-			ThreadArg* temp=new ThreadArg;
+			ThreadArg* temp=(ThreadArg*)malloc(sizeof(ThreadArg));
 			temp->pserver=this;
 			temp->soc=newClient;
 			ThreadPool::Task task={threadWorker,temp};
@@ -5155,6 +5163,32 @@ public:
 			result=std::regex_replace(result,reg,now.second);
 		}
 		return result;
+	}
+};
+/***********************************************
+* Author: chenxuan-1607772321@qq.com
+* change time:2022-04-16 23:35:16
+* description:http api
+***********************************************/
+class HttpApi{
+private:
+	HttpApi()=delete;
+	HttpApi(const HttpApi&)=delete;
+public:
+	//get complete datagram,result store in buffer,return recv size
+	static int getCompleteHtml(std::string& buffer,int sock,int flag=0)
+	{
+		SocketApi::recvSockBorder(sock,buffer,"\r\n\r\n",flag);
+		auto temp=DealHttp::findKeyValue("Content-Length",buffer.c_str());
+		int len=0;
+		if(temp.size()==0)
+			return 0;
+		else
+			sscanf(temp.c_str(),"%d",&len);
+		if(len==0)
+			return 0;
+		SocketApi::recvSockSize(sock,buffer,len);
+		return buffer.size();
 	}
 };
 }

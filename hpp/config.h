@@ -42,26 +42,6 @@ struct Config{
 }_config;
 /***********************************************
 * Author: chenxuan-1607772321@qq.com
-* change time:2022-04-14 14:39:38
-* description:get complete datagram
-* example: result store in buffer,return recv size
-***********************************************/
-int getCompleteHtml(std::string& buffer,int sock,int flag=0)
-{
-	SocketApi::recvSockBorder(sock,buffer,"\r\n\r\n",flag);
-	auto temp=DealHttp::findKeyValue("Content-Length",buffer.c_str());
-	int len=0;
-	if(temp.size()==0)
-		return 0;
-	else
-		sscanf(temp.c_str(),"%d",&len);
-	if(len==0)
-		return 0;
-	SocketApi::recvSockSize(sock,buffer,len);
-	return buffer.size();
-}
-/***********************************************
-* Author: chenxuan-1607772321@qq.com
 * change time:2022-03-17 19:32:20
 * description:function of Reverse proxy
 ***********************************************/
@@ -104,7 +84,7 @@ void proxy(HttpServer& server,DealHttp& http,int soc)
 		memset(server.getSenBuffer(),0,server.getMaxSenLen());
 		int socCli=client.getSocket();
 		std::string strGet;
-		int len=getCompleteHtml(strGet,socCli);
+		int len=HttpApi::getCompleteHtml(strGet,socCli);
 		if(len<=0)
 		{
 			http.gram.statusCode=DealHttp::STATUSNOFOUND;
