@@ -1,14 +1,25 @@
+#***********************************************
+# Author: chenxuan-1607772321@qq.com
+# change time:2022-04-15 19:29:51
+# description: makefile of project
+#**********************************************/
 all:main
 
-main:./cpp/main.cpp ./hpp/cppweb.h ./hpp/config.h ./hpp/route.h
-	g++ -O2 ./cpp/main.cpp -o main -lpthread -lwsock32 -std=c++11
+cc=g++
+obj=main
+obj_source=./cpp/main.cpp
+pro_source=./hpp/cppweb.h
+source=./cpp/main.cpp ./hpp/cppweb.h ./hpp/proxy.h ./hpp/config.h ./hpp/route.h
+link=-lpthread -lwsock32
+link_ssl=-lpthread -lwsock32 -lssl -lcrypto
+macro=-D CPPWEB_OPENSSL
+compile_option=-std=c++11
+
+main: $(source)
+	$(cc) -O2 $(obj_source) -o $(obj) $(link) $(compile_option)
 clean:
 	rm -f *.o 
-sql: sql.o
-	ar rcs ./lib/libsql.a sql.o
-sql.o: ./cpp/sql.cpp
-	g++ -c ./cpp/sql.cpp -o sql.o
-ssl:./hpp/cppweb.h ./hpp/config.h ./cpp/main.cpp ./hpp/route.h
-	g++ -O2 ./cpp/main.cpp -o main -D CPPWEB_OPENSSL -lpthread -lwsock32 -lssl -lcrypto -std=c++11
+ssl: $(source)
+	$(cc) -O2 $(obj_source) -o $(obj) $(macro) $(link_ssl)
 debug:
-	g++ -g ./cpp/main.cpp -o main -lpthread
+	$(cc) -g $(obj_source) -o $(obj) $(link)
