@@ -7,6 +7,7 @@
 #include "../hpp/route.h"
 #include "../hpp/config.h"
 using namespace cppweb;
+std::string _configFile;
 /***********************************************
 * Author: chenxuan-1607772321@qq.com
 * change time:2022-03-17 23:34:19
@@ -186,8 +187,10 @@ void readSetting(LoadConfig& load)
 *********************************/
 void serverHttp()
 {
+	if(_config.configFile.size()==0)
+		_config.configFile="./config.json";
 	FileGet file;
-	LoadConfig config(file.getFileBuff("./config.json"));
+	LoadConfig config(file.getFileBuff(_config.configFile.c_str()));
 	if(config.lastError()!=NULL)
 	{
 		printf("config wrong %s\n",config.lastError());
@@ -234,6 +237,12 @@ void dealArgc(int argc,char** argv)
 			sleep(5);
 		}
 #endif
+	}
+	else if(strncmp(argv[1],"--config=",9)==0)
+	{
+		char* pname=argv[1]+9;
+		_config.configFile=pname;
+		printf("read config from %s\n",pname);
 	}
 	else
 	{

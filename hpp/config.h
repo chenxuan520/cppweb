@@ -28,6 +28,7 @@ struct Config{
 	int port;
 	int defaultMemory;
 	int threadNum;
+	std::string configFile;
 	std::string defaultFile;
 	std::string logPath;
 	std::string model;

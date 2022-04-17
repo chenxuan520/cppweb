@@ -3085,6 +3085,97 @@ public:
 	{
 		return req.createAskRequest();
 	}
+	int createDatagram(const Datagram& gram,std::string& buffer)
+	{
+		const char* statusEng=NULL;
+		switch(gram.statusCode)
+		{
+		case STATUSOK:
+			statusEng="OK";
+			break;
+		case STATUSNOCON:
+			statusEng="No Content";
+			break;
+		case STATUSMOVED:
+			statusEng="Moved Permanently";
+			break;
+		case STATUSMOVTEMP:
+			statusEng="Found";
+			break;
+		case STATUSBADREQUEST:
+			statusEng="Bad Request";
+			break;
+		case STATUSFORBIDDEN:
+			statusEng="Forbidden";
+			break;
+		case STATUSNOFOUND:
+			statusEng="Not Found";
+			break;
+		case STATUSNOIMPLEMENT:
+			statusEng="Not Implemented";
+			break;
+		default:
+			error="status code UNKNOWN";
+			return -1;
+		}
+		buffer+="HTTP/1.1 "+std::to_string((int)gram.statusCode)+" ";
+		buffer+=statusEng+std::string("\r\n");
+		buffer+="Server: "+std::string(serverName)+"\r\n";
+		buffer+="Connect: "+std::string(connect)+"\r\n";
+		if(gram.statusCode==STATUSNOFOUND)
+		{
+			buffer+="Content-Type: text/plain\r\nContent-Length:"+std::to_string(strlen(("404 page no found")))+\
+					 "\r\n\r\n404 page no found";
+			return buffer.size();
+		}
+		switch(gram.typeFile)
+		{
+		case UNKNOWN:
+			if(gram.typeName.size()==0||gram.typeName.size()>200)
+				break;
+			buffer+="Content-Type: "+gram.typeName+"\r\n";
+			break;
+		case NOFOUND:
+			buffer+="\r\n";
+			break;
+		case HTML:
+			buffer+="Content-Type: text/html\r\n";
+			break;
+		case TXT:
+			buffer+="Content-Type: text/plain\r\n";
+			break;
+		case IMAGE:
+			buffer+="Content-Type: image\r\n";
+			break;
+		case CSS:
+			buffer+="Content-Type: text/css\r\n";
+			break;
+		case JS:
+			buffer+="Content-Type: text/javascript\r\n";
+			break;
+		case JSON:
+			buffer+="Content-Type: application/json\r\n";
+			break;
+		case ZIP:
+			buffer+="Content-Type: application/zip\r\n";
+			break;
+		}
+		buffer+="Content-Length: "+std::to_string(gram.fileLen)+"\r\n";
+		if(!gram.head.empty())
+			for(auto iter=gram.head.begin();iter!=gram.head.end();iter++)
+				buffer+=iter->first+": "+iter->second+"\r\n";
+		if(!head.empty())
+			for(auto iter=head.begin();iter!=head.end();iter++)
+				buffer+=iter->first+": "+iter->second+"\r\n";
+		if(!gram.cookie.empty())
+			for(auto iter=gram.cookie.begin();iter!=gram.cookie.end();iter++)
+				buffer+="Set-Cookie:"+iter->first+"="+iter->second+"\r\n";
+		if(!cookie.empty())
+			for(auto iter=cookie.begin();iter!=cookie.end();iter++)
+				buffer+="Set-Cookie:"+iter->first+"="+iter->second+"\r\n";
+		buffer+=gram.body;
+		return buffer.size();
+	}
 	int createDatagram(const Datagram& gram,void* buffer,unsigned bufferLen)
 	{
 		if(gram.fileLen>bufferLen||bufferLen==0)
