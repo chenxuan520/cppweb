@@ -193,7 +193,7 @@ private:
 	void configServer(HttpServer& server)
 	{
 		server.changeSetting(_config.isDebug,_config.isLongConnect,_config.isAuto,_config.defaultMemory);
-		if(_config.isProxy&&_config.model=="THREAD")
+		if(_config.isProxy)
 		{
 			server.all("http://*",ForwardProxy::httpProxy);
 			server.routeHandle(HttpServer::CONNECT,"*",ForwardProxy::httpsProxy);

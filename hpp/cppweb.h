@@ -1621,6 +1621,9 @@ public:
 #else
 		OPENSSL_init_ssl(OPENSSL_INIT_LOAD_SSL_STRINGS | OPENSSL_INIT_LOAD_CRYPTO_STRINGS, NULL);
 #endif
+#ifndef _WIN32
+		signal(SIGPIPE, SIG_IGN);
+#endif
 		ctx=SSL_CTX_new(TLS_method());
 		if(ctx==NULL)
 		{
