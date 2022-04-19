@@ -234,7 +234,7 @@ void dealArgc(int argc,char** argv)
 		else
 		{
 			printf("wait for the port unbound...\n");
-			sleep(5);
+			sleep(1);
 		}
 #endif
 	}
@@ -248,9 +248,10 @@ void dealArgc(int argc,char** argv)
 	{
 		printf("thank using chenxuanweb,if you have any question\n"
 			   "send email to 1607772321@qq.com to deal problem\nTHANK YOU!\n"
-			   "--help\t\tget the help\n"
-			   "--stop\t\tstop the server\n"
-			   "--reload\t\treload the server\n"
+			   "--help\t\t\tget the help\n"
+			   "--stop\t\t\tstop the server\n"
+			   "--reload\t\t\treload the server\n"
+			   "--config=(file name)\t\t\tchoose file as config file\n"
 			   "! only in linux the argv is accepted\n");
 		exit(0);
 	}

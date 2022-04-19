@@ -82,6 +82,24 @@ private:
 	SocketApi()=delete;
 	SocketApi(const SocketApi&)=delete;
 public:
+	static inline int setSocWriteWait(int fd,unsigned sec,unsigned msec=0)
+	{
+		if(sec==0&&msec==0)
+			return 0;
+		struct timeval tv; 
+		tv.tv_sec=sec;
+		tv.tv_usec=msec;
+		return setsockopt(fd,SOL_SOCKET,SO_SNDTIMEO,&tv,sizeof(struct timeval));
+	}
+	static inline int setSocReadWait(int fd,unsigned sec,unsigned msec=0)
+	{
+		if(sec==0&&msec==0)
+			return 0;
+		struct timeval tv; 
+		tv.tv_sec=sec;
+		tv.tv_usec=msec;
+		return setsockopt(fd,SOL_SOCKET,SO_RCVTIMEO,&tv,sizeof(struct timeval));
+	}
 	static inline int receiveSocket(int fd,void* buffer,size_t len,int flag=0)
 	{
 		return recv(fd,(char*)buffer,len,flag);
@@ -1498,11 +1516,13 @@ protected:
 	int numClient;//how many clients now;
 	int fd_count;//sum of clients in fd_set
 	int epfd;//file descriptor to ctrl epoll
+	int sock;//file descriptor of host;
+	int sockC;//file descriptor to sign every client;
+	int writeTime;//useful only in ssl model
+	bool reuseAddr;//if reuse the addr
 	char* hostip;//host IP 
 	char* hostname;//host name
 	const char* error;//error hapen
-	int sock;//file descriptor of host;
-	int sockC;//file descriptor to sign every client;
 	sockaddr_in addr;//IPv4 of host;
 	sockaddr_in client;//IPv4 of client;
 	fd_set  fdClients;//file descriptor
@@ -1586,6 +1606,8 @@ public:
 		sizeAddr=sizeof(sockaddr);
 		backwait=wait;
 		numClient=0;
+		writeTime=5;
+		reuseAddr=true;
 		error=NULL;
 		hostip=(char*)malloc(sizeof(char)*200);
 		if(hostip==NULL)
@@ -1611,6 +1633,9 @@ public:
 			error="pfdn wrong";
 		else
 			memset(pfdn,0,sizeof(int)*64);
+#ifndef _WIN32
+		signal(SIGPIPE, SIG_IGN);
+#endif
 #endif
 		fdNumNow=0;
 		fdMax=64;
@@ -1621,15 +1646,13 @@ public:
 #else
 		OPENSSL_init_ssl(OPENSSL_INIT_LOAD_SSL_STRINGS | OPENSSL_INIT_LOAD_CRYPTO_STRINGS, NULL);
 #endif
-#ifndef _WIN32
-		signal(SIGPIPE, SIG_IGN);
-#endif
 		ctx=SSL_CTX_new(TLS_method());
 		if(ctx==NULL)
 		{
 			error="create ctx wrong";
 			return;
 		}
+		SSL_CTX_set_mode(ctx, SSL_MODE_AUTO_RETRY);
 		SSL_CTX_set_options(ctx,
 							SSL_OP_ALL | SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 |
 							SSL_OP_NO_COMPRESSION |
@@ -1682,6 +1705,7 @@ public:
 	int acceptSocketSSL(sockaddr_in& newaddr)
 	{
 		int cli=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
+		SocketApi::setSocWriteWait(cli,writeTime);
 		SSL* now=SSL_new(ctx);
 		if(now==NULL)
 		{
@@ -1730,6 +1754,11 @@ public:
 #endif
 	inline bool bondhost()//bond myself first
 	{
+		if(reuseAddr)
+		{
+			int optval=1;
+			setsockopt(sock,SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
+		}
 		if(bind(sock,(sockaddr*)&addr,sizeof(addr))==-1)
 			return false;
 		return true;
@@ -4382,13 +4411,15 @@ public:
 		textLen=result;
 		return result;
 	}
-	void changeSetting(bool debug,bool isLongCon,bool isAuto=true,unsigned maxSendLen=10)
+	void changeSetting(bool debug,bool isLongCon,bool isAuto=true,unsigned maxSendLen=10,unsigned sslWriteTime=5)
 	{//change setting
 		this->isDebug=debug;
 		this->isLongCon=isLongCon;
 		this->isAutoAnalysis=isAuto;
 		if(maxSendLen>1)
 			this->maxLen=maxSendLen;
+		if(sslWriteTime!=0)
+			this->writeTime=sslWriteTime;
 	}
 	inline void* recText()
 	{//get the recv text;
@@ -4699,6 +4730,9 @@ private:
 		{
 			if(isDebug)
 				perror("send wrong");
+			if(logError)
+				logError(strerror(errno),num);
+			this->cleanSocket(num);
 		}
 		else
 		{
@@ -4729,9 +4763,12 @@ private:
 			{
 				server.getText=server.enlargeMemory(server.getText,server.recLen);
 				getNum=server.receiveSocket(soc,(char*)server.getText+all,server.recLen-all,MSG_DONTWAIT);
-				if(getNum<=0)
+				if(getNum==0)
 					break;
-				all+=getNum;
+				else if(getNum<0)
+					return soc;
+				else
+					all+=getNum;
 			}
 			if(all>0)
 			{
