@@ -28,6 +28,7 @@ struct Config{
 	int port;
 	int defaultMemory;
 	int threadNum;
+	std::string configFile;
 	std::string defaultFile;
 	std::string logPath;
 	std::string model;
@@ -40,26 +41,6 @@ struct Config{
 	std::unordered_map<std::string,Proxy> proxyMap;
 	Config():isLongConnect(true),isBack(false),isGuard(false),isLog(false),isAuto(true),isDebug(true),isProxy(false),port(5200),defaultMemory(1),threadNum(0){};
 }_config;
-/***********************************************
-* Author: chenxuan-1607772321@qq.com
-* change time:2022-04-14 14:39:38
-* description:get complete datagram
-* example: result store in buffer,return recv size
-***********************************************/
-int getCompleteHtml(std::string& buffer,int sock,int flag=0)
-{
-	SocketApi::recvSockBorder(sock,buffer,"\r\n\r\n",flag);
-	auto temp=DealHttp::findKeyValue("Content-Length",buffer.c_str());
-	int len=0;
-	if(temp.size()==0)
-		return 0;
-	else
-		sscanf(temp.c_str(),"%d",&len);
-	if(len==0)
-		return 0;
-	SocketApi::recvSockSize(sock,buffer,len);
-	return buffer.size();
-}
 /***********************************************
 * Author: chenxuan-1607772321@qq.com
 * change time:2022-03-17 19:32:20
@@ -104,7 +85,7 @@ void proxy(HttpServer& server,DealHttp& http,int soc)
 		memset(server.getSenBuffer(),0,server.getMaxSenLen());
 		int socCli=client.getSocket();
 		std::string strGet;
-		int len=getCompleteHtml(strGet,socCli);
+		int len=HttpApi::getCompleteHtml(strGet,socCli);
 		if(len<=0)
 		{
 			http.gram.statusCode=DealHttp::STATUSNOFOUND;
@@ -212,7 +193,7 @@ private:
 	void configServer(HttpServer& server)
 	{
 		server.changeSetting(_config.isDebug,_config.isLongConnect,_config.isAuto,_config.defaultMemory);
-		if(_config.isProxy&&_config.model=="THREAD")
+		if(_config.isProxy)
 		{
 			server.all("http://*",ForwardProxy::httpProxy);
 			server.routeHandle(HttpServer::CONNECT,"*",ForwardProxy::httpsProxy);

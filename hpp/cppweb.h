@@ -82,6 +82,24 @@ private:
 	SocketApi()=delete;
 	SocketApi(const SocketApi&)=delete;
 public:
+	static inline int setSocWriteWait(int fd,unsigned sec,unsigned msec=0)
+	{
+		if(sec==0&&msec==0)
+			return 0;
+		struct timeval tv; 
+		tv.tv_sec=sec;
+		tv.tv_usec=msec;
+		return setsockopt(fd,SOL_SOCKET,SO_SNDTIMEO,&tv,sizeof(struct timeval));
+	}
+	static inline int setSocReadWait(int fd,unsigned sec,unsigned msec=0)
+	{
+		if(sec==0&&msec==0)
+			return 0;
+		struct timeval tv; 
+		tv.tv_sec=sec;
+		tv.tv_usec=msec;
+		return setsockopt(fd,SOL_SOCKET,SO_RCVTIMEO,&tv,sizeof(struct timeval));
+	}
 	static inline int receiveSocket(int fd,void* buffer,size_t len,int flag=0)
 	{
 		return recv(fd,(char*)buffer,len,flag);
@@ -1498,11 +1516,13 @@ protected:
 	int numClient;//how many clients now;
 	int fd_count;//sum of clients in fd_set
 	int epfd;//file descriptor to ctrl epoll
+	int sock;//file descriptor of host;
+	int sockC;//file descriptor to sign every client;
+	int writeTime;//useful only in ssl model
+	bool reuseAddr;//if reuse the addr
 	char* hostip;//host IP 
 	char* hostname;//host name
 	const char* error;//error hapen
-	int sock;//file descriptor of host;
-	int sockC;//file descriptor to sign every client;
 	sockaddr_in addr;//IPv4 of host;
 	sockaddr_in client;//IPv4 of client;
 	fd_set  fdClients;//file descriptor
@@ -1586,6 +1606,8 @@ public:
 		sizeAddr=sizeof(sockaddr);
 		backwait=wait;
 		numClient=0;
+		writeTime=5;
+		reuseAddr=true;
 		error=NULL;
 		hostip=(char*)malloc(sizeof(char)*200);
 		if(hostip==NULL)
@@ -1611,6 +1633,9 @@ public:
 			error="pfdn wrong";
 		else
 			memset(pfdn,0,sizeof(int)*64);
+#ifndef _WIN32
+		signal(SIGPIPE, SIG_IGN);
+#endif
 #endif
 		fdNumNow=0;
 		fdMax=64;
@@ -1627,6 +1652,7 @@ public:
 			error="create ctx wrong";
 			return;
 		}
+		SSL_CTX_set_mode(ctx, SSL_MODE_AUTO_RETRY);
 		SSL_CTX_set_options(ctx,
 							SSL_OP_ALL | SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 |
 							SSL_OP_NO_COMPRESSION |
@@ -1679,6 +1705,7 @@ public:
 	int acceptSocketSSL(sockaddr_in& newaddr)
 	{
 		int cli=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
+		SocketApi::setSocWriteWait(cli,writeTime);
 		SSL* now=SSL_new(ctx);
 		if(now==NULL)
 		{
@@ -1727,6 +1754,11 @@ public:
 #endif
 	inline bool bondhost()//bond myself first
 	{
+		if(reuseAddr)
+		{
+			int optval=1;
+			setsockopt(sock,SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
+		}
 		if(bind(sock,(sockaddr*)&addr,sizeof(addr))==-1)
 			return false;
 		return true;
@@ -2402,6 +2434,14 @@ public:
 			typeFile=FileKind::ZIP;
 			this->createData(staCode,data);
 		}
+		void redirect(const std::string& location,bool forever=false)
+		{
+			if(forever)
+				statusCode=STATUSMOVED;
+			else
+				statusCode=STATUSMOVTEMP;
+			this->head["Location"]=location;
+		}
 	private:
 		void createData(Status staCode,const std::string& data)
 		{
@@ -3076,6 +3116,97 @@ public:
 	inline std::string createAskRequest(Request& req)
 	{
 		return req.createAskRequest();
+	}
+	int createDatagram(const Datagram& gram,std::string& buffer)
+	{
+		const char* statusEng=NULL;
+		switch(gram.statusCode)
+		{
+		case STATUSOK:
+			statusEng="OK";
+			break;
+		case STATUSNOCON:
+			statusEng="No Content";
+			break;
+		case STATUSMOVED:
+			statusEng="Moved Permanently";
+			break;
+		case STATUSMOVTEMP:
+			statusEng="Found";
+			break;
+		case STATUSBADREQUEST:
+			statusEng="Bad Request";
+			break;
+		case STATUSFORBIDDEN:
+			statusEng="Forbidden";
+			break;
+		case STATUSNOFOUND:
+			statusEng="Not Found";
+			break;
+		case STATUSNOIMPLEMENT:
+			statusEng="Not Implemented";
+			break;
+		default:
+			error="status code UNKNOWN";
+			return -1;
+		}
+		buffer+="HTTP/1.1 "+std::to_string((int)gram.statusCode)+" ";
+		buffer+=statusEng+std::string("\r\n");
+		buffer+="Server: "+std::string(serverName)+"\r\n";
+		buffer+="Connect: "+std::string(connect)+"\r\n";
+		if(gram.statusCode==STATUSNOFOUND)
+		{
+			buffer+="Content-Type: text/plain\r\nContent-Length:"+std::to_string(strlen(("404 page no found")))+\
+					 "\r\n\r\n404 page no found";
+			return buffer.size();
+		}
+		switch(gram.typeFile)
+		{
+		case UNKNOWN:
+			if(gram.typeName.size()==0||gram.typeName.size()>200)
+				break;
+			buffer+="Content-Type: "+gram.typeName+"\r\n";
+			break;
+		case NOFOUND:
+			buffer+="\r\n";
+			break;
+		case HTML:
+			buffer+="Content-Type: text/html\r\n";
+			break;
+		case TXT:
+			buffer+="Content-Type: text/plain\r\n";
+			break;
+		case IMAGE:
+			buffer+="Content-Type: image\r\n";
+			break;
+		case CSS:
+			buffer+="Content-Type: text/css\r\n";
+			break;
+		case JS:
+			buffer+="Content-Type: text/javascript\r\n";
+			break;
+		case JSON:
+			buffer+="Content-Type: application/json\r\n";
+			break;
+		case ZIP:
+			buffer+="Content-Type: application/zip\r\n";
+			break;
+		}
+		buffer+="Content-Length: "+std::to_string(gram.fileLen)+"\r\n";
+		if(!gram.head.empty())
+			for(auto iter=gram.head.begin();iter!=gram.head.end();iter++)
+				buffer+=iter->first+": "+iter->second+"\r\n";
+		if(!head.empty())
+			for(auto iter=head.begin();iter!=head.end();iter++)
+				buffer+=iter->first+": "+iter->second+"\r\n";
+		if(!gram.cookie.empty())
+			for(auto iter=gram.cookie.begin();iter!=gram.cookie.end();iter++)
+				buffer+="Set-Cookie:"+iter->first+"="+iter->second+"\r\n";
+		if(!cookie.empty())
+			for(auto iter=cookie.begin();iter!=cookie.end();iter++)
+				buffer+="Set-Cookie:"+iter->first+"="+iter->second+"\r\n";
+		buffer+=gram.body;
+		return buffer.size();
 	}
 	int createDatagram(const Datagram& gram,void* buffer,unsigned bufferLen)
 	{
@@ -4280,13 +4411,15 @@ public:
 		textLen=result;
 		return result;
 	}
-	void changeSetting(bool debug,bool isLongCon,bool isAuto=true,unsigned maxSendLen=10)
+	void changeSetting(bool debug,bool isLongCon,bool isAuto=true,unsigned maxSendLen=10,unsigned sslWriteTime=5)
 	{//change setting
 		this->isDebug=debug;
 		this->isLongCon=isLongCon;
 		this->isAutoAnalysis=isAuto;
 		if(maxSendLen>1)
 			this->maxLen=maxSendLen;
+		if(sslWriteTime!=0)
+			this->writeTime=sslWriteTime;
 	}
 	inline void* recText()
 	{//get the recv text;
@@ -4597,6 +4730,9 @@ private:
 		{
 			if(isDebug)
 				perror("send wrong");
+			if(logError)
+				logError(strerror(errno),num);
+			this->cleanSocket(num);
 		}
 		else
 		{
@@ -4627,9 +4763,12 @@ private:
 			{
 				server.getText=server.enlargeMemory(server.getText,server.recLen);
 				getNum=server.receiveSocket(soc,(char*)server.getText+all,server.recLen-all,MSG_DONTWAIT);
-				if(getNum<=0)
+				if(getNum==0)
 					break;
-				all+=getNum;
+				else if(getNum<0)
+					return soc;
+				else
+					all+=getNum;
 			}
 			if(all>0)
 			{
@@ -4698,7 +4837,7 @@ private:
 			int newClient=acceptSocket(newaddr);
 			if(newClient==-1)
 				continue;
-			ThreadArg* temp=new ThreadArg;
+			ThreadArg* temp=(ThreadArg*)malloc(sizeof(ThreadArg));
 			temp->pserver=this;
 			temp->soc=newClient;
 			ThreadPool::Task task={threadWorker,temp};
@@ -5155,6 +5294,32 @@ public:
 			result=std::regex_replace(result,reg,now.second);
 		}
 		return result;
+	}
+};
+/***********************************************
+* Author: chenxuan-1607772321@qq.com
+* change time:2022-04-16 23:35:16
+* description:http api
+***********************************************/
+class HttpApi{
+private:
+	HttpApi()=delete;
+	HttpApi(const HttpApi&)=delete;
+public:
+	//get complete datagram,result store in buffer,return recv size
+	static int getCompleteHtml(std::string& buffer,int sock,int flag=0)
+	{
+		SocketApi::recvSockBorder(sock,buffer,"\r\n\r\n",flag);
+		auto temp=DealHttp::findKeyValue("Content-Length",buffer.c_str());
+		int len=0;
+		if(temp.size()==0)
+			return 0;
+		else
+			sscanf(temp.c_str(),"%d",&len);
+		if(len==0)
+			return 0;
+		SocketApi::recvSockSize(sock,buffer,len);
+		return buffer.size();
 	}
 };
 }

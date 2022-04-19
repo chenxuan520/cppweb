@@ -7,6 +7,7 @@
 #include "../hpp/route.h"
 #include "../hpp/config.h"
 using namespace cppweb;
+std::string _configFile;
 /***********************************************
 * Author: chenxuan-1607772321@qq.com
 * change time:2022-03-17 23:34:19
@@ -186,8 +187,10 @@ void readSetting(LoadConfig& load)
 *********************************/
 void serverHttp()
 {
+	if(_config.configFile.size()==0)
+		_config.configFile="./config.json";
 	FileGet file;
-	LoadConfig config(file.getFileBuff("./config.json"));
+	LoadConfig config(file.getFileBuff(_config.configFile.c_str()));
 	if(config.lastError()!=NULL)
 	{
 		printf("config wrong %s\n",config.lastError());
@@ -231,17 +234,24 @@ void dealArgc(int argc,char** argv)
 		else
 		{
 			printf("wait for the port unbound...\n");
-			sleep(5);
+			sleep(1);
 		}
 #endif
+	}
+	else if(strncmp(argv[1],"--config=",9)==0)
+	{
+		char* pname=argv[1]+9;
+		_config.configFile=pname;
+		printf("read config from %s\n",pname);
 	}
 	else
 	{
 		printf("thank using chenxuanweb,if you have any question\n"
 			   "send email to 1607772321@qq.com to deal problem\nTHANK YOU!\n"
-			   "--help\t\tget the help\n"
-			   "--stop\t\tstop the server\n"
-			   "--reload\t\treload the server\n"
+			   "--help\t\t\tget the help\n"
+			   "--stop\t\t\tstop the server\n"
+			   "--reload\t\t\treload the server\n"
+			   "--config=(file name)\t\t\tchoose file as config file\n"
 			   "! only in linux the argv is accepted\n");
 		exit(0);
 	}
