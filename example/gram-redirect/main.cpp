@@ -1,6 +1,7 @@
 #include <iostream>  
 #include "../../hpp/cppweb.h"
 using namespace cppweb;
+using namespace std;
 int main()  
 {  
 	/* ProcessCtrl::backGround(); */
@@ -10,8 +11,11 @@ int main()
 		std::cout<<server.lastError()<<std::endl;
 		return -1;
 	}
-	server.get("/*",[](HttpServer&,DealHttp& http,int){
-			   http.gram.redirect("https://chenxuanweb.top");
+	server.get("/*",[](HttpServer& ser,DealHttp& http,int){
+			   unordered_map<string,string> route;
+			   http.req.routePairing((char*)ser.recText(),"/:route",route);
+			   auto result="https://chenxuanweb.top/"+route["route"];
+			   http.gram.redirect(result);
 			   });
 	server.run();
     return 0; 
