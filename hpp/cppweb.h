@@ -3975,6 +3975,7 @@ private:
 			now.first->pool.mutexLock();
 			now.first->nowFree.push(now.second);
 			now.first->pool.mutexUnlock();
+			delete (std::pair<LogSystem*,char*>*)argv;
 			return NULL;
 		}
 		fprintf(fp,"%s",now.second);
