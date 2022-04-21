@@ -3971,6 +3971,10 @@ private:
 		if(fp==NULL)
 		{
 			now.first->error="open file wrong";
+			memset(now.second,0,now.first->bufferLen);
+			now.first->pool.mutexLock();
+			now.first->nowFree.push(now.second);
+			now.first->pool.mutexUnlock();
 			return NULL;
 		}
 		fprintf(fp,"%s",now.second);
@@ -4579,7 +4583,7 @@ private:
 	{
 		static DealHttp http;
 		AskType type=GET;
-		int len=0,flag=2;
+		int len=0,flag=1;
 		char ask[200]={0};
 		if(middleware!=NULL)
 		{

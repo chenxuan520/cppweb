@@ -36,16 +36,24 @@ When I was building a C++ server, I found that the boost library was too large a
 
 - Detailed documentation in Chinese, all code is open source
 
-- Lightweight, the core code has only one header file, the code is less than 5000 lines, you can directly use the header file to operate
+- Lightweight, the core code has only one header file, the code contains 5000 lines of comments, and can be directly operated using the header file
 
 ## project structure
 
 - cppweb.h in hpp is all code, including this header file can be used
+
+- Hpp cpp is the project source file directory
+
 - example is an example of use, it is recommended to read first
+
 - doc is a description document, including the usage of functions and classes
+
 - class is compiled for some classes, including a simple memory leak detection header file
+
 - bin is the executable
+
 - install.sh runs the script for the server
+
 - The old folder is the header and source files of version 1.0, which is not recommended
 
 ## Project Features
