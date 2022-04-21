@@ -89,7 +89,11 @@ public:
 		struct timeval tv; 
 		tv.tv_sec=sec;
 		tv.tv_usec=msec;
+#ifndef _WIN32
 		return setsockopt(fd,SOL_SOCKET,SO_SNDTIMEO,&tv,sizeof(struct timeval));
+#else
+		return setsockopt(fd,SOL_SOCKET,SO_SNDTIMEO,(const char*)&tv,sizeof(struct timeval));
+#endif
 	}
 	static inline int setSocReadWait(int fd,unsigned sec,unsigned msec=0)
 	{
@@ -98,7 +102,11 @@ public:
 		struct timeval tv; 
 		tv.tv_sec=sec;
 		tv.tv_usec=msec;
+#ifndef _WIN32
 		return setsockopt(fd,SOL_SOCKET,SO_RCVTIMEO,&tv,sizeof(struct timeval));
+#else
+		return setsockopt(fd,SOL_SOCKET,SO_RCVTIMEO,(const char*)&tv,sizeof(struct timeval));
+#endif
 	}
 	static inline int receiveSocket(int fd,void* buffer,size_t len,int flag=0)
 	{
@@ -1751,7 +1759,9 @@ public:
 		if(reuseAddr)
 		{
 			int optval=1;
+#ifndef _WIN32
 			setsockopt(sock,SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
+#endif
 		}
 		if(bind(sock,(sockaddr*)&addr,sizeof(addr))==-1)
 			return false;
