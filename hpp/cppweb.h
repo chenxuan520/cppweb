@@ -1509,7 +1509,8 @@ protected:
 	int epfd;//file descriptor to ctrl epoll
 	int sock;//file descriptor of host;
 	int sockC;//file descriptor to sign every client;
-	int writeTime;//useful only in ssl model
+	int writeTime;//useful only in ssl model,for write time
+	int readTime;//useful only in ssl model,for read time
 	bool reuseAddr;//if reuse the addr
 	char* hostip;//host IP 
 	char* hostname;//host name
@@ -1598,6 +1599,7 @@ public:
 		backwait=wait;
 		numClient=0;
 		writeTime=5;
+		readTime=1;
 		reuseAddr=true;
 		error=NULL;
 		hostip=(char*)malloc(sizeof(char)*200);
@@ -1697,6 +1699,7 @@ public:
 	{
 		int cli=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
 		SocketApi::setSocWriteWait(cli,writeTime);
+		SocketApi::setSocReadWait(cli,readTime);
 		SSL* now=SSL_new(ctx);
 		if(now==NULL)
 		{
