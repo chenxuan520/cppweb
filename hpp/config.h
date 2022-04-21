@@ -95,7 +95,6 @@ void proxy(HttpServer& server,DealHttp& http,int soc)
 		while(len>(int)server.getMaxSenLen())
 			server.enlagerSenBuffer();
 		memcpy(server.getSenBuffer(),strGet.c_str(),len);
-		client.disconnectHost();
 		server.selfCreate(len);
 	}
 	else

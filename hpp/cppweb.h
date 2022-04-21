@@ -146,27 +146,18 @@ public:
 	}
 	static int recvSockSize(int fd,std::string& buffer,size_t needSize,int flag=0)
 	{
-		char now=0,temp[1024]={0};
-		unsigned all=0;
-		int len=0,size=0;
-		while(all<needSize)
-		{
-			len=recv(fd,(char*)&now,1,flag);
-			if(len<=0)
-				break;
-			temp[size]=now;
-			size++;
-			if(size>=1024)
-			{
-				buffer+=std::string(temp,size);
-				size=0;
-			}
-			all+=1;
-			if(all>=needSize)
-				break;
-		}
-		buffer+=std::string(temp,size);
-		return all;
+		if(needSize==0)
+			return -1;
+		char* pbuffer=(char*)malloc(sizeof(char)*needSize+1);
+		if(pbuffer==NULL)
+			return -1;
+		memset(pbuffer,0,sizeof(char)*needSize+1);
+		int len=recv(fd,pbuffer,needSize,MSG_WAITALL|flag);
+		if(len<=0)
+			return len;
+		buffer+=std::string(pbuffer,len);
+		free(pbuffer);
+		return len;
 	}
 	static int receiveSocket(int fd,std::string& buffer,int flag=0)
 	{
@@ -1518,7 +1509,8 @@ protected:
 	int epfd;//file descriptor to ctrl epoll
 	int sock;//file descriptor of host;
 	int sockC;//file descriptor to sign every client;
-	int writeTime;//useful only in ssl model
+	int writeTime;//useful only in ssl model,for write time
+	int readTime;//useful only in ssl model,for read time
 	bool reuseAddr;//if reuse the addr
 	char* hostip;//host IP 
 	char* hostname;//host name
@@ -1607,6 +1599,7 @@ public:
 		backwait=wait;
 		numClient=0;
 		writeTime=5;
+		readTime=1;
 		reuseAddr=true;
 		error=NULL;
 		hostip=(char*)malloc(sizeof(char)*200);
@@ -1706,6 +1699,7 @@ public:
 	{
 		int cli=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
 		SocketApi::setSocWriteWait(cli,writeTime);
+		SocketApi::setSocReadWait(cli,readTime);
 		SSL* now=SSL_new(ctx);
 		if(now==NULL)
 		{
@@ -2458,7 +2452,7 @@ public:
 		std::unordered_map<std::string,std::string> head;
 		const char* body;
 		const char* error;
-		Request():body(NULL),error(NULL){};
+		Request():version("HTTP/1.1"),body(NULL),error(NULL){};
 		Request(const char* recvText,bool onlyTop=false)
 		{
 			this->analysisRequest(recvText,onlyTop);
@@ -2556,6 +2550,13 @@ public:
 			}
 			if(req.head.find("Connection")==req.head.end())
 				strcat((char*)buffer,"Connection: Close\r\n");
+			if(req.body!=NULL)
+			{
+				int len=strlen(req.body);
+				char temp[32]={0};
+				sprintf(temp,"Content-Length:%d\r\n",len);
+				strcat((char*)buffer,temp);
+			}
 			strcat((char*)buffer,"\r\n");
 			if(req.body!=NULL)
 				strcat((char*)buffer,req.body);
@@ -3970,6 +3971,11 @@ private:
 		if(fp==NULL)
 		{
 			now.first->error="open file wrong";
+			memset(now.second,0,now.first->bufferLen);
+			now.first->pool.mutexLock();
+			now.first->nowFree.push(now.second);
+			now.first->pool.mutexUnlock();
+			delete (std::pair<LogSystem*,char*>*)argv;
 			return NULL;
 		}
 		fprintf(fp,"%s",now.second);
@@ -4578,7 +4584,7 @@ private:
 	{
 		static DealHttp http;
 		AskType type=GET;
-		int len=0,flag=2;
+		int len=0,flag=1;
 		char ask[200]={0};
 		if(middleware!=NULL)
 		{
@@ -4763,10 +4769,8 @@ private:
 			{
 				server.getText=server.enlargeMemory(server.getText,server.recLen);
 				getNum=server.receiveSocket(soc,(char*)server.getText+all,server.recLen-all,MSG_DONTWAIT);
-				if(getNum==0)
+				if(getNum<=0)
 					break;
-				else if(getNum<0)
-					return soc;
 				else
 					all+=getNum;
 			}
@@ -5317,7 +5321,7 @@ public:
 		else
 			sscanf(temp.c_str(),"%d",&len);
 		if(len==0)
-			return 0;
+			return buffer.size();
 		SocketApi::recvSockSize(sock,buffer,len);
 		return buffer.size();
 	}
