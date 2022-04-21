@@ -5321,7 +5321,7 @@ public:
 		else
 			sscanf(temp.c_str(),"%d",&len);
 		if(len==0)
-			return 0;
+			return buffer.size();
 		SocketApi::recvSockSize(sock,buffer,len);
 		return buffer.size();
 	}
