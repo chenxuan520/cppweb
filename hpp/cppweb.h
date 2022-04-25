@@ -10,6 +10,7 @@
 #ifndef _WIN32
 #include<signal.h>
 #include<netinet/in.h>
+#include<netinet/tcp.h>
 #include<arpa/inet.h>
 #include<sys/wait.h>
 #include<sys/socket.h>
@@ -95,6 +96,22 @@ public:
 		return setsockopt(fd,SOL_SOCKET,SO_SNDTIMEO,(const char*)&tv,sizeof(struct timeval));
 #endif
 	}
+	static inline int setSockWriteSize(int fd,int size)
+	{
+#ifndef _WIN32
+		return setsockopt(fd,SOL_SOCKET,SO_SNDBUF,&size,sizeof(int));
+#else
+		return setsockopt(fd,SOL_SOCKET,SO_SNDBUF,(const char*)&size,sizeof(int));
+#endif
+	}
+	static inline int setSockReadSize(int fd,int size)
+	{
+#ifndef _WIN32
+		return setsockopt(fd,SOL_SOCKET,SO_RCVBUF,&size,sizeof(int));
+#else
+		return setsockopt(fd,SOL_SOCKET,SO_RCVBUF,(const char*)&size,sizeof(int));
+#endif
+	}
 	static inline int setSocReadWait(int fd,unsigned sec,unsigned msec=0)
 	{
 		if(sec==0&&msec==0)
@@ -106,6 +123,14 @@ public:
 		return setsockopt(fd,SOL_SOCKET,SO_RCVTIMEO,&tv,sizeof(struct timeval));
 #else
 		return setsockopt(fd,SOL_SOCKET,SO_RCVTIMEO,(const char*)&tv,sizeof(struct timeval));
+#endif
+	}
+	static inline int setDeferAccept(int fd,int timeout=5)
+	{
+#ifndef _WIN32
+		return setsockopt(fd,IPPROTO_TCP,TCP_DEFER_ACCEPT,&timeout,sizeof(int));
+#else
+		return setsockopt(fd,IPPROTO_TCP,TCP_DEFER_ACCEPT,(const char*)&timeout,sizeof(int));
 #endif
 	}
 	static inline int receiveSocket(int fd,void* buffer,size_t len,int flag=0)
