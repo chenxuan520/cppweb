@@ -2487,14 +2487,16 @@ public:
 		std::unordered_map<std::string,std::string> head;
 		const char* body;
 		const char* error;
-		Request():version("HTTP/1.1"),body(NULL),error(NULL){};
+		bool isFull;
+		Request():version("HTTP/1.1"),body(NULL),error(NULL),isFull(false){};
 		Request(const char* recvText,bool onlyTop=false)
 		{
 			this->analysisRequest(recvText,onlyTop);
 		}
-		bool routePairing(const char* recvText,std::string key,std::unordered_map<std::string,std::string>& pairMap)
+		bool routePairing(std::string key,std::unordered_map<std::string,std::string>& pairMap,const char* recvText=NULL)
 		{
-			this->analysisRequest(recvText,true);
+			if(this->askPath.size()==0)
+				this->analysisRequest(recvText,true);
 			unsigned pos=0,word=0,value2=0;
 			auto value1=key.find(':');
 			if(strncmp(this->askPath.c_str(),key.c_str(),value1-1)!=0)
@@ -2522,6 +2524,11 @@ public:
 		}
 		bool analysisRequest(const void* recvText,bool onlyTop=false)
 		{
+			if(recvText==NULL)
+			{
+				error="null input";
+				return false;
+			}
 			Request& req=*this;
 			char one[128]={0},two[512]={0},three[512]={0};
 			const char* now=(char*)recvText,*end=strstr(now,"\r\n\r\n");
@@ -2530,7 +2537,8 @@ public:
 				this->error="error request";
 				return false;
 			}
-			sscanf(now,"%100s %100s %100s",one,two,three);
+			isFull=true;
+			sscanf(now,"%128s %512s %512s",one,two,three);
 			now+=strlen(one)+strlen(two)+strlen(three)+4;
 			req.method=one;
 			req.askPath=two;
@@ -2551,7 +2559,7 @@ public:
 				}
 			return true;
 		}
-		std::string formValue(void* buffer,const std::string& key)
+		std::string formValue(const std::string& key,void* buffer=NULL)
 		{
 			if(this->body==NULL)
 				this->analysisRequest(buffer);
@@ -2562,6 +2570,13 @@ public:
 				return "";
 			result=getArr[1];
 			return result;
+		}
+		std::string getCookie(const std::string& key,void* buffer=NULL)
+		{
+			if(this->head.find("Cookie")!=this->head.end())
+				return DealHttp::findKeyValue(key,this->head["Cookie"].c_str());
+			else
+				return DealHttp::getCookie(buffer,key.c_str());
 		}
 		bool createAskRequest(void* buffer,unsigned buffLen)
 		{
@@ -2611,7 +2626,9 @@ public:
 		}
 		void clear()
 		{
+			isFull=false;
 			this->body=NULL;
+			this->error=NULL;
 			this->head.clear();
 			this->version.clear();
 			this->method.clear();
@@ -3002,7 +3019,7 @@ public:
 		*temp='\r';
 		return value;
 	}
-	std::string getCookie(void* recText,const char* key)
+	static std::string getCookie(void* recText,const char* key)
 	{
 		if(recText==NULL||key==NULL)
 			return "";
@@ -4731,6 +4748,8 @@ private:
 				http.gram.head.clear();
 				http.gram.fileLen=0;
 				http.gram.typeFile=DealHttp::TXT;
+				if(http.req.isFull)
+					http.req.clear();
 				pfunc(*this,http,num);
 				if(selfCtrl)
 				{

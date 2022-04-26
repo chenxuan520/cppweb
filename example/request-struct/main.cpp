@@ -10,8 +10,8 @@ void func(HttpServer& server,DealHttp& http,int)
 		printf("%s:%s\n",iter->first.c_str(),iter->second.c_str());
 	printf("body:%s\n",http.req.body);
 	Json json={
-		{"ads",http.req.formValue(server.recText(),"ads")},
-		{"fgf",http.req.formValue(server.recText(),"fgf")}
+		{"ads",http.req.formValue("ads")},
+		{"fgf",http.req.formValue("fgf")}
 	};
 	http.gram.json(DealHttp::STATUSOK,json());
 }
