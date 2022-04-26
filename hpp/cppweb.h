@@ -2551,6 +2551,18 @@ public:
 				}
 			return true;
 		}
+		std::string formValue(void* buffer,const std::string& key)
+		{
+			if(this->body==NULL)
+				this->analysisRequest(buffer);
+			std::string temp=key+"\\s*[=]\\s*([\\\\\\w\\%\\.\\?\\+\\-]+)",result;
+			std::cmatch getArr;
+			auto flag=std::regex_search(this->body,getArr,std::regex(temp));
+			if(!flag)
+				return "";
+			result=getArr[1];
+			return result;
+		}
 		bool createAskRequest(void* buffer,unsigned buffLen)
 		{
 			Request& req=*this;
@@ -2596,6 +2608,14 @@ public:
 			if(req.body!=NULL)
 				strcat((char*)buffer,req.body);
 			return true;
+		}
+		void clear()
+		{
+			this->body=NULL;
+			this->head.clear();
+			this->version.clear();
+			this->method.clear();
+			this->askPath.clear();
 		}
 		std::string createAskRequest()
 		{
