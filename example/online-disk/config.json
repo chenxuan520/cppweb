@@ -4,6 +4,6 @@
 	"log path":"./access.log",
 	"token time":120,
 	"store":"./template",
-	"verify":false,
+	"verify":true,
 	"passwd":"123456"
 }

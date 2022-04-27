@@ -10,6 +10,7 @@
 #ifndef _WIN32
 #include<signal.h>
 #include<netinet/in.h>
+#include<netinet/tcp.h>
 #include<arpa/inet.h>
 #include<sys/wait.h>
 #include<sys/socket.h>
@@ -89,7 +90,27 @@ public:
 		struct timeval tv; 
 		tv.tv_sec=sec;
 		tv.tv_usec=msec;
+#ifndef _WIN32
 		return setsockopt(fd,SOL_SOCKET,SO_SNDTIMEO,&tv,sizeof(struct timeval));
+#else
+		return setsockopt(fd,SOL_SOCKET,SO_SNDTIMEO,(const char*)&tv,sizeof(struct timeval));
+#endif
+	}
+	static inline int setSockWriteSize(int fd,int size)
+	{
+#ifndef _WIN32
+		return setsockopt(fd,SOL_SOCKET,SO_SNDBUF,&size,sizeof(int));
+#else
+		return setsockopt(fd,SOL_SOCKET,SO_SNDBUF,(const char*)&size,sizeof(int));
+#endif
+	}
+	static inline int setSockReadSize(int fd,int size)
+	{
+#ifndef _WIN32
+		return setsockopt(fd,SOL_SOCKET,SO_RCVBUF,&size,sizeof(int));
+#else
+		return setsockopt(fd,SOL_SOCKET,SO_RCVBUF,(const char*)&size,sizeof(int));
+#endif
 	}
 	static inline int setSocReadWait(int fd,unsigned sec,unsigned msec=0)
 	{
@@ -98,7 +119,19 @@ public:
 		struct timeval tv; 
 		tv.tv_sec=sec;
 		tv.tv_usec=msec;
+#ifndef _WIN32
 		return setsockopt(fd,SOL_SOCKET,SO_RCVTIMEO,&tv,sizeof(struct timeval));
+#else
+		return setsockopt(fd,SOL_SOCKET,SO_RCVTIMEO,(const char*)&tv,sizeof(struct timeval));
+#endif
+	}
+	static inline int setDeferAccept(int fd,int timeout=5)
+	{
+#ifndef _WIN32
+		return setsockopt(fd,IPPROTO_TCP,TCP_DEFER_ACCEPT,&timeout,sizeof(int));
+#else
+		return setsockopt(fd,IPPROTO_TCP,TCP_DEFER_ACCEPT,(const char*)&timeout,sizeof(int));
+#endif
 	}
 	static inline int receiveSocket(int fd,void* buffer,size_t len,int flag=0)
 	{
@@ -1751,7 +1784,9 @@ public:
 		if(reuseAddr)
 		{
 			int optval=1;
+#ifndef _WIN32
 			setsockopt(sock,SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
+#endif
 		}
 		if(bind(sock,(sockaddr*)&addr,sizeof(addr))==-1)
 			return false;
@@ -2452,14 +2487,28 @@ public:
 		std::unordered_map<std::string,std::string> head;
 		const char* body;
 		const char* error;
-		Request():version("HTTP/1.1"),body(NULL),error(NULL){};
+		bool isFull;
+		Request():version("HTTP/1.1"),body(NULL),error(NULL),isFull(false){};
 		Request(const char* recvText,bool onlyTop=false)
 		{
 			this->analysisRequest(recvText,onlyTop);
 		}
-		bool routePairing(const char* recvText,std::string key,std::unordered_map<std::string,std::string>& pairMap)
+		std::string getWildUrl(const char* route,void* recvMsg=NULL)
 		{
-			this->analysisRequest(recvText,true);
+			if(askPath.size()==0)
+				this->analysisRequest(recvMsg,true);
+			if(route==NULL)
+				return askPath;
+			auto pos=askPath.find(route);
+			if(pos==askPath.npos)
+				return "";
+			else
+				return std::string(askPath.c_str()+strlen(route)+pos);
+		}
+		bool routePairing(std::string key,std::unordered_map<std::string,std::string>& pairMap,const char* recvText=NULL)
+		{
+			if(this->askPath.size()==0)
+				this->analysisRequest(recvText,true);
 			unsigned pos=0,word=0,value2=0;
 			auto value1=key.find(':');
 			if(strncmp(this->askPath.c_str(),key.c_str(),value1-1)!=0)
@@ -2487,6 +2536,11 @@ public:
 		}
 		bool analysisRequest(const void* recvText,bool onlyTop=false)
 		{
+			if(recvText==NULL)
+			{
+				error="null input";
+				return false;
+			}
 			Request& req=*this;
 			char one[128]={0},two[512]={0},three[512]={0};
 			const char* now=(char*)recvText,*end=strstr(now,"\r\n\r\n");
@@ -2495,7 +2549,8 @@ public:
 				this->error="error request";
 				return false;
 			}
-			sscanf(now,"%100s %100s %100s",one,two,three);
+			isFull=true;
+			sscanf(now,"%128s %512s %512s",one,two,three);
 			now+=strlen(one)+strlen(two)+strlen(three)+4;
 			req.method=one;
 			req.askPath=two;
@@ -2515,6 +2570,37 @@ public:
 					now+=2;
 				}
 			return true;
+		}
+		std::string formValue(const std::string& key,void* buffer=NULL)
+		{
+			if(this->body==NULL)
+				this->analysisRequest(buffer);
+			std::string temp=key+"\\s*[=]\\s*([\\\\\\w\\%\\.\\?\\+\\-]+)",result;
+			std::cmatch getArr;
+			auto flag=std::regex_search(this->body,getArr,std::regex(temp));
+			if(!flag)
+				return "";
+			result=getArr[1];
+			return result;
+		}
+		std::string routeValue(const std::string& key,void* buffer=NULL)
+		{
+			if(this->askPath.size()==0)
+				this->analysisRequest(buffer);
+			std::string temp=key+"\\s*[=]\\s*([\\\\\\w\\%\\.\\?\\+\\-]+)",result;
+			std::cmatch getArr;
+			auto flag=std::regex_search(this->askPath.c_str(),getArr,std::regex(temp));
+			if(!flag)
+				return "";
+			result=getArr[1];
+			return result;
+		}
+		std::string getCookie(const std::string& key,void* buffer=NULL)
+		{
+			if(this->head.find("Cookie")!=this->head.end())
+				return DealHttp::findKeyValue(key,this->head["Cookie"].c_str());
+			else
+				return DealHttp::getCookie(buffer,key.c_str());
 		}
 		bool createAskRequest(void* buffer,unsigned buffLen)
 		{
@@ -2561,6 +2647,47 @@ public:
 			if(req.body!=NULL)
 				strcat((char*)buffer,req.body);
 			return true;
+		}
+		void clear()
+		{
+			isFull=false;
+			this->body=NULL;
+			this->error=NULL;
+			this->head.clear();
+			this->version.clear();
+			this->method.clear();
+			this->askPath.clear();
+		}
+		void urlDecode(std::string& srcString)
+		{
+			char ch=0;
+			int temp=0;
+			unsigned int srcLen=srcString.size();
+			char* buffer=(char*)malloc(srcLen);
+			if(buffer==NULL)
+				return;
+			memset(buffer,0,srcLen);
+			for (unsigned int i=0; i<srcLen; i++)
+			{
+				if (int(srcString[i])==37)
+				{
+					sscanf(srcString.c_str()+i+1, "%x", &temp);
+					ch=(char)temp;
+					buffer[strlen(buffer)]=ch;
+					buffer[strlen(buffer)+1]=0;
+					i=i+2;
+				}
+				else
+					buffer[strlen(buffer)]=srcString[i];
+			}
+			if(srcLen<strlen(buffer))
+			{
+				free(buffer);
+				return;
+			}
+			srcString=buffer;
+			free(buffer);
+			return;
 		}
 		std::string createAskRequest()
 		{
@@ -2947,7 +3074,7 @@ public:
 		*temp='\r';
 		return value;
 	}
-	std::string getCookie(void* recText,const char* key)
+	static std::string getCookie(void* recText,const char* key)
 	{
 		if(recText==NULL||key==NULL)
 			return "";
@@ -4676,6 +4803,8 @@ private:
 				http.gram.head.clear();
 				http.gram.fileLen=0;
 				http.gram.typeFile=DealHttp::TXT;
+				if(http.req.isFull)
+					http.req.clear();
 				pfunc(*this,http,num);
 				if(selfCtrl)
 				{
@@ -5313,16 +5442,32 @@ public:
 	//get complete datagram,result store in buffer,return recv size
 	static int getCompleteHtml(std::string& buffer,int sock,int flag=0)
 	{
-		SocketApi::recvSockBorder(sock,buffer,"\r\n\r\n",flag);
-		auto temp=DealHttp::findKeyValue("Content-Length",buffer.c_str());
 		int len=0;
-		if(temp.size()==0)
-			return 0;
+		if(buffer.size()==0||buffer.find("\r\n\r\n")==buffer.npos)
+		{
+			SocketApi::recvSockBorder(sock,buffer,"\r\n\r\n",flag);
+			auto temp=DealHttp::findKeyValue("Content-Length",buffer.c_str());
+			if(temp.size()==0)
+				return 0;
+			else
+				sscanf(temp.c_str(),"%d",&len);
+			if(len==0)
+				return buffer.size();
+			SocketApi::recvSockSize(sock,buffer,len);
+		}
 		else
-			sscanf(temp.c_str(),"%d",&len);
-		if(len==0)
-			return buffer.size();
-		SocketApi::recvSockSize(sock,buffer,len);
+		{
+			auto pos=buffer.find("\r\n\r\n");
+			pos+=4;
+			auto temp=DealHttp::findKeyValue("Content-Length",buffer.c_str());
+			if(temp.size()==0)
+				return 0;
+			else
+				sscanf(temp.c_str(),"%d",&len);
+			if(len==0)
+				return buffer.size();
+			SocketApi::recvSockSize(sock,buffer,len-(buffer.size()-pos));
+		}
 		return buffer.size();
 	}
 };
