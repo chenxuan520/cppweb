@@ -270,8 +270,9 @@ void moveFile(HttpServer& server,DealHttp& http,int)
 ***********************************************/
 void loginIn(HttpServer& server,DealHttp& http,int)
 {
-	char value[128]={0};
-	if(NULL==http.getKeyValue(server.recText(),"passwd",value,128))
+	http.req.analysisRequest(server.recText());
+	auto value=http.req.formValue("passwd");
+	if(value.size()==0)
 	{
 		http.gram.body="Verify identity wrong";
 		return;
@@ -283,11 +284,8 @@ void loginIn(HttpServer& server,DealHttp& http,int)
 	}
 	else
 	{
-		http.gram.statusCode=DealHttp::STATUSOK;
-		http.gram.typeFile=DealHttp::HTML;
 		http.gram.cookie["disk"]=http.designCookie(_config.passwd.c_str(),_config.tokenTime);
-		FileGet file;
-		http.gram.body=file.getFileBuff("../index.html");
+		http.gram.html(DealHttp::STATUSOK,FileGet::getFileString("../index.html"));
 		if(http.gram.body.size()==0)
 			printf("index wrong\n");
 		return;
@@ -343,6 +341,16 @@ void getEdit(HttpServer& server,DealHttp& http,int)
 	printf("result:%s\n",json());
 	http.gram.json(DealHttp::STATUSOK,json());
 	return;
+}
+/***********************************************
+* Author: chenxuan-1607772321@qq.com
+* change time:2022-04-27 18:44:00
+* description:log out from the disk
+***********************************************/
+void loginOut(HttpServer&,DealHttp& http,int)
+{
+	http.gram.cookie["disk"]=http.designCookie("",0);
+	http.gram.html(DealHttp::STATUSOK,FileGet::getFileString("../login.html"));
 }
 /***********************************************
 * Author: chenxuan-1607772321@qq.com

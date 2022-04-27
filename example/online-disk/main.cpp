@@ -6,6 +6,7 @@ using namespace cppweb;
 int main()
 {
 	/* ProcessCtrl::backGround(); */
+	/* ProcessCtrl::guard(); */
 	if(false==configServer("./config.json"))
 	{
 		printf("find config.json wrong\n");
@@ -22,6 +23,7 @@ int main()
 	server.post("/delete*",mkdirNow);
 	server.post("/move*",moveFile);
 	server.post("/login",loginIn);
+	server.post("/logout",loginOut);
 	server.get("/*",sendHtml);
 	auto group=server.createGroup("/edit");
 	{
