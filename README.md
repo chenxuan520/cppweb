@@ -110,7 +110,7 @@
 ## 搭建服务器
 
 - 在linux下, ./install.sh为安装脚本,运行就可以安装
-- [doc介绍](./doc/http服务器搭建.md)
+- [doc介绍](./doc/服务器搭建.md)
 
 ## 框架介绍
 
@@ -266,7 +266,7 @@ int main()
 ```cpp
     DealHttp::Request req;
     unordered_map<string,string> tree;
-    req.routePairing((char*)server.recText(),"/try/:id/:name",tree);
+    req.routePairing("/try/:id/:name",tree);
     Json json={
         {"id",tree["id"]},
         {"name",tree["name"]}
@@ -274,7 +274,7 @@ int main()
 ```
 
 > 通过: 分割key
-> 结果保存在第三个参数中
+> 结果保存在第二个参数中
 
 #### 设置cookie
 

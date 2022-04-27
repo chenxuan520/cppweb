@@ -3,22 +3,35 @@
 using namespace cppweb;
 void func(HttpServer& server,DealHttp& http,int)
 {
-	DealHttp::Request req;
-	http.analysisRequest(req,server.recText());
-	printf("old:%s\n",(char*)server.recText());
-	printf("new:%s %s %s\n",req.method.c_str(),req.askPath.c_str(),req.version.c_str());
-	for(auto iter=req.head.begin();iter!=req.head.end();iter++)
-		printf("%s:%s\n",iter->first.c_str(),iter->second.c_str());
-	printf("body:%s\n",req.body);
-	http.gram.statusCode=DealHttp::STATUSOK;
-	http.gram.typeFile=DealHttp::JSON;
-	http.gram.body="{\"ha\":\"ha\"}";
+	http.req.analysisRequest(server.recText());
+	Json json={
+		{"ads",http.req.formValue("ads")},
+		{"fgf",http.req.formValue("fgf")}
+	};
+	http.gram.json(DealHttp::STATUSOK,json());
+}
+void getValue(HttpServer& server,DealHttp& http,int)
+{
+	http.req.analysisRequest(server.recText());
+	auto value=http.req.routeValue("key");
+	std::cout<<"get:"<<http.req.getWildUrl("/get")<<std::endl;
+	http.req.urlDecode(value);
+	Json json;
+	if(value.size()==0)
+		json["status"]="find wrong";
+	else
+	{
+		json["status"]="ok";
+		json["key"]=value;
+	}
+	http.gram.json(DealHttp::STATUSOK,json());
 }
 int main()  
 {  
 	HttpServer server(5200,true);//input the port bound
 	server.all("/root",func);
-	server.run("./index.html");
+	server.get("/get*",getValue);
+	server.run("./api.html");
 	if(server.lastError()!=NULL)
 	{
 		std::cout<<server.lastError()<<std::endl;

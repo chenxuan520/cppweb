@@ -15,7 +15,7 @@
 - html files accessed by default
 - If you don't want to set it can be ""
 
-###model
+### model
 
 - Server operating mode
 
@@ -37,9 +37,9 @@
 
 - whether to enable logging
 
-### log path 
+### log path
 
-- log save path
+- log storage path
 
 ### auto
 
@@ -47,7 +47,7 @@
 
 ### message print
 
-- bool type,whether to print message in stdout
+- bool type, whether to print the output to the terminal
 
 ### redirect
 
@@ -108,6 +108,18 @@
 
 ### optional
 
+#### cert path
+
+- https cert location
+
+#### key path
+
+- https key location
+
+#### cert password
+
+- key password (do not delete this line directly)
+
 #### memory
 
 - int type, no setting defaults to 1
@@ -118,4 +130,4 @@
 
 - Specify the number of threads, int type, the default is 5
 
-- Only works in THREAD mode 
+- Only works in THREAD mode

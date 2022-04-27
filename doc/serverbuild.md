@@ -1,6 +1,6 @@
 ## Goal of this article
 
-- Use cppweb to build a simple http server
+- Use cppweb to build a simple http server and https server
 
 ## Script installation tutorial
 
@@ -24,7 +24,7 @@
 
 8. Fill in whether to use daemon (true or false)
 
-## Modify the configuration method
+## Modify the configuration method (recommended)
 
 > Both windows and linux are available
 
@@ -50,8 +50,58 @@
 
 - ./main --reload
 
-- Wait about half a minute
-
 ## stop the server
 
 - ./main --stop
+
+## Specify the configuration file
+
+- ./main --config=(file name)
+
+## View help
+
+- ./main --help
+
+## Build https service
+
+### illustrate
+
+1. Used to modify the configuration method, the script method is invalid
+
+2. You need to install openssl in advance
+   
+   apt install openssl openssl-dev
+
+### 1. Get the certificate
+
+#### openssl self-signed (for testing)
+
+```shell
+openssl genrsa -des3 -out privkey.pem 2048
+openssl req -new -key privkey.pem -out cert.csr
+openssl req -new -x509 -key privkey.pem -out cacert.pem -days 1095
+```
+
+#### Get ssl certificate using domain name
+
+1. The acquisition path is the domain name purchase place or [freessl](https://freessl.cn/)
+
+2. Download the certificate for nginx, including a pem and a key
+
+3. Convert key to pem
+
+```shell
+openssl rsa -in (key name).key -out (new name).pem
+```
+
+### 2. Modify config.h
+
+- Change the values ​​of "cert path" and "key path" to the certificate path
+
+- if there is no password comment the line "cert password"
+
+### 3. Compile and run
+
+1. **make ssl**
+
+2. ./main
