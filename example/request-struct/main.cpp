@@ -4,21 +4,33 @@ using namespace cppweb;
 void func(HttpServer& server,DealHttp& http,int)
 {
 	http.req.analysisRequest(server.recText());
-	printf("old:%s\n",(char*)server.recText());
-	printf("new:%s %s %s\n",http.req.method.c_str(),http.req.askPath.c_str(),http.req.version.c_str());
-	for(auto iter=http.req.head.begin();iter!=http.req.head.end();iter++)
-		printf("%s:%s\n",iter->first.c_str(),iter->second.c_str());
-	printf("body:%s\n",http.req.body);
 	Json json={
 		{"ads",http.req.formValue("ads")},
 		{"fgf",http.req.formValue("fgf")}
 	};
 	http.gram.json(DealHttp::STATUSOK,json());
 }
+void getValue(HttpServer& server,DealHttp& http,int)
+{
+	http.req.analysisRequest(server.recText());
+	auto value=http.req.routeValue("key");
+	std::cout<<"get:"<<http.req.getWildUrl("/get")<<std::endl;
+	http.req.urlDecode(value);
+	Json json;
+	if(value.size()==0)
+		json["status"]="find wrong";
+	else
+	{
+		json["status"]="ok";
+		json["key"]=value;
+	}
+	http.gram.json(DealHttp::STATUSOK,json());
+}
 int main()  
 {  
 	HttpServer server(5200,true);//input the port bound
 	server.all("/root",func);
+	server.get("/get*",getValue);
 	server.run("./api.html");
 	if(server.lastError()!=NULL)
 	{

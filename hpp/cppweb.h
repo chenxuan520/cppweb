@@ -2493,6 +2493,18 @@ public:
 		{
 			this->analysisRequest(recvText,onlyTop);
 		}
+		std::string getWildUrl(const char* route,void* recvMsg=NULL)
+		{
+			if(askPath.size()==0)
+				this->analysisRequest(recvMsg,true);
+			if(route==NULL)
+				return askPath;
+			auto pos=askPath.find(route);
+			if(pos==askPath.npos)
+				return "";
+			else
+				return std::string(askPath.c_str()+strlen(route)+pos);
+		}
 		bool routePairing(std::string key,std::unordered_map<std::string,std::string>& pairMap,const char* recvText=NULL)
 		{
 			if(this->askPath.size()==0)
@@ -2571,6 +2583,18 @@ public:
 			result=getArr[1];
 			return result;
 		}
+		std::string routeValue(const std::string& key,void* buffer=NULL)
+		{
+			if(this->askPath.size()==0)
+				this->analysisRequest(buffer);
+			std::string temp=key+"\\s*[=]\\s*([\\\\\\w\\%\\.\\?\\+\\-]+)",result;
+			std::cmatch getArr;
+			auto flag=std::regex_search(this->askPath.c_str(),getArr,std::regex(temp));
+			if(!flag)
+				return "";
+			result=getArr[1];
+			return result;
+		}
 		std::string getCookie(const std::string& key,void* buffer=NULL)
 		{
 			if(this->head.find("Cookie")!=this->head.end())
@@ -2633,6 +2657,37 @@ public:
 			this->version.clear();
 			this->method.clear();
 			this->askPath.clear();
+		}
+		void urlDecode(std::string& srcString)
+		{
+			char ch=0;
+			int temp=0;
+			unsigned int srcLen=srcString.size();
+			char* buffer=(char*)malloc(srcLen);
+			if(buffer==NULL)
+				return;
+			memset(buffer,0,srcLen);
+			for (unsigned int i=0; i<srcLen; i++)
+			{
+				if (int(srcString[i])==37)
+				{
+					sscanf(srcString.c_str()+i+1, "%x", &temp);
+					ch=(char)temp;
+					buffer[strlen(buffer)]=ch;
+					buffer[strlen(buffer)+1]=0;
+					i=i+2;
+				}
+				else
+					buffer[strlen(buffer)]=srcString[i];
+			}
+			if(srcLen<strlen(buffer))
+			{
+				free(buffer);
+				return;
+			}
+			srcString=buffer;
+			free(buffer);
+			return;
 		}
 		std::string createAskRequest()
 		{
@@ -5387,16 +5442,32 @@ public:
 	//get complete datagram,result store in buffer,return recv size
 	static int getCompleteHtml(std::string& buffer,int sock,int flag=0)
 	{
-		SocketApi::recvSockBorder(sock,buffer,"\r\n\r\n",flag);
-		auto temp=DealHttp::findKeyValue("Content-Length",buffer.c_str());
 		int len=0;
-		if(temp.size()==0)
-			return 0;
+		if(buffer.size()==0||buffer.find("\r\n\r\n")==buffer.npos)
+		{
+			SocketApi::recvSockBorder(sock,buffer,"\r\n\r\n",flag);
+			auto temp=DealHttp::findKeyValue("Content-Length",buffer.c_str());
+			if(temp.size()==0)
+				return 0;
+			else
+				sscanf(temp.c_str(),"%d",&len);
+			if(len==0)
+				return buffer.size();
+			SocketApi::recvSockSize(sock,buffer,len);
+		}
 		else
-			sscanf(temp.c_str(),"%d",&len);
-		if(len==0)
-			return buffer.size();
-		SocketApi::recvSockSize(sock,buffer,len);
+		{
+			auto pos=buffer.find("\r\n\r\n");
+			pos+=4;
+			auto temp=DealHttp::findKeyValue("Content-Length",buffer.c_str());
+			if(temp.size()==0)
+				return 0;
+			else
+				sscanf(temp.c_str(),"%d",&len);
+			if(len==0)
+				return buffer.size();
+			SocketApi::recvSockSize(sock,buffer,len-(buffer.size()-pos));
+		}
 		return buffer.size();
 	}
 };

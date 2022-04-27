@@ -30,7 +30,7 @@
 	// ],
 	"redirect":[],
 	//remove path array
-	//"delete path":["./templaye"],
+	//"delete path":["./template"],
 	"delete path":[],
 	//replace the path,the arr must is a objext and have path and replace 
 	//	"replace":[
