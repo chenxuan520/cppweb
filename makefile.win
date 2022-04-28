@@ -7,9 +7,9 @@ all:main
 
 cc=g++
 obj=main
-obj_source=./cpp/main.cpp
-pro_source=./hpp/cppweb.h
-source=./cpp/main.cpp ./hpp/cppweb.h ./hpp/proxy.h ./hpp/config.h ./hpp/route.h
+obj_source=./src/cpp/main.cpp
+pro_source=./src/hpp/cppweb.h
+source=./src/cpp/main.cpp ./src/hpp/cppweb.h ./src/hpp/proxy.h ./src/hpp/config.h ./src/hpp/route.h
 link=-lpthread -lwsock32
 link_ssl=-lpthread -lwsock32 -lssl -lcrypto
 macro=-D CPPWEB_OPENSSL
