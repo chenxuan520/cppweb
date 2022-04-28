@@ -3,7 +3,8 @@
 using namespace cppweb;
 int main()  
 {  
-	HttpServer server(5201,true);//input the port bound
+	HttpServer server(5200);//input the port bound
+	server.changeSetting(false,false);//close long connect and do not print message
 	if(server.lastError()!=NULL)
 	{
 		std::cout<<server.lastError()<<std::endl;
