@@ -465,7 +465,11 @@ public:
 			for(auto iter=initList.begin();iter!=initList.end();iter++)
 				addKeyValue(ARRAY,iter->first.c_str(),iter->second.val.c_str());
 		}
-		inline const char* operator()()
+		inline const char* operator()() const
+		{
+			return result.c_str();
+		}
+		inline const char* getStr() const
 		{
 			return result.c_str();
 		}
@@ -856,7 +860,11 @@ public:
 	{
 		return Node(data);
 	}
-	const char* operator()()
+	inline const char* operator()() const
+	{
+		return node();
+	}
+	inline const char* getStr() const
 	{
 		return node();
 	}
@@ -892,6 +900,10 @@ public:
 		this->floNum=floNum;
 		node.changeSetting(floNum);
 		return true;
+	}
+	static const char* create(const Node& temp)
+	{
+		return temp();
 	}
 private:
 	Object* analyseObj(char* begin,char* end)
@@ -2462,6 +2474,15 @@ public:
 		{
 			typeFile=FileKind::ZIP;
 			this->createData(staCode,data);
+		}
+		inline void noFound()
+		{
+			statusCode=STATUSNOFOUND;
+		}
+		inline void forbidden()
+		{
+			typeFile=TXT;
+			createData(STATUSFORBIDDEN,"403 forbidden");
 		}
 		void redirect(const std::string& location,bool forever=false)
 		{

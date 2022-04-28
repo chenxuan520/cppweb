@@ -7,29 +7,33 @@ using namespace cppweb;
 multimap<int,string> tree;
 void addCLi(HttpServer& server,DealHttp& http,int)
 {
-	char strSco[20]={0},name[50]={0};
-	http.gram.typeFile=DealHttp::JSON;
-	if(http.getKeyValue(server.recText(),"score",strSco,20,true)==NULL)
+	http.req.analysisRequest(server.recText());
+	auto name=http.req.formValue("name");
+	auto scoStr=http.req.formValue("score");
+	if(scoStr.size()==0)
 	{
-		printf("get name wrong \n%s\n",(char*)server.recText());
-		http.gram.statusCode=DealHttp::STATUSNOFOUND;
-		http.gram.typeFile=DealHttp::NOFOUND;
+		http.gram.json(DealHttp::STATUSOK,Json::create({
+													   {"status","wrong"},
+													   {"error","cannot find score"}
+													   }));
 		return;
 	}
-	if(http.getKeyValue(server.recText(),"name",name,50,true)==NULL)
+	if(name.size()==0)
 	{
-		printf("get name wrong \n%s\n",(char*)server.recText());
-		http.gram.statusCode=DealHttp::STATUSNOFOUND;
-		http.gram.typeFile=DealHttp::NOFOUND;
+		http.gram.json(DealHttp::STATUSOK,Json::create({
+													   {"status","wrong"},
+													   {"error","cannot find name"}
+													   }));
 		return;
 	}
-	DealHttp::urlDecode(name);
+	http.req.urlDecode(name);
 	int score=0;
-	if(0>=sscanf(strSco,"%d",&score))
+	if(0>=sscanf(scoStr.c_str(),"%d",&score))
 	{
-		printf("get score wrong \n%s\n",(char*)server.recText());
-		http.gram.statusCode=DealHttp::STATUSNOFOUND;
-		http.gram.typeFile=DealHttp::NOFOUND;
+		http.gram.json(DealHttp::STATUSOK,Json::create({
+													   {"status","wrong"},
+													   {"error","read score wrong"}
+													   }));
 		return;
 	}
 	if(tree.size()<5)
@@ -50,7 +54,7 @@ void addCLi(HttpServer& server,DealHttp& http,int)
 		{"sco",score},
 		{"status","ok"}
 	};
-	http.gram.body=json();
+	http.gram.json(DealHttp::STATUSOK,json());
 }
 void getList(HttpServer&,DealHttp& http,int)
 {
@@ -68,7 +72,7 @@ void getList(HttpServer&,DealHttp& http,int)
 		buf.push_back(node);
 		begin++;
 	}
-	json[ "array" ]=buf;
+	json["array"]=buf;
 	http.gram.body=json();
 }
 int main()  

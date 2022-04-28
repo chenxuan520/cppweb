@@ -5,31 +5,28 @@ using namespace std;
 void pfuncTwo(HttpServer&,DealHttp& http,int)
 {
 	char temp[]="is a text file";
-	http.gram.typeFile=DealHttp::TXT;
-	http.gram.body=temp;
-	std::cout<<http.gram.body<<endl;
-	http.gram.fileLen=strlen(temp);
 	http.gram.statusCode=DealHttp::STATUSOK;
+	http.gram.txt(DealHttp::STATUSOK,temp);
 }
 void pfunc(HttpServer& server,DealHttp& http,int)
 {
-	char url[100]={0};
-	http.getWildUrl(server.recText(),"/root/",url,100);//get url wild
+	http.req.analysisRequest(server.recText(),true);
+	auto url=http.req.getWildUrl("/root/");//get url wild
 	Json json={{"name",url},{"welcome","you"}};
 	http.gram.json(DealHttp::STATUSOK,json());
 }
 void pfuncThree(HttpServer& server,DealHttp& http,int)
 {
-	DealHttp::Request req;
+	http.req.analysisRequest(server.recText());
 	unordered_map<string,string> tree;
-	req.routePairing((char*)server.recText(),"/try/:id/:name",tree);
+	http.req.routePairing("/try/:id/:name",tree);
 	Json json={
 		{"id",tree["id"]},
 		{"name",tree["name"]}
 	};
 	char* sen=(char*)server.getSenBuffer();
-	http.customizeAddTop(sen,1024*1024,200,strlen(json()));
-	int len=http.customizeAddBody(sen,1024*1024,json(),strlen(json()));
+	http.customizeAddTop(sen,server.getMaxSenLen(),200,strlen(json()));
+	int len=http.customizeAddBody(sen,server.getMaxSenLen(),json(),strlen(json()));
 	server.selfCreate(len);
 }
 int main()  
