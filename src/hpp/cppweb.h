@@ -1722,6 +1722,13 @@ public:
 #endif
 	}
 #ifdef CPPWEB_OPENSSL
+	inline SSL* getSSL(int sock)
+	{
+		if(sslHash.find(sock)==sslHash.end())
+			return NULL;
+		else
+			return sslHash[sock];
+	}
 	bool loadCertificate(const char* certPath,const char* keyPath,const char* passwd=NULL)
 	{
 		if(ctx==NULL)
@@ -5491,6 +5498,31 @@ public:
 		}
 		return buffer.size();
 	}
+#ifdef CPPWEB_OPENSSL
+	static int getCompleteHtmlSSL(std::string& buffer,SSL* ssl,int=0)
+	{
+		int len=0;
+		if(buffer.size()==0||buffer.find("\r\n\r\n")==buffer.npos)
+		{
+			do{
+				int len=SocketApi::receiveSocket(ssl,buffer);
+				if(len==-1)
+					return buffer.size();
+			}while(buffer.find("\r\n\r\n")==buffer.npos);
+		}
+		auto pos=buffer.find("\r\n\r\n");
+		pos+=4;
+		auto temp=DealHttp::findKeyValue("Content-Length",buffer.c_str());
+		if(temp.size()==0)
+			return 0;
+		else
+			sscanf(temp.c_str(),"%d",&len);
+		if(len==0)
+			return buffer.size();
+		SocketApi::recvSockSize(ssl,buffer,len-(buffer.size()-pos));
+		return buffer.size();
+	}
+#endif
 };
 }
 #endif

@@ -45,7 +45,8 @@ void wget(const char* str)
 	req.askPath=endUrl;
 	req.method="GET";
 	req.version="HTTP/1.1";
-	char buffer[500]={0},rec[5000]={0};
+	char buffer[500]={0};
+	string rec;
 	http.createAskRequest(req,buffer,500);
 	printf("buffer:\n%s\n",buffer);
 	if(!isHttps)
@@ -61,8 +62,8 @@ void wget(const char* str)
 			printf("send wrong");
 			exit(0);
 		}
-		client.receiveHost(rec,5000);
-		printf("%s\n\n",rec);
+		auto soc=client.getSocket();
+		HttpApi::getCompleteHtml(rec,soc);
 	}
 	else
 	{
@@ -77,9 +78,10 @@ void wget(const char* str)
 			printf("send wrong");
 			exit(0);
 		}
-		client.receiveHost(rec,5000);
-		printf("%s\n\n",rec);
+		auto ssl=client.getSSL();
+		HttpApi::getCompleteHtmlSSL(rec,ssl);
 	}
+	cout<<rec<<endl<<endl;
 }
 int main(int argc,char** argv)
 {
