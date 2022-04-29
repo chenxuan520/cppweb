@@ -69,8 +69,10 @@
 1. Used to modify the configuration method, the script method is invalid
 
 2. You need to install openssl in advance
-   
-   apt install openssl openssl-dev
+
+```shell
+    sudo apt install openssl libssl-dev
+```
 
 ### 1. Get the certificate
 
@@ -96,7 +98,7 @@ openssl rsa -in (key name).key -out (new name).pem
 
 ### 2. Modify config.h
 
-- Change the values ​​of "cert path" and "key path" to the certificate path
+- Change the values of "cert path" and "key path" to the certificate path
 
 - if there is no password comment the line "cert password"
 
