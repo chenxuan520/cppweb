@@ -3612,7 +3612,17 @@ public:
 		memset(&their_addr, 0, sizeof(their_addr));
 		their_addr.sin_family = AF_INET;
 		their_addr.sin_port = htons(25);	
+		if(domain==NULL)
+		{
+			sprintf(error,"wrong domain");
+			return;
+		}
 		hostent* hptr = gethostbyname(domain);		  
+		if(hptr==NULL)
+		{
+			sprintf(error,"wrong domain");
+			return;
+		}
 		memcpy(&their_addr.sin_addr.s_addr, hptr->h_addr_list[0], hptr->h_length);
 	}
 	bool emailSend(const char* sendEmail,const char* passwd,const char* recEmail,const char* body)
