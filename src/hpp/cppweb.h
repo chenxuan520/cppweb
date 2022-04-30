@@ -46,6 +46,7 @@
 #endif
 
 namespace cppweb{
+typedef std::unordered_map<std::string,std::string> KeyMap;
 //this class for windows 
 #ifdef _WIN32
 #define socklen_t int
@@ -735,7 +736,7 @@ public:
 			else if(std::is_same<T,const char*>::value||std::is_same<T,char*>::value)
 				return addKeyValue(STRING,key,data);
 			else
-				return addKeyValue(EMPTY,key,data);
+				return addKeyValue(EMPTY,key,NULL);
 		}
 		template<typename T>
 		bool addKeyValue(const char* key,const std::vector<T>& data)
@@ -3574,7 +3575,7 @@ public:
 };
 /*******************************
  * author:chenxuan
- * class:use to send eamil easy
+ * class:use to send email easy
  * example:{
  *  Email email("qq.com");
  *  email.CreateSend
@@ -3582,6 +3583,16 @@ public:
  * }
 ******************************/
 class Email{
+public:
+	struct EmailGram{
+		std::string senEmail;
+		std::string recvEmail;
+		std::string token;
+		std::string senName;
+		std::string recvName;
+		std::string subject;
+		std::string body;
+	};
 private:
 	sockaddr_in their_addr;
 	bool isDebug;
@@ -3601,7 +3612,17 @@ public:
 		memset(&their_addr, 0, sizeof(their_addr));
 		their_addr.sin_family = AF_INET;
 		their_addr.sin_port = htons(25);	
+		if(domain==NULL)
+		{
+			sprintf(error,"wrong domain");
+			return;
+		}
 		hostent* hptr = gethostbyname(domain);		  
+		if(hptr==NULL)
+		{
+			sprintf(error,"wrong domain");
+			return;
+		}
 		memcpy(&their_addr.sin_addr.s_addr, hptr->h_addr_list[0], hptr->h_length);
 	}
 	bool emailSend(const char* sendEmail,const char* passwd,const char* recEmail,const char* body)
@@ -3814,6 +3835,20 @@ public:
 			return NULL;
 		sprintf(buffer,"smtp.%s",temp+1);
 		return buffer;
+	}
+	static const char* sendEmail(const EmailGram& gram)
+	{
+		char domain[32]={0};
+		if(NULL==getDomainBySelfEmail(gram.senEmail.c_str(),domain,32))
+			return "unknown send email";
+		std::string buffer="From: \""+gram.senName+"\"<"+gram.senEmail+">\r\nTo: \""\
+							+gram.recvName+"\"<"+gram.recvEmail+">\r\nSubject:"\
+							+gram.subject+"\r\n\r\n"+gram.body+"\n";
+		Email email(domain,false);
+		auto flag=email.emailSend(gram.senEmail.c_str(),gram.token.c_str(),gram.recvEmail.c_str(),buffer.c_str());
+		if(flag==false)
+			return email.lastError();
+		return NULL;
 	}
 };
 /***********************************************

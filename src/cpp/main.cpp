@@ -87,7 +87,7 @@ void readSetting(LoadConfig& load)
 					else
 					{
 						printf("Warning:model not define,use defalt MULTIPLEXING\n");
-						con.model="";
+						con.model="MULTIPLEXING";
 					}
 					});
 	load.findConfig("long connect",[](Json::Object& obj,Config& con){
@@ -162,7 +162,11 @@ void readSetting(LoadConfig& load)
 #ifdef CPPWEB_OPENSSL
 	load.findConfig("key path",[](Json::Object& obj,Config& con){
 					if(obj!=Json::npos)
+					{
 						con.keyPath=obj.strVal;
+						if(con.keyPath.find(".pem")==con.keyPath.npos)
+							printf("Warning:key format must be pem!\n");
+					}
 					else
 						printf("Warning:use ssl but not define key path,https cannot work!\n");
 					});
