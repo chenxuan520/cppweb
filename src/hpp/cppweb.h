@@ -2,7 +2,7 @@
 //
 //THIS PROGRAM IS FREE SOFTWARE. IS LICENSED UNDER AGPL
 //
-//Copyright (c) 2022 chenxuan 
+//Copyright (c) 2022 chenxuan
 /* #define CPPWEB_OPENSSL */
 #ifndef _CPPWEB_H_
 #define _CPPWEB_H_
@@ -4328,6 +4328,10 @@ public:
 	inline bool loadKeyCert(const char* certPath,const char* keyPath,const char* passwd=NULL)
 	{
 		return loadCertificate(certPath,keyPath,passwd);
+	}
+	inline SSL* getSocSSL(int fd)
+	{
+		return this->getSSL(fd);
 	}
 #endif
 	void changeModel(RunModel model,unsigned threadNum=5)
