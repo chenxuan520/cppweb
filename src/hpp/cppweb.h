@@ -2,7 +2,7 @@
 //
 //THIS PROGRAM IS FREE SOFTWARE. IS LICENSED UNDER AGPL
 //
-//Copyright (c) 2022 chenxuan 
+//Copyright (c) 2022 chenxuan
 /* #define CPPWEB_OPENSSL */
 #ifndef _CPPWEB_H_
 #define _CPPWEB_H_
@@ -35,6 +35,7 @@
 #include<stack>
 #include<string>
 #include<regex>
+#include<codecvt>
 #include<functional>
 #include<type_traits>
 #include<unordered_map>
@@ -902,7 +903,7 @@ public:
 		node.changeSetting(floNum);
 		return true;
 	}
-	static const char* create(const Node& temp)
+	static const char* createJson(const Node& temp)
 	{
 		return temp();
 	}
@@ -2718,6 +2719,44 @@ public:
 			free(buffer);
 			return;
 		}
+		std::string hexStrToUtf8(const std::string& src)
+		{
+			std::string result;
+			unsigned pos=0;
+			auto func=[](const std::string& src)->std::string{
+				std::regex re(R"(\\u([0-9a-zA-Z]{4,5}))");
+				std::regex_token_iterator<std::string::const_iterator> rend;
+				std::regex_token_iterator<std::string::const_iterator> it(src.begin(), src.end(), re, 1);
+				std::wstring_convert<std::codecvt_utf8<char32_t>, char32_t> conv;
+				std::string result;
+				while (it!=rend) {
+					result += conv.to_bytes( (char32_t)strtoul((*it).str().c_str(), NULL, 16) );
+					++it;
+				}
+				return result;
+			};
+			while(pos!=src.size())
+			{
+				if(src[pos]=='\\'&&pos+1<src.size()&&src[pos+1]=='u')
+				{
+					unsigned begin=pos;
+					pos+=2;
+					while(pos<src.size()&&((src[pos]>='0'&&src[pos]<='9')||\
+										   (src[pos]>='a'&&src[pos]<='z')||\
+										   (src[pos]>='A'&&src[pos]<='Z')||src[pos]=='\\'))
+						pos++;
+					result+=func(std::string(src.begin()+begin,src.begin()+pos));
+				}
+				else if(src[pos]!='\\')
+				{
+					result+=src[pos];
+					pos++;
+				}
+				else
+					pos++;
+			}
+			return result;
+		}
 		std::string createAskRequest()
 		{
 			Request& req=*this;
@@ -4328,6 +4367,10 @@ public:
 	inline bool loadKeyCert(const char* certPath,const char* keyPath,const char* passwd=NULL)
 	{
 		return loadCertificate(certPath,keyPath,passwd);
+	}
+	inline SSL* getSocSSL(int fd)
+	{
+		return this->getSSL(fd);
 	}
 #endif
 	void changeModel(RunModel model,unsigned threadNum=5)
