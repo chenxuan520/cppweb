@@ -12,7 +12,7 @@ void addCLi(HttpServer& server,DealHttp& http,int)
 	auto scoStr=http.req.formValue("score");
 	if(scoStr.size()==0)
 	{
-		http.gram.json(DealHttp::STATUSOK,Json::create({
+		http.gram.json(DealHttp::STATUSOK,Json::createJson({
 													   {"status","wrong"},
 													   {"error","cannot find score"}
 													   }));
@@ -20,7 +20,7 @@ void addCLi(HttpServer& server,DealHttp& http,int)
 	}
 	if(name.size()==0)
 	{
-		http.gram.json(DealHttp::STATUSOK,Json::create({
+		http.gram.json(DealHttp::STATUSOK,Json::createJson({
 													   {"status","wrong"},
 													   {"error","cannot find name"}
 													   }));
@@ -30,7 +30,7 @@ void addCLi(HttpServer& server,DealHttp& http,int)
 	int score=0;
 	if(0>=sscanf(scoStr.c_str(),"%d",&score))
 	{
-		http.gram.json(DealHttp::STATUSOK,Json::create({
+		http.gram.json(DealHttp::STATUSOK,Json::createJson({
 													   {"status","wrong"},
 													   {"error","read score wrong"}
 													   }));
