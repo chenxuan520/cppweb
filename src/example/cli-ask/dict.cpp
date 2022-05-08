@@ -19,17 +19,16 @@ void dict(const char* str)
 		return;
 	}
 	DealHttp::Request req;
+	Json json={
+		{"trans_type","en2zh"},
+		{"source",str}
+	};
 	req.method="POST";
 	req.askPath="/v1/dict";
 	req.head["Host"]="api.interpreter.caiyunai.com";
 	req.head["Content-Type"]="application/json;charset=utf-8";
 	req.head["X-Authorization"]="token:qgemv4jr1y38jyq6vhvi";
 	req.head["Connection"]="keep-alive";
-	Json json={
-		{"trans_type","en2zh"},
-		{"source",str}
-	};
-	req.head["Content-Length"]=std::to_string(strlen(json()));
 	req.body=json();
 	auto buffer=req.createAskRequest();
 	if(0>=client.sendHost(buffer.c_str(),buffer.size()))
