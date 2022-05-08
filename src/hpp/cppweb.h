@@ -2772,6 +2772,10 @@ public:
 			if(req.version.size()==0)
 				req.version="HTTP/1.1";
 			std::string result=req.method+" "+req.askPath+" "+req.version+"\r\n";
+			if(req.body!=NULL&&req.head.find("Content-Length")==req.head.end())
+				req.head.insert({"Content-Length",std::to_string(strlen(req.body))});
+			if(req.head.find("Connection")==req.head.end())
+				req.head.insert({"Connection","Close"});
 			for(auto& now:req.head)
 				result+=now.first+": "+now.second+"\r\n";
 			result+="\r\n";
@@ -5572,7 +5576,8 @@ public:
 				sscanf(temp.c_str(),"%d",&len);
 			if(len==0)
 				return buffer.size();
-			SocketApi::recvSockSize(sock,buffer,len-(buffer.size()-pos));
+			if(len-((int)buffer.size()-pos)>0)
+				SocketApi::recvSockSize(sock,buffer,len-(buffer.size()-pos));
 		}
 		return buffer.size();
 	}
@@ -5597,7 +5602,8 @@ public:
 			sscanf(temp.c_str(),"%d",&len);
 		if(len==0)
 			return buffer.size();
-		SocketApi::recvSockSize(ssl,buffer,len-(buffer.size()-pos));
+		if(len-((int)buffer.size()-pos)>0)
+			SocketApi::recvSockSize(ssl,buffer,len-(buffer.size()-pos));
 		return buffer.size();
 	}
 #endif
