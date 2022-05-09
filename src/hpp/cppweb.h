@@ -52,6 +52,7 @@ typedef std::unordered_map<std::string,std::string> KeyMap;
 #ifdef _WIN32
 #define socklen_t int
 #define MSG_DONTWAIT 0
+#define TCP_DEFER_ACCEPT 0
 /***********************************************
 * Author: chenxuan-1607772321@qq.com
 * change time:2022-03-17 14:50:16
