@@ -2445,6 +2445,7 @@ public:
 ******************************/
 class DealHttp{
 public:
+	//file type ,it will change Content-type
 	enum FileKind{
 		UNKNOWN=0,HTML=1,TXT=2,IMAGE=3,NOFOUND=4,CSS=5,JS=6,ZIP=7,JSON=8,
 	};
@@ -2538,7 +2539,7 @@ public:
 			this->analysisRequest(recvText,onlyTop);
 		}
 		std::string getWildUrl(const char* route,void* recvMsg=NULL)
-		{
+		{//such as /okok/lplp ,getWildUrl("/okok/")="lplp"
 			if(askPath.size()==0)
 				this->analysisRequest(recvMsg,true);
 			if(route==NULL)
@@ -2616,7 +2617,7 @@ public:
 			return true;
 		}
 		std::string formValue(const std::string& key,void* buffer=NULL)
-		{
+		{//get form value
 			if(this->body==NULL)
 				this->analysisRequest(buffer);
 			std::string temp=key+"\\s*[=]\\s*([\\\\\\w\\%\\.\\?\\+\\-]+)",result;
@@ -2628,7 +2629,7 @@ public:
 			return result;
 		}
 		std::string routeValue(const std::string& key,void* buffer=NULL)
-		{
+		{//get kay value in route
 			if(this->askPath.size()==0)
 				this->analysisRequest(buffer);
 			std::string temp=key+"\\s*[=]\\s*([\\\\\\w\\%\\.\\?\\+\\-]+)",result;
@@ -2957,6 +2958,7 @@ private:
 		return word;
 	}
 public:
+	// key value by regex,
 	static std::string findKeyValue(const std::string& key,const char* text,unsigned len=0)
 	{
 		if(text==NULL)
@@ -3121,6 +3123,7 @@ public:
 		strcat((char*)buffer,"\r\n");
 		return true;
 	}
+	//create cookie with domain,time,and path
 	std::string designCookie(const char* value,int liveTime=-1,const char* path=NULL,const char* domain=NULL)
 	{
 		std::string result="";
@@ -4382,17 +4385,19 @@ public:
 			free(arrRoute);
 	}
 #ifdef CPPWEB_OPENSSL
+	//load cert and key,and they must be pem format(such as key.pem,cert.pem)
 	inline bool loadKeyCert(const char* certPath,const char* keyPath,const char* passwd=NULL)
 	{
 		return loadCertificate(certPath,keyPath,passwd);
 	}
+	//get ssl connection for socket fd
 	inline SSL* getSocSSL(int fd)
 	{
 		return this->getSSL(fd);
 	}
 #endif
 	void changeModel(RunModel model,unsigned threadNum=5)
-	{
+	{//change model for server
 		if(this->model==model&&model!=THREAD)
 			return;
 		this->model=model;
@@ -4525,7 +4530,7 @@ public:
 		return true;
 	}
 	inline Group createGroup(const char* route)
-	{
+	{//create route group
 		Group temp(*this,route);
 		return temp;
 	}
@@ -4712,7 +4717,7 @@ public:
 		this->isContinue=false;
 	}
 	inline void resetServer()
-	{
+	{//delete all the route
 		this->trie.clean();
 		this->now=0;
 	}
