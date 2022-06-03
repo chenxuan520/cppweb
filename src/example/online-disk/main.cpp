@@ -3,10 +3,9 @@
 #include "./config.h"
 #include "./route.h"
 using namespace cppweb;
-int main()
+int main(int argc,char** argv)
 {
-	/* ProcessCtrl::backGround(); */
-	/* ProcessCtrl::guard(); */
+	dealArgv(argv,argc);
 	if(false==configServer("./config.json"))
 	{
 		printf("find config.json wrong\n");

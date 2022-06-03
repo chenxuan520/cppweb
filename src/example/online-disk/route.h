@@ -327,6 +327,7 @@ void saveEdit(HttpServer& server,DealHttp& http,int)
 void webLink(HttpServer& server,DealHttp& http,int soc)
 {
 	auto flag=http.req.analysisRequest(server.recText(),true);
+	cout<<http.req.method<<" "<<http.req.askPath<<endl;
 	auto pos=http.req.askPath.find("web-link/");
 	int len=0;
 	if(!flag||pos==http.req.askPath.npos)
