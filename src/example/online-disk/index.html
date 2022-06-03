@@ -163,6 +163,16 @@
 		padding:10px;
 		font-size:15px;
 	}
+	#contact button[id="link"] {
+		cursor:pointer;
+		width:100%;
+		border:none;
+		background:#99ff33;
+		color:#000;
+		margin:0 0 5px;
+		padding:10px;
+		font-size:15px;
+	}
 
 	#contact input[type="file"] {
 		cursor:pointer;
@@ -215,6 +225,7 @@
 		  	<button type="button" id="update" onclick="update();">update</button>
 		  	<button type="button" id="back" onclick="back();">back</button>
 		  	<button type="button" id="move" onclick="move();">move</button>
+		  	<button type="button" id="link" onclick="createLink();">link</button>
 			<form action="/upload" method="post" enctype="multipart/form-data" id="sen">
 				 	<h4 class="glyphicon glyphicon-floppy-disk" >点击按钮选择文件</h4><input type="file" class="file1" name="file1" />
 				 <button type="submit" class="but1">upload</button>
@@ -287,6 +298,11 @@
   	function mkdir()
   	{
   		var sen=document.getElementById("mkdir");
+   		if(sen.value.length==0)
+  		{
+  			alert("please input dir name");
+  			return;
+  		}
   		var url=window.location.pathname+"/"+sen.value;
   		console.log(url);
 	  	axios.post("/mkdir"+url, {
@@ -300,6 +316,11 @@
   	function remove()
   	{
   		var sen=document.getElementById("mkdir");
+   		if(sen.value.length==0)
+  		{
+  			alert("please choose file");
+  			return;
+  		}
   		var url=window.location.pathname+"/"+sen.value;
   		console.log(url);
 	  	axios.post("/delete"+url, {
@@ -310,9 +331,31 @@
 			sen.value="";
 		});
   	}
+  	function createLink()
+  	{
+  		var sen=document.getElementById("mkdir");
+  		if(sen.value.length==0)
+  		{
+  			alert("please choose file");
+  			return;
+  		}
+  		var url=window.location.pathname+"/"+sen.value;
+  		console.log(url);
+	  	axios.post("/link"+url, {
+		}).then(function (response) {
+			var status=window.location.protocol+"//"+window.location.host+JSON.parse(JSON.stringify(response.data))['status']+"\n链接只出现一次,务必保存好";
+			alert(status);
+			sen.value="";
+		});
+  	}
   	function move()
   	{
    		var sen=document.getElementById("mkdir");
+    	if(sen.value.length==0)
+  		{
+  			alert("please choose file");
+  			return;
+  		}
   		var url=window.location.pathname+"/"+sen.value;
   		var person=prompt("please input the way you move",window.location.pathname+"/");
   		if(person!=null&&person!="")

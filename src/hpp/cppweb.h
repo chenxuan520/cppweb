@@ -2499,6 +2499,11 @@ public:
 			typeFile=FileKind::ZIP;
 			this->createData(staCode,data);
 		}
+		inline void file(Status staCode,const std::string& data)
+		{
+			typeFile=FileKind::UNKNOWN;
+			this->createData(staCode,data);
+		}
 		inline void noFound()
 		{
 			statusCode=STATUSNOFOUND;
