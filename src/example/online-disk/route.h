@@ -1,6 +1,7 @@
 #include "../../hpp/cppweb.h"
 #include "./config.h"
 #include <dirent.h>
+#include <ctime>
 #include <sys/stat.h>
 using namespace cppweb;
 using namespace std;
@@ -320,6 +321,75 @@ void saveEdit(HttpServer& server,DealHttp& http,int)
 }
 /***********************************************
 * Author: chenxuan-1607772321@qq.com
+* change time:2022-06-03 16:44:07
+* description:create web link for res
+***********************************************/
+void webLink(HttpServer& server,DealHttp& http,int soc)
+{
+	auto flag=http.req.analysisRequest(server.recText(),true);
+	cout<<http.req.method<<" "<<http.req.askPath<<endl;
+	auto pos=http.req.askPath.find("web-link/");
+	int len=0;
+	if(!flag||pos==http.req.askPath.npos)
+	{
+		http.gram.json(DealHttp::STATUSNOFOUND,Json::createJson(Json::Node()={{"status","message wrong"}}));
+		return;
+	}
+	auto temp=http.req.askPath.substr(pos+strlen("web-link/"));
+	string file="../link/"+temp;
+	http.createSendMsg(DealHttp::UNKNOWN,(char*)server.getSenBuffer(),server.getMaxSenLen(),file.c_str(),&len);
+	if(len==0)
+	{
+		http.gram.noFound();
+		len=http.createDatagram(http.gram,server.getSenBuffer(),server.getMaxSenLen());
+	}
+	if(len>0)
+		server.httpSend(soc,server.getSenBuffer(),len);
+}
+/***********************************************
+* description:create soft link
+***********************************************/
+string createLink(string from,string link)
+{
+	auto flag=symlink(from.c_str(),link.c_str());
+	cout<<"from:"<<from<<" link:"<<link;
+	if(flag!=0)
+		return "message wrong";
+	else
+		return string("/web-link/")+link;
+}
+/***********************************************
+* Author: chenxuan-1607772321@qq.com
+* change time:2022-06-03 17:15:57
+* description:route to create link
+***********************************************/
+void apiLink(HttpServer& server,DealHttp& http,int)
+{
+	char path[128]={0};
+	auto flag=http.req.analysisRequest(server.recText(),true);
+	if(!flag)
+	{
+		http.gram.json(DealHttp::STATUSNOFOUND,Json::createJson(Json::Node()={{"status","message wrong"}}));
+		return;
+	}
+	http.getWildUrl(server.recText(),server.getNowRoute()->route,path,sizeof(char)*128);
+	char pwd[256]={0};
+	flag=getcwd(pwd,256);
+	if(!flag)
+	{
+		http.gram.json(DealHttp::STATUSNOFOUND,Json::createJson(Json::Node()={{"status","message wrong"}}));
+		return;
+	}
+	http.req.askPath=pwd;
+	http.req.askPath+=path;
+	auto now=to_string(time(NULL));
+	auto link=string("../link/")+now;
+	createLink(http.req.askPath,link);
+	Json json={{"status",string("/web-link/"+now)}};
+	http.gram.json(DealHttp::STATUSOK,json());
+}
+/***********************************************
+* Author: chenxuan-1607772321@qq.com
 * change time:2022-04-06 21:12:39
 * description:get file message
 ***********************************************/
@@ -364,6 +434,8 @@ void middleware(HttpServer& server,DealHttp& http,int soc)
 	http.analysisRequest(req,server.recText(),true);
 	if(req.method=="POST"&&req.askPath.find("login")!=req.askPath.npos)
 		server.continueNext(soc);
+	else if(req.method=="GET"&&req.askPath.find("web-link/")!=req.askPath.npos)
+		webLink(server,http,soc);
 	else if(getpwd!=_config.passwd)
 	{
 		int len=0;

@@ -3,10 +3,9 @@
 #include "./config.h"
 #include "./route.h"
 using namespace cppweb;
-int main()
+int main(int argc,char** argv)
 {
-	/* ProcessCtrl::backGround(); */
-	/* ProcessCtrl::guard(); */
+	dealArgv(argv,argc);
 	if(false==configServer("./config.json"))
 	{
 		printf("find config.json wrong\n");
@@ -24,6 +23,7 @@ int main()
 	server.post("/move*",moveFile);
 	server.post("/login",loginIn);
 	server.post("/logout",loginOut);
+	server.post("/link*",apiLink);
 	server.get("/*",sendHtml);
 	auto group=server.createGroup("/edit");
 	{
