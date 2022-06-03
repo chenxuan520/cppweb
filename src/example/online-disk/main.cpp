@@ -24,6 +24,7 @@ int main()
 	server.post("/move*",moveFile);
 	server.post("/login",loginIn);
 	server.post("/logout",loginOut);
+	server.post("/link*",apiLink);
 	server.get("/*",sendHtml);
 	auto group=server.createGroup("/edit");
 	{
