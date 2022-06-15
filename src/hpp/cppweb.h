@@ -4936,6 +4936,7 @@ private:
 				http.gram.cookie.clear();
 				http.gram.head.clear();
 				http.gram.fileLen=0;
+				http.gram.statusCode=DealHttp::STATUSOK;
 				http.gram.typeFile=DealHttp::TXT;
 				if(http.req.isFull)
 					http.req.clear();
