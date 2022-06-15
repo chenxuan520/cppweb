@@ -25,6 +25,8 @@ void nowPwdFile(HttpServer& server,DealHttp& http,int)
 	req.askPath=".";
 	req.askPath+=path;
 	cout<<"path:"<<req.askPath<<endl;
+	if(req.askPath.find("web-link")!=req.askPath.npos)
+		req.askPath="./link";
 	dirent* ptr=NULL;
 	DIR* dir=NULL;
 	struct stat temp;
@@ -327,7 +329,6 @@ void saveEdit(HttpServer& server,DealHttp& http,int)
 void webLink(HttpServer& server,DealHttp& http,int soc)
 {
 	auto flag=http.req.analysisRequest(server.recText(),true);
-	cout<<http.req.method<<" "<<http.req.askPath<<endl;
 	auto pos=http.req.askPath.find("web-link/");
 	int len=0;
 	if(!flag||pos==http.req.askPath.npos)
@@ -336,7 +337,7 @@ void webLink(HttpServer& server,DealHttp& http,int soc)
 		return;
 	}
 	auto temp=http.req.askPath.substr(pos+strlen("web-link/"));
-	string file="../link/"+temp;
+	string file="./link/"+temp;
 	http.createSendMsg(DealHttp::UNKNOWN,(char*)server.getSenBuffer(),server.getMaxSenLen(),file.c_str(),&len);
 	if(len==0)
 	{
@@ -382,8 +383,15 @@ void apiLink(HttpServer& server,DealHttp& http,int)
 	}
 	http.req.askPath=pwd;
 	http.req.askPath+=path;
-	auto now=to_string(time(NULL));
-	auto link=string("../link/")+now;
+	auto pos=http.req.askPath.find(".");
+	if(pos==http.req.askPath.npos)
+	{
+		http.gram.json(DealHttp::STATUSOK,Json::createJson({{"status","file wrong"}}));
+		return;
+	}
+	auto temp=http.req.askPath.substr(pos);
+	auto now=to_string(time(NULL))+temp;
+	auto link=string("./link/")+now;
 	createLink(http.req.askPath,link);
 	Json json={{"status",string("/web-link/"+now)}};
 	http.gram.json(DealHttp::STATUSOK,json());
