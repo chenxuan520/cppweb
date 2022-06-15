@@ -2,9 +2,9 @@
   <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
   <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
   <head>
-  	<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css" crossorigin="anonymous">
-    <meta name="generator">
-    <title>online disk</title>
+	<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css" crossorigin="anonymous">
+	<meta name="generator">
+	<title>online disk</title>
 	<style>
 	* {
 		margin:0;
@@ -210,180 +210,186 @@
 	</style>
   </head>
   <body>
-  	<div class="container">
-  		<div id="contact">
-  			<h5>welcome to online disk,now your path is</h3>
-  			<ol class="breadcrumb" id="travel">	
+	<div class="container">
+		<div id="contact">
+			<h5>welcome to online disk,now your path is</h3>
+			<ol class="breadcrumb" id="travel">	
 			</ol>
-		  	<div id="div">
-		  		<h3 class="glyphicon glyphicon-cloud">当前目录文件</h3>
-		  	</div>
-		  	<h4 class="glyphicon glyphicon-log-in"> 选择操作文件名或目录名</h4>
-		  	<input type="text" id="mkdir">
-		  	<button type="button" id="submit" onclick="mkdir();">mkdir</button>
-		  	<button type="button" id="delete" onclick="remove();">delete</button>
-		  	<button type="button" id="update" onclick="update();">update</button>
-		  	<button type="button" id="back" onclick="back();">back</button>
-		  	<button type="button" id="move" onclick="move();">move</button>
-		  	<button type="button" id="link" onclick="createLink();">link</button>
+			<div id="div">
+				<h3 class="glyphicon glyphicon-cloud">当前目录文件</h3>
+			</div>
+			<h4 class="glyphicon glyphicon-log-in"> 选择操作文件名或目录名</h4>
+			<input type="text" id="mkdir">
+			<button type="button" id="submit" onclick="mkdir();">mkdir</button>
+			<button type="button" id="delete" onclick="remove();">delete</button>
+			<button type="button" id="update" onclick="update();">update</button>
+			<button type="button" id="back" onclick="back();">back</button>
+			<button type="button" id="move" onclick="move();">move</button>
+			<button type="button" id="link" onclick="createLink();">link</button>
 			<form action="/upload" method="post" enctype="multipart/form-data" id="sen">
-				 	<h4 class="glyphicon glyphicon-floppy-disk" >点击按钮选择文件</h4><input type="file" class="file1" name="file1" />
+					<h4 class="glyphicon glyphicon-floppy-disk" >点击按钮选择文件</h4><input type="file" class="file1" name="file1" />
 				 <button type="submit" class="but1">upload</button>
 			</form>
-		  	<h5>if you want to edit online check <a href="/edit" class="edit">there</a></h5>
-		  	<button type="button" id="logout" onclick="logout();">out</button><br>
-  		</div>
+			<h5>if you want to edit online check <a href="/edit" class="edit">there</a></h5>
+			<h5>the web link file,check<a href="/link" class="edit">there</a></h5>
+			<button type="button" id="logout" onclick="logout();">out</button><br>
+		</div>
 	</div>
   </body>
   <script>
-  	function createTravel()
-  	{
-  		var url=window.location.pathname;
-	  	var travel=document.getElementById("travel");
-        var arr = url.split('/');
-        var str="";
-        for(var i=0;i<arr.length;i++)
-        {
-        	str+=arr[i]+"/";
+	function createTravel()
+	{
+		var url=window.location.pathname;
+		var travel=document.getElementById("travel");
+		var arr = url.split('/');
+		var str="";
+		for(var i=0;i<arr.length;i++)
+		{
+			str+=arr[i]+"/";
 			var temp=document.createElement("lo");
 			var path=document.createElement("a");
 			if(i!=0)  	
-	  			path.innerText=arr[i]+"/";
-	  		else
-	  			path.innerText="Home/";
-	  		path.href=str;
-	  		if(path.innerText!="/")
-	  		{
-			  	temp.appendChild(path);
-			  	travel.appendChild(temp);
-	  		}
-        }
-  	}
+				path.innerText=arr[i]+"/";
+			else
+				path.innerText="Home/";
+			path.href=str;
+			if(path.innerText!="/")
+			{
+				temp.appendChild(path);
+				travel.appendChild(temp);
+			}
+		}
+	}
   </script>
   <script>
-  	var url=window.location.pathname;
-  	var allUrl=window.location.href;
-  	if(url.search("login")!=-1)
-  		window.location.replace("/");
-  	var sen=document.getElementById("sen");
-  	createTravel();
-  	sen.action+=url;
-  	sen.action+="/";
+	var url=window.location.pathname;
+	var allUrl=window.location.href;
+	if(url.search("login")!=-1)
+		window.location.replace("/");
+	var sen=document.getElementById("sen");
+	createTravel();
+	sen.action+=url;
+	sen.action+="/";
 	console.log(sen.action);
 	axios.post("/message"+url, {
 	}).then(function (response) {
-	    var arr=JSON.parse(JSON.stringify(response.data))['list'];
-  		var div = document.getElementById("div");
-	    for(var i in arr)
-	    {
-  			var linkTmp = document.createElement("a");
-  			linkTmp.innerText=" "+arr[i];
-  			linkTmp.href =allUrl;
-  			var len=linkTmp.href.length;
-  			if(linkTmp.href[len-1]=='/')
-  				linkTmp.href+=arr[i];
-  			else
-  				linkTmp.href+="/"+arr[i];
-	    	console.log(arr[i]);
-  			if(arr[i].indexOf(".")==-1)
-  				linkTmp.className=" glyphicon glyphicon-folder-open";
-  			else
-  				linkTmp.className="glyphicon glyphicon-file";
-	    	div.appendChild(linkTmp);
-	    	div.appendChild(document.createElement("br"));
-	    }
-  	});
+		var arr=JSON.parse(JSON.stringify(response.data))['list'];
+		var div = document.getElementById("div");
+		for(var i in arr)
+		{
+			if(arr[i].indexOf("link")!=-1)
+				continue;
+			var linkTmp = document.createElement("a");
+			linkTmp.innerText=" "+arr[i];
+			linkTmp.href =allUrl;
+			var len=linkTmp.href.length;
+			if(linkTmp.href[len-1]=='/')
+				linkTmp.href+=arr[i];
+			else
+				linkTmp.href+="/"+arr[i];
+			console.log(arr[i]);
+			if(window.location.pathname.indexOf("link")==-1&&arr[i].indexOf(".")==-1)
+				linkTmp.className="glyphicon glyphicon-folder-open";
+			else
+				linkTmp.className="glyphicon glyphicon-file";
+			div.appendChild(linkTmp);
+			div.appendChild(document.createElement("br"));
+		}
+	});
   </script>
   <script>
-  	function mkdir()
-  	{
-  		var sen=document.getElementById("mkdir");
-   		if(sen.value.length==0)
-  		{
-  			alert("please input dir name");
-  			return;
-  		}
-  		var url=window.location.pathname+"/"+sen.value;
-  		console.log(url);
-	  	axios.post("/mkdir"+url, {
+	function linkFile(){
+		window.location.pathname="link";
+	}
+	function mkdir()
+	{
+		var sen=document.getElementById("mkdir");
+		if(sen.value.length==0)
+		{
+			alert("please input dir name");
+			return;
+		}
+		var url=window.location.pathname+"/"+sen.value;
+		console.log(url);
+		axios.post("/mkdir"+url, {
 		}).then(function (response) {
 			var status=JSON.parse(JSON.stringify(response.data))['status'];
 			alert(status);
 			location.reload();
 			sen.value="";
 		});
-  	}
-  	function remove()
-  	{
-  		var sen=document.getElementById("mkdir");
-   		if(sen.value.length==0)
-  		{
-  			alert("please choose file");
-  			return;
-  		}
-  		var url=window.location.pathname+"/"+sen.value;
-  		console.log(url);
-	  	axios.post("/delete"+url, {
+	}
+	function remove()
+	{
+		var sen=document.getElementById("mkdir");
+		if(sen.value.length==0)
+		{
+			alert("please choose file");
+			return;
+		}
+		var url=window.location.pathname+"/"+sen.value;
+		console.log(url);
+		axios.post("/delete"+url, {
 		}).then(function (response) {
 			var status=JSON.parse(JSON.stringify(response.data))['status'];
 			alert(status);
 			location.reload();
 			sen.value="";
 		});
-  	}
-  	function createLink()
-  	{
-  		var sen=document.getElementById("mkdir");
-  		if(sen.value.length==0)
-  		{
-  			alert("please choose file");
-  			return;
-  		}
-  		var url=window.location.pathname+"/"+sen.value;
-  		console.log(url);
-	  	axios.post("/link"+url, {
+	}
+	function createLink()
+	{
+		var sen=document.getElementById("mkdir");
+		if(sen.value.length==0)
+		{
+			alert("please choose file");
+			return;
+		}
+		var url=window.location.pathname+"/"+sen.value;
+		console.log(url);
+		axios.post("/link"+url, {
 		}).then(function (response) {
 			var status=window.location.protocol+"//"+window.location.host+JSON.parse(JSON.stringify(response.data))['status']+"\n链接只出现一次,务必保存好";
 			alert(status);
 			sen.value="";
 		});
-  	}
-  	function move()
-  	{
-   		var sen=document.getElementById("mkdir");
-    	if(sen.value.length==0)
-  		{
-  			alert("please choose file");
-  			return;
-  		}
-  		var url=window.location.pathname+"/"+sen.value;
-  		var person=prompt("please input the way you move",window.location.pathname+"/");
-  		if(person!=null&&person!="")
-  		{
-	  	  	axios.post("/move"+url, {
-	  	  		"newpath":person
+	}
+	function move()
+	{
+		var sen=document.getElementById("mkdir");
+		if(sen.value.length==0)
+		{
+			alert("please choose file");
+			return;
+		}
+		var url=window.location.pathname+"/"+sen.value;
+		var person=prompt("please input the way you move",window.location.pathname+"/");
+		if(person!=null&&person!="")
+		{
+			axios.post("/move"+url, {
+				"newpath":person
 			}).then(function (response) {
 				var status=JSON.parse(JSON.stringify(response.data))['status'];
 				alert(status);
 				location.reload();
 				sen.value="";
 			});
-  		}
-  	}
-  	function logout()
-  	{
- 	  	axios.post("/logout", {
+		}
+	}
+	function logout()
+	{
+		axios.post("/logout", {
 		}).then(function (response) {
 			location.reload();
 		});
-  	}
-  	function update()
-  	{
-  		location.reload();
-  	}
-   	function back()
-  	{
-  		window.history.back(-1);
-  	}
+	}
+	function update()
+	{
+		location.reload();
+	}
+	function back()
+	{
+		window.history.back(-1);
+	}
   </script>
 </html>
