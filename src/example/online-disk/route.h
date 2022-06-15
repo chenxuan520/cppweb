@@ -16,8 +16,7 @@ void nowPwdFile(HttpServer& server,DealHttp& http,int)
 	if(false==http.analysisRequest(req,server.recText()))
 	{
 		Json json={{"status","analysisHttpAsk wrong"}};
-		http.gram.typeFile=DealHttp::JSON;
-		http.gram.body=json();
+		http.gram.json(DealHttp::STATUSOK,json());
 		return;
 	}
 	char path[128]={0};
@@ -34,8 +33,7 @@ void nowPwdFile(HttpServer& server,DealHttp& http,int)
 	if(now<0)
 	{
 		Json json={{"status","stat wrong"}};
-		http.gram.typeFile=DealHttp::JSON;
-		http.gram.body=json();
+		http.gram.json(DealHttp::STATUSOK,json());
 		return;
 	}
 	else if(S_ISREG(temp.st_mode))
@@ -62,14 +60,12 @@ void nowPwdFile(HttpServer& server,DealHttp& http,int)
 		closedir(dir);
 		json[ "list" ]=file;
 		printf("json:%s\n",json());
-		http.gram.typeFile=DealHttp::JSON;
-		http.gram.body=json();
+		http.gram.json(DealHttp::STATUSOK,json());
 	}
 	else
 	{
 		Json json={{"status","unknown file"}};
-		http.gram.typeFile=DealHttp::JSON;
-		http.gram.body=json();
+		http.gram.json(DealHttp::STATUSOK,json());
 		return;
 	}
 }
@@ -97,9 +93,7 @@ void sendHtml(HttpServer& server,DealHttp& http,int)
 	auto now=stat(req.askPath.c_str(),&temp);
 	if(now<0)
 	{
-		FileGet file;
-		http.gram.body=file.getFileBuff("../index.html");
-		http.gram.typeFile=DealHttp::HTML;
+		http.gram.html(DealHttp::STATUSOK,FileGet::getFileString("../index.html"));
 		return;
 	}
 	else if(S_ISREG(temp.st_mode))
@@ -113,11 +107,7 @@ void sendHtml(HttpServer& server,DealHttp& http,int)
 	}
 	else
 	{
-		FileGet file;
-		int len=file.getFileLen("../index.html");
-		http.gram.body=string(file.getFileBuff("../index.html"),len);
-		http.gram.fileLen=len;
-		http.gram.typeFile=DealHttp::HTML;
+		http.gram.html(DealHttp::STATUSOK,FileGet::getFileString("../index.html"));
 		return;
 	}
 }
@@ -133,8 +123,7 @@ void upload(HttpServer& server,DealHttp& http,int soc)
 	if(false==http.analysisRequest(req,server.recText()))
 	{
 		Json json={{"status","analysisHttpAsk wrong"}};
-		http.gram.typeFile=DealHttp::JSON;
-		http.gram.body=json();
+		http.gram.json(DealHttp::STATUSOK,json());
 		return;
 	}
 	if(req.head.find("Content-Length")==req.head.end())
@@ -160,10 +149,7 @@ void upload(HttpServer& server,DealHttp& http,int soc)
 	req.askPath+=name;
 	cout<<"file:"<<req.askPath<<endl;
     FileGet::writeToFile(req.askPath.c_str(),(char*)temp,flen);
-	http.gram.typeFile=DealHttp::HTML;
-	FileGet file;
-	http.gram.body=file.getFileBuff("../jump.html");
-	http.gram.typeFile=DealHttp::HTML;
+	http.gram.html(DealHttp::STATUSOK,FileGet::getFileString("../jump.html"));
 	free(temp);
 }
 /***********************************************
@@ -177,8 +163,7 @@ void mkdirNow(HttpServer& server,DealHttp& http,int)
 	if(false==http.analysisRequest(req,server.recText()))
 	{
 		Json json={{"status","analysisHttpAsk wrong"}};
-		http.gram.typeFile=DealHttp::JSON;
-		http.gram.body=json();
+		http.gram.json(DealHttp::STATUSOK,json());
 		return;
 	}
 	bool isDelete=false;
@@ -192,6 +177,7 @@ void mkdirNow(HttpServer& server,DealHttp& http,int)
 	{
 		http.gram.typeFile=DealHttp::JSON;
 		http.gram.body="{\"status\":\"delete wrong\"}";
+		http.gram.statusCode=DealHttp::STATUSOK;
 		return;
 	}
 	if(!isDelete)
@@ -201,23 +187,19 @@ void mkdirNow(HttpServer& server,DealHttp& http,int)
 	else
 	{
 		Json json={{"status",(const char*)strerror(errno)}};
-		http.gram.typeFile=DealHttp::JSON;
-		http.gram.body=json();
+		http.gram.json(DealHttp::STATUSOK,json());
 		return;
 	}
 	if(flag==0)
 	{
 		Json json={{"status","ok"}};
-		http.gram.statusCode=DealHttp::STATUSOK;
-		http.gram.typeFile=DealHttp::JSON;
-		http.gram.body=json();
+		http.gram.json(DealHttp::STATUSOK,json());
 		return;
 	}
 	else
 	{
 		Json json={{"status",(const char*)strerror(errno)}};
-		http.gram.typeFile=DealHttp::JSON;
-		http.gram.body=json();
+		http.gram.json(DealHttp::STATUSOK,json());
 		return;
 	}
 }
@@ -232,8 +214,7 @@ void moveFile(HttpServer& server,DealHttp& http,int)
 	if(false==http.analysisRequest(req,server.recText()))
 	{
 		Json json={{"status","analysisHttpAsk wrong"}};
-		http.gram.typeFile=DealHttp::JSON;
-		http.gram.body=json();
+		http.gram.json(DealHttp::STATUSOK,json());
 		return;
 	}
 	bool isDelete=false;
