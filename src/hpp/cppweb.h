@@ -4319,7 +4319,8 @@ private:
 	bool selfCtrl;
 	bool isContinue;
 	bool isAutoAnalysis;
-	void (*middleware)(HttpServer&,DealHttp&,int num);
+	void (*middleware)(HttpServer&,DealHttp&,int);
+	void (*noRouteFunc)(HttpServer&,DealHttp&,int);
 	void (*clientIn)(HttpServer&,int num,void* ip,int port);
 	void (*clientOut)(HttpServer&,int num,void* ip,int port);
 	void (*logFunc)(const void*,int);
@@ -4327,6 +4328,7 @@ private:
 	Trie<RouteFuntion> trie;
 	ThreadPool* pool;
 	RunModel model;
+	DealHttp http;
 public:
 	HttpServer(unsigned port,bool debug=false,RunModel serverModel=MULTIPLEXING,unsigned threadNum=5)
 		:ServerTcpIp(port),model(serverModel)
@@ -4335,6 +4337,7 @@ public:
 		getText=NULL;
 		senText=NULL;
 		middleware=NULL;
+		noRouteFunc=NULL;
 		defaultFile=NULL;
 		arrRoute=NULL;
 		clientIn=NULL;
@@ -4575,10 +4578,14 @@ public:
 		func(cliSock);
 		middleware=temp;
 	}
-	void setLog(void (*pfunc)(const void*,int),void (*errorFunc)(const void*,int))
+	inline void setLog(void (*pfunc)(const void*,int),void (*errorFunc)(const void*,int))
 	{//log system 
 		logFunc=pfunc;
 		logError=errorFunc;
+	}
+	inline void setNoRouteFunc(void (*pfunc)(HttpServer&,DealHttp&,int))
+	{
+		noRouteFunc=pfunc;
 	}
 	void run(const char* defaultFile=NULL,bool restart=false)
 	{//server begin to run
@@ -4752,7 +4759,7 @@ private:
 			break;
 		}
 		printf("port:\t\t%u\n",boundPort);
-		if(isAutoAnalysis)
+		if(isAutoAnalysis&&noRouteFunc==NULL)
 			printf("auto:\t\tTrue\n");
 		else
 			printf("auto:\t\tFalse\n");
@@ -4829,6 +4836,8 @@ private:
 				break;
 			}
 		}
+		if(noRouteFunc!=NULL)
+			printf("noroute\t\tfunction set\n");
 		if(middleware!=NULL)
 			printf("middleware\t\tfuntion set\n");
 		if(logFunc!=NULL)
@@ -4843,7 +4852,6 @@ private:
 	}
 	int func(int num)
 	{
-		static DealHttp http;
 		AskType type=GET;
 		int len=0,flag=1;
 		char ask[200]={0};
@@ -4928,7 +4936,7 @@ private:
 			pnowRoute=tempRoute;
 			pfunc=tempRoute->pfunc;
 		}
-		if(pfunc!=NULL)
+		if(pfunc!=NULL||noRouteFunc!=NULL)
 		{
 			if(pfunc!=loadFile&&pfunc!=deleteFile)
 			{
@@ -4936,10 +4944,14 @@ private:
 				http.gram.cookie.clear();
 				http.gram.head.clear();
 				http.gram.fileLen=0;
+				http.gram.statusCode=DealHttp::STATUSOK;
 				http.gram.typeFile=DealHttp::TXT;
 				if(http.req.isFull)
 					http.req.clear();
-				pfunc(*this,http,num);
+				if(pfunc!=NULL)
+					pfunc(*this,http,num);
+				else
+					noRouteFunc(*this,http,num);
 				if(selfCtrl)
 				{
 					selfCtrl=false;
