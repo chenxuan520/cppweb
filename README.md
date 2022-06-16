@@ -50,7 +50,7 @@
 
 - class是为编译的一些类，包括一个简单的内存泄漏检测头文件
 
-- bin是可执行文件 
+- 
 
 - install.sh为服务器运行脚本
 
@@ -142,11 +142,10 @@ int main()
 ```cpp
 #define CPPWEB_OPENSSL
 #include "../../hpp/cppweb.h"
-using namespace std;
 using namespace cppweb;
 int main()
 {
-    HttpServer server(5201,true,HttpServer::THREAD,5);
+    HttpServer server(5201);
     server.loadKeyCert("./cacert.pem","./privkey.pem","123456");
     //第一个是证书位置,第二个是私钥位置,第三个是密码(没有可以不填)
     server.run("./index.html");

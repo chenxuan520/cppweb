@@ -50,8 +50,6 @@ When I was building a C++ server, I found that the boost library was too large a
 
 - class is compiled for some classes, including a simple memory leak detection header file
 
-- bin is the executable
-
 - install.sh runs the script for the server
 
 - The old folder is the header and source files of version 1.0, which is not recommended
@@ -143,10 +141,9 @@ int main()
 #define CPPWEB_OPENSSL
 #include "../../hpp/cppweb.h"
 using namespace std;
-using namespace cppweb;
 int main()
 {
-    HttpServer server(5201, true, HttpServer::THREAD, 5);
+    HttpServer server(5201);
     server.loadKeyCert("./cacert.pem","./privkey.pem","123456");
     //The first is the certificate location, the second is the private key location, and the third is the password (if there is none, you can leave it blank)
     server.run("./index.html");
