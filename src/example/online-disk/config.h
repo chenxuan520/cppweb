@@ -1,5 +1,6 @@
 #pragma once
 #include "../../hpp/cppweb.h"
+#include "../../hpp/argc.h"
 using namespace cppweb;
 struct _Config{
 	std::string passwd;
@@ -45,22 +46,4 @@ bool configServer(const char* configPath)
 	if(_config.logPath.size()!=0&&_config.isLog)
 		LogSystem::defaultName=_config.logPath.c_str();
 	return true;
-}
-void dealArgv(char** argv,int argc)
-{
-	if(argc<=1)
-		return;
-	else if(strcmp(argv[1],"-d")==0)
-	{
-		ProcessCtrl::backGround();
-		return;
-	}
-	else if(strcmp(argv[1],"-dg")==0)
-	{
-		ProcessCtrl::backGround();
-		ProcessCtrl::guard();
-		return;
-	}
-	else
-		printf("welcome to online disk,\n -d\t run in background\n -gt run in back with guard");
 }

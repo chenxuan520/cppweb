@@ -42,9 +42,9 @@ public:
 		}
 	}
 	void setVari(std::string variName,std::string usage,bool must=false){
-		std::string temp="\t,no must";
+		std::string temp="\tno must";
 		if(must)
-			temp="\t,must";
+			temp="\tmust";
 		message.insert({"--"+variName+"=(variable)",usage+temp});
 		if(must&&argAll.find(variName)==argAll.end()){
 			app.pfunc=NULL;
@@ -54,9 +54,9 @@ public:
 		return argAll.find(name)!=argAll.end();
 	}
 	void setOption(std::string option,std::string usage,bool must=false){
-		std::string temp="\t,no must";
+		std::string temp="\tno must";
 		if(must)
-			temp="\t,must";
+			temp="\tmust";
 		message.insert({"-"+option,usage+temp});
 		if(must&&argAll.find(option)==argAll.end()){
 			app.pfunc=NULL;
@@ -78,7 +78,7 @@ public:
 		for(auto iter:message){
 			printf("\t%s\t\t%s\n",iter.first.c_str(),iter.second.c_str());
 		}
-		printf("\t-h,--help\t\tget help of app\n");
+		printf("\t-h,--help\t\tget help of app\tno must\n");
 		return 0;
 	}
 };
