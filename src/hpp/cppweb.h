@@ -349,6 +349,20 @@ public:
 			else
 				return *this->arr[pos];
 		}
+		Object& excapeChar()
+		{
+			auto temp=strVal;
+			strVal.clear();
+			for(unsigned i=0;i<temp.size();i++)
+			{
+				if(temp[i]=='\\')
+					i++;
+				if(i>=temp.size())
+					break;
+				strVal+=temp[i];
+			}
+			return *this;
+		}
 	};
 	static Object npos;
 	class Node;
