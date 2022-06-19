@@ -6,6 +6,7 @@
 #include "../hpp/cppweb.h"
 #include "../hpp/route.h"
 #include "../hpp/config.h"
+#include "../hpp/argc.h"
 using namespace cppweb;
 std::string _configFile;
 /***********************************************
@@ -213,12 +214,9 @@ void serverHttp()
 	date:2021.7.5
 	funtion:reload the server
 *********************************/
-void dealArgc(int argc,char** argv)
+void dealArgc(ArgcDeal& args)
 {
-	if(argc==1)
-		return;
-	if(strcmp(argv[1],"reload")==0||strcmp(argv[1],"--reload")==0||\
-	   strcmp(argv[1],"stop")==0||strcmp(argv[1],"--stop")==0)
+	if(args.getOption("reload")||args.getOption("stop"))
 	{
 #ifndef _WIN32
 		FILE* fp=fopen("./server.pid","r+");
@@ -233,7 +231,7 @@ void dealArgc(int argc,char** argv)
 			exit(0);
 		kill(pid,2);
 		fclose(fp);
-		if(strcmp(argv[1],"stop")==0||strcmp(argv[1],"--stop")==0)
+		if(args.getOption("stop"))
 			exit(0);
 		else
 		{
@@ -242,27 +240,29 @@ void dealArgc(int argc,char** argv)
 		}
 #endif
 	}
-	else if(strncmp(argv[1],"--config=",9)==0)
+	if(args.getOption("config"))
 	{
-		char* pname=argv[1]+9;
-		_config.configFile=pname;
-		printf("read config from %s\n",pname);
-	}
-	else
-	{
-		printf("thank using chenxuanweb,if you have any question\n"
-			   "send email to 1607772321@qq.com to deal problem\nTHANK YOU!\n"
-			   "--help\t\t\tget the help\n"
-			   "--stop\t\t\tstop the server\n"
-			   "--reload\t\t\treload the server\n"
-			   "--config=(file name)\t\t\tchoose file as config file\n"
-			   "! only in linux the argv is accepted\n");
-		exit(0);
+		_config.configFile=args.getVari("config");
+		printf("read config from %s\n",_config.configFile.c_str());
 	}
 }
-int main(int argc, char** argv) 
+int _main(ArgcDeal& args)
 {
-	dealArgc(argc,argv);
+	dealArgc(args);
 	serverHttp();
 	return 0;
+}
+int main(int argc, char** argv)
+{
+	ArgcDeal args(argc,argv);
+	args.app.name="chenxuanweb server";
+	args.app.pfunc=_main;
+	args.app.usage="thank using chenxuanweb,if you have any question\n"
+		"\tsend email to 1607772321@qq.com to deal problem,thank you!\n"
+		"\t! only in linux the argv is accepted\n";
+	args.app.version="v2.0";
+	args.setOption("reload","restart the server");
+	args.setOption("stop","stop the server");
+	args.setVari("config","choose the file to be config file");
+	return args.run();
 }
