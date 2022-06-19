@@ -14,6 +14,7 @@ public:
 	const char* error;
 	Host host;
 	DealHttp::Request req;
+	string body;
 	Config(string configFile){
 		error=NULL;
 		auto text=FileGet::getFileString(configFile.c_str());
@@ -74,7 +75,10 @@ public:
 			return;
 		}
 		if(root["req"]["body"]!=Json::npos){
-			req.body=root["req"]["body"].strVal.c_str();
+			req.body=root["req"]["body"].excapeChar().strVal.c_str();
+		}else if(root["req"]["body_file"]!=Json::npos){
+			body=FileGet::getFileString(root["req"]["body_file"].strVal.c_str());
+			req.body=body.c_str();
 		}else{
 			error="body wrong";
 			return;

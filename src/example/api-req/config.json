@@ -1,15 +1,21 @@
 {
 	//file to create request
 	"host":{
-		"ip":"www.baidu.com",
+		//ip can be host name or ip name
+		"ip":"api.interpreter.caiyunai.com",
 		"port":443
 	},
 	"req":{
-		"method":"GET",
-		"path":"/",
+		"method":"POST",
+		"path":"/v1/dict",
 		"version":"HTTP/1.1",
 		"head":{
+			"Content-Type":"application/json;charset=utf-8",
+			"X-Authorization":"token:qgemv4jr1y38jyq6vhvi",
+			"Connection":"keep-alive"
 		},
-		"body":""
+		//if body is long,can change body to body_file to load file path
+		//such as "body_file":"./config.json"
+		"body":"{\"trans_type\":\"en2zh\",\"source\":\"hello\"}"
 	}
 }
