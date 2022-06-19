@@ -1,0 +1,15 @@
+{
+	//file to create request
+	"host":{
+		"ip":"www.baidu.com",
+		"port":443
+	},
+	"req":{
+		"method":"GET",
+		"path":"/",
+		"version":"HTTP/1.1",
+		"head":{
+		},
+		"body":""
+	}
+}
