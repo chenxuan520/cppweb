@@ -2,12 +2,12 @@
 	//file to create request
 	"host":{
 		//ip can be host name or ip name
-		"ip":"api.interpreter.caiyunai.com",
-		"port":443
+		"ip":"127.0.0.1",
+		"port":5200
 	},
 	"req":{
-		"method":"POST",
-		"path":"/v1/dict",
+		"method":"GET",
+		"path":"/",
 		"version":"HTTP/1.1",
 		"head":{
 			"Content-Type":"application/json;charset=utf-8",

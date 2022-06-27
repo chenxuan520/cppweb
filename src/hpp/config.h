@@ -52,7 +52,7 @@ void proxy(HttpServer& server,DealHttp& http,int soc)
 	char url[128]={0};
 	std::string strNow=pathNow->route;
 	strNow+='*';
-	http.getWildUrl(server.recText(),pathNow->route,url,128);
+	http.getWildUrl(server.recText(http),pathNow->route,url,128);
 	if(_config.proxyMap.find(strNow)!=_config.proxyMap.end())
 	{
 		auto now=_config.proxyMap[strNow].load;
@@ -63,12 +63,12 @@ void proxy(HttpServer& server,DealHttp& http,int soc)
 		else
 			strNow=now.getHashServer(ServerTcpIp::getPeerIp(soc,&temp));
 		sscanf(strNow.c_str(),"%[^:]:%d",ip,&port);
-		memset(server.getSenBuffer(),0,server.getMaxSenLen());
+		memset(server.getSenBuffer(http),0,server.getMaxSenLen(http));
 		DealHttp::Request req;
-		http.analysisRequest(req,server.recText());
+		http.analysisRequest(req,server.recText(http));
 		req.askPath=url;
 		req.head["Host"]=strNow;
-		http.createAskRequest(req,server.getSenBuffer(),server.getMaxSenLen());
+		http.createAskRequest(req,server.getSenBuffer(http),server.getMaxSenLen(http));
 		ClientTcpIp client(ip,port);
 		if(false==client.tryConnect())
 		{
@@ -76,13 +76,13 @@ void proxy(HttpServer& server,DealHttp& http,int soc)
 			LogSystem::recordRequest("connect cliwrong",soc);
 			return;
 		}
-		if(false==client.sendHost(server.getSenBuffer(),strlen((char*)server.getSenBuffer())))
+		if(false==client.sendHost(server.getSenBuffer(http),strlen((char*)server.getSenBuffer(http))))
 		{
 			http.gram.statusCode=DealHttp::STATUSNOFOUND;
 			LogSystem::recordRequest("sen cliwrong",soc);
 			return;
 		}
-		memset(server.getSenBuffer(),0,server.getMaxSenLen());
+		memset(server.getSenBuffer(http),0,server.getMaxSenLen(http));
 		int socCli=client.getSocket();
 		std::string strGet;
 		int len=HttpApi::getCompleteHtml(strGet,socCli);
@@ -92,10 +92,10 @@ void proxy(HttpServer& server,DealHttp& http,int soc)
 			LogSystem::recordRequest("rec cliwrong",soc);
 			return;
 		}
-		while(len>(int)server.getMaxSenLen())
+		while(len>(int)server.getMaxSenLen(http))
 			server.enlagerSenBuffer();
-		memcpy(server.getSenBuffer(),strGet.c_str(),len);
-		server.selfCreate(len);
+		memcpy(server.getSenBuffer(http),strGet.c_str(),len);
+		http.info.staticLen=len;
 	}
 	else
 		http.gram.statusCode=DealHttp::STATUSNOFOUND;

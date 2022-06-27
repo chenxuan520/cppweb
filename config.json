@@ -6,7 +6,7 @@
 	//default file when ask /
 	"default file":"index.html",
 	//if fork model,use "MULTIPLEXING" or "FORK" or"THREAD"
-	"model":"MULTIPLEXING",
+	"model":"THREAD",
 	//if long connect
 	"long connect":true,
 	//if run in background

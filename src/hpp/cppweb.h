@@ -35,6 +35,7 @@
 #include<stack>
 #include<string>
 #include<regex>
+#include<mutex>
 #include<codecvt>
 #include<functional>
 #include<type_traits>
@@ -286,6 +287,123 @@ public:
 		return all;
 	}
 #endif
+};
+/***********************************************
+* Author: chenxuan-1607772321@qq.com
+* change time:2022-06-27 12:40:51
+* description:the buffer of memory
+***********************************************/
+class Buffer{
+private:
+	unsigned maxLen;
+public:
+	char* buffer;
+	const char* error;
+	Buffer():maxLen(0),buffer(NULL),error(NULL){};
+	Buffer(unsigned len):Buffer(){
+		maxLen=len;
+		buffer=(char*)malloc(sizeof(char)*len);
+		if(buffer==NULL){
+			error="malloc wrong";
+			return;
+		}else{
+			memset(buffer,0,sizeof(char)*len);
+		}
+	}
+	~Buffer(){
+		if(buffer!=NULL){
+			free(buffer);
+			buffer=NULL;
+		}
+	}
+	inline unsigned getMaxSize(){
+		return maxLen;
+	}
+	bool resize(unsigned len){
+		if(len<=maxLen){
+			return true;
+		}else if(buffer!=NULL){
+			char* temp=(char*)realloc(buffer,len);
+			if(temp==NULL){
+				error="realloc wrong";
+				return false;
+			}else{
+				buffer=temp;
+				maxLen=len;
+			}
+		}else{
+			buffer=(char*)malloc(sizeof(char)*len);
+			if(buffer==NULL){
+				error="malloc wrong";
+				return false;
+			}else{
+				memset(buffer,0,sizeof(char)*len);
+				maxLen=len;
+			}
+		}
+		return true;
+	}
+	bool enlargeMemory(){
+		if(buffer!=NULL){
+			char* temp=(char*)realloc(buffer,maxLen*2);
+			if(temp==NULL){
+				error="realloc wrong";
+				return false;
+			}else{
+				maxLen*=2;
+				buffer=temp;
+			}
+		}
+		return true;
+	}
+};
+/***********************************************
+* Author: chenxuan-1607772321@qq.com
+* change time:2022-06-27 16:10:43
+* description:the pool to deal thread argc
+***********************************************/
+template<class T>
+class Pool{
+private:
+	std::vector<T> data;
+	std::queue<T*> que;
+	std::mutex mut;
+public:
+	Pool(){}
+	Pool(unsigned poolSize){
+		data.resize(poolSize);
+		for(auto& now:data){
+			que.push(&now);
+		}
+	}
+	Pool(const std::vector<T>& data){
+		this->data=data;
+		for(auto& now:data){
+			que.push(&now);
+		}
+	}
+	void addData(const T& thing){
+		this->data.push_back(thing);
+		mut.lock();
+		this->que.push(&data[data.size()-1]);
+		mut.unlock();
+	}
+	T* getData(){
+		mut.lock();
+		if(que.empty()){
+			mut.unlock();
+			return NULL;
+		}
+		T* temp=que.front();
+		que.pop();
+		mut.unlock();
+		return temp;
+	}
+	void retData(T* thing){
+		mut.lock();
+		que.push(thing);
+		mut.unlock();
+	}
 };
 /*******************************
  * author:chenxuan
@@ -2478,6 +2596,16 @@ public:
 		std::string typeName;
 		std::string body;
 		Datagram():statusCode(STATUSOK),typeFile(TXT),fileLen(0){};
+		inline void clear()
+		{
+			head.clear();
+			cookie.clear();
+			body="";
+			typeName="";
+			statusCode=STATUSOK;
+			typeFile=TXT;
+			fileLen=0;
+		}
 		inline void json(Status staCode,const std::string& data)
 		{
 			typeFile=FileKind::JSON;
@@ -2818,6 +2946,14 @@ public:
 			return result;
 		}
 	};
+	struct RouteInfo{
+		const void* nowRoute;
+		const void* recText;
+		Buffer* sendBuffer;
+		int staticLen;
+		int recLen;
+		RouteInfo():nowRoute(NULL),recText(NULL),sendBuffer(NULL),staticLen(0){};
+	};
 private:
 	char ask[512];
 	char* pfind;
@@ -2825,6 +2961,7 @@ private:
 	const char* connect;
 	const char* serverName;
 public:
+	RouteInfo info;
 	Datagram gram;//default gram to create gram
 	Request req;//default request to use by user
 	std::unordered_map<std::string,std::string> head;//default head toadd middleware
@@ -2838,7 +2975,6 @@ public:
 		connect="keep-alive";
 		serverName="LCserver/1.1";
 	}
-	DealHttp(const DealHttp&)=delete;
 private:
 	bool cutLineAsk(char* message,const char* pcutIn)
 	{
@@ -3030,7 +3166,7 @@ public:
 		*plong=len+temp+1;
 		return 0;
 	}
-	const char* analysisHttpAsk(void* message,const char* pneed="GET")
+	const char* analysisHttpAsk(const void* message,const char* pneed="GET")
 	{
 		if(message==NULL)
 		{
@@ -3649,6 +3785,75 @@ public:
 			}
 		}
 		return NULL;
+	}
+#endif
+};
+/***********************************************
+* Author: chenxuan-1607772321@qq.com
+* change time:2022-04-16 23:35:16
+* description:http api
+***********************************************/
+class HttpApi{
+private:
+	HttpApi()=delete;
+	HttpApi(const HttpApi&)=delete;
+public:
+	//get complete datagram,result store in buffer,return recv size
+	static int getCompleteHtml(std::string& buffer,int sock,int flag=0)
+	{
+		int len=0;
+		if(buffer.size()==0||buffer.find("\r\n\r\n")==buffer.npos)
+		{
+			SocketApi::recvSockBorder(sock,buffer,"\r\n\r\n",flag);
+			auto temp=DealHttp::findKeyValue("Content-Length",buffer.c_str());
+			if(temp.size()==0)
+				return 0;
+			else
+				sscanf(temp.c_str(),"%d",&len);
+			if(len==0)
+				return buffer.size();
+			SocketApi::recvSockSize(sock,buffer,len);
+		}
+		else
+		{
+			auto pos=buffer.find("\r\n\r\n");
+			pos+=4;
+			auto temp=DealHttp::findKeyValue("Content-Length",buffer.c_str());
+			if(temp.size()==0)
+				return 0;
+			else
+				sscanf(temp.c_str(),"%d",&len);
+			if(len==0)
+				return buffer.size();
+			if(len-((int)buffer.size()-pos)>0)
+				SocketApi::recvSockSize(sock,buffer,len-(buffer.size()-pos));
+		}
+		return buffer.size();
+	}
+#ifdef CPPWEB_OPENSSL
+	static int getCompleteHtmlSSL(std::string& buffer,SSL* ssl,int=0)
+	{
+		int len=0;
+		if(buffer.size()==0||buffer.find("\r\n\r\n")==buffer.npos)
+		{
+			do{
+				int len=SocketApi::receiveSocket(ssl,buffer);
+				if(len==-1)
+					return buffer.size();
+			}while(buffer.find("\r\n\r\n")==buffer.npos);
+		}
+		auto pos=buffer.find("\r\n\r\n");
+		pos+=4;
+		auto temp=DealHttp::findKeyValue("Content-Length",buffer.c_str());
+		if(temp.size()==0)
+			return 0;
+		else
+			sscanf(temp.c_str(),"%d",&len);
+		if(len==0)
+			return buffer.size();
+		if(len-((int)buffer.size()-pos)>0)
+			SocketApi::recvSockSize(ssl,buffer,len-(buffer.size()-pos));
+		return buffer.size();
 	}
 #endif
 };
@@ -4318,14 +4523,13 @@ private:
 	RouteFuntion* arrRoute;
 	RouteFuntion* pnowRoute;
 	void* getText;
-	void* senText;
 	const char* defaultFile;
-	unsigned int senLen;
-	unsigned int recLen;
-	unsigned int maxLen;
-	unsigned int maxNum;
-	unsigned int now;
-	unsigned int boundPort;
+	unsigned recLen;
+	unsigned maxLen;
+	unsigned maxNum;
+	unsigned now;
+	unsigned boundPort;
+	unsigned threadNum;
 	int selfLen;
 	int textLen;
 	bool isDebug;
@@ -4340,6 +4544,7 @@ private:
 	void (*logFunc)(const void*,int);
 	void (*logError)(const void*,int);
 	Trie<RouteFuntion> trie;
+	Buffer senBuffer;
 	ThreadPool* pool;
 	RunModel model;
 	DealHttp http;
@@ -4349,7 +4554,6 @@ public:
 	{
 		pool=NULL;
 		getText=NULL;
-		senText=NULL;
 		middleware=NULL;
 		noRouteFunc=NULL;
 		defaultFile=NULL;
@@ -4359,7 +4563,7 @@ public:
 		logFunc=NULL;
 		logError=NULL;
 		pnowRoute=NULL;
-		senLen=1024*1024;
+		this->threadNum=0;
 		maxLen=10;
 		recLen=2048;
 		selfLen=0;
@@ -4389,6 +4593,7 @@ public:
 				return;
 			}
 			pool=new ThreadPool(threadNum);
+			this->threadNum=threadNum;
 			if(pool==NULL)
 			{
 				error="pool new wrong";
@@ -4583,13 +4788,13 @@ public:
 		middleware=pfunc;
 		return true;
 	}
-	inline void continueNext(int cliSock)
+	inline void continueNext(int cliSock,DealHttp& http)
 	{//middleware funtion to continue default task
 		if(middleware==NULL)
 			return;
 		auto temp=middleware;
 		middleware=NULL;
-		func(cliSock);
+		func(cliSock,http,http.info.recText,*(Buffer*)http.info.sendBuffer);
 		middleware=temp;
 	}
 	inline void setLog(void (*pfunc)(const void*,int),void (*errorFunc)(const void*,int))
@@ -4604,8 +4809,8 @@ public:
 	void run(const char* defaultFile=NULL,bool restart=false)
 	{//server begin to run
 		char* getT=(char*)malloc(sizeof(char)*recLen);
-		char* sen=(char*)malloc(sizeof(char)*senLen);
-		if(sen==NULL||getT==NULL)
+		auto flag=senBuffer.resize(1024*1024);
+		if(!flag||getT==NULL)
 		{
 			this->error="server:malloc get and sen wrong";
 			if(logError!=NULL)
@@ -4613,7 +4818,6 @@ public:
 			return;
 		}
 		memset(getT,0,sizeof(char)*recLen);
-		memset(sen,0,sizeof(char)*senLen);
 		if(!restart)
 		{
 			if(false==this->bondhost())
@@ -4634,7 +4838,6 @@ public:
 		if(logFunc!=NULL)
 			logFunc("server start",0);
 		this->getText=getT;
-		this->senText=sen;
 		this->defaultFile=defaultFile;
 		if(isDebug)
 			messagePrint();
@@ -4650,7 +4853,6 @@ public:
 				this->threadHttp();
 			break;
 		}
-		free(sen);
 		free(getT);
 	}
 	int httpSend(int num,void* buffer,int sendLen,int flag=0)
@@ -4661,14 +4863,21 @@ public:
 	{
 		return this->receiveSocket(num,buffer,bufferLen,flag);
 	}
-	int httpRecv(int num,std::string& buffer,int flag)
+	int httpRecv(int num,std::string& buffer,int flag=0)
 	{
 		return this->receiveSocket(num,buffer,flag);
 	}
-	int getCompleteMessage(int sockCli)
+	int httpRecvAll(int clisoc,std::string& buffer,int flag=0){
+#ifndef CPPWEB_OPENSSL
+		return HttpApi::getCompleteHtml(buffer,clisoc,flag);
+#else
+		return HttpApi::getCompleteHtmlSSL(buffer,getSSL(clisoc),flag);
+#endif
+	}
+	int getCompleteMessage(int sockCli,const DealHttp& http)
 	{//some time text is not complete ,it can get left text 
 		void*& message=getText;
-		unsigned messageLen=this->getRecLen();
+		unsigned messageLen=this->getRecLen(http);
 		if(message==NULL||message==0)
 			return -1;
 		unsigned int len=0,old=messageLen;
@@ -4709,13 +4918,13 @@ public:
 		if(sslWriteTime!=0)
 			this->writeTime=sslWriteTime;
 	}
-	inline void* recText()
+	inline void* recText(const DealHttp& http)
 	{//get the recv text;
-		return this->getText;
+		return (void*)http.info.recText;
 	}
-	inline int getRecLen()
+	inline int getRecLen(const DealHttp& http)
 	{//get the recv text len
-		return this->textLen;
+		return http.info.recLen;
 	}
 	inline const char* lastError()
 	{//get the error of server
@@ -4725,18 +4934,13 @@ public:
 	{//active dicconnect socket
 		this->cleanSocket(soc);
 	}
-	inline void selfCreate(int senLen)
-	{//use getSenBuff to create task by self
-		selfCtrl=true;
-		selfLen=senLen;
-	}
-	inline void* getSenBuffer()
+	inline void* getSenBuffer(const DealHttp& http)
 	{//get the sen buffer
-		return senText;
+		return http.info.sendBuffer->buffer;
 	}
-	inline unsigned getMaxSenLen()
+	inline unsigned getMaxSenLen(const DealHttp& http)
 	{//get sen buffer size
-		return this->senLen;
+		return http.info.sendBuffer->getMaxSize();
 	}
 	inline void stopServer()
 	{//stop server run;
@@ -4751,10 +4955,17 @@ public:
 	{//get the now route;
 		return pnowRoute;
 	}
+	inline RouteFuntion* getNowRoute(const void* message)
+	{//thread model to get now route
+		return (RouteFuntion*)message;
+	}
 	inline void* enlagerSenBuffer()
 	{//Proactively scale up sen buffer
-		this->senText=enlargeMemory(this->senText,this->senLen);
-		return this->senText;
+		auto flag=this->senBuffer.enlargeMemory();
+		if(!flag){
+			return NULL;
+		}
+		return this->senBuffer.buffer;
 	}
 private:
 	void messagePrint()
@@ -4864,11 +5075,15 @@ private:
 			printf("clientout\t\tfunction set\n");
 		printf("\n");
 	}
-	int func(int num)
+	int func(int num,DealHttp& http,const void* getText,Buffer& senText)
 	{
 		AskType type=GET;
 		int len=0,flag=1;
 		char ask[200]={0};
+		http.info.recText=getText;
+		http.info.nowRoute=NULL;
+		http.info.staticLen=0;
+		http.info.sendBuffer=&senText;
 		if(middleware!=NULL)
 		{
 			middleware(*this,http,num);
@@ -4876,31 +5091,31 @@ private:
 		}
 		if(isLongCon==false)
 			http.changeSetting("Close","LCserver/1.1");
-		sscanf((char*)this->getText,"%100s",ask);
+		sscanf((const char*)getText,"%100s",ask);
 		if(strstr(ask,"GET")!=NULL)
 		{
-			http.getAskRoute(this->getText,"GET",ask,200);
+			http.getAskRoute(getText,"GET",ask,200);
 			if(isDebug)
 				printf("Get url:%s\n",ask);
 			type=GET;
 		}
 		else if(strstr(ask,"POST")!=NULL)
 		{
-			http.getAskRoute(this->getText,"POST",ask,200);
+			http.getAskRoute(getText,"POST",ask,200);
 			if(isDebug)
 				printf("POST url:%s\n",ask);
 			type=POST;
 		}
 		else if(strstr(ask,"PUT")!=NULL)
 		{
-			http.getAskRoute(this->getText,"PUT",ask,200);
+			http.getAskRoute(getText,"PUT",ask,200);
 			if(isDebug)
 				printf("PUT url:%s\n",ask);
 			type=PUT;
 		}
 		else if(strstr(ask,"DELETE")!=NULL)
 		{
-			http.getAskRoute(this->getText,"DELETE",ask,200);
+			http.getAskRoute(getText,"DELETE",ask,200);
 			if(isDebug)
 				printf("DELETE url:%s\n",ask);
 #ifndef _WIN32
@@ -4911,14 +5126,14 @@ private:
 		}
 		else if(strstr(ask,"OPTIONS")!=NULL)
 		{
-			http.getAskRoute(this->getText,"OPTIONS",ask,200);
+			http.getAskRoute(getText,"OPTIONS",ask,200);
 			if(isDebug)
 				printf("OPTIONS url:%s\n",ask);
 			type=OPTIONS;
 		}
 		else if(strstr(ask,"CONNECT")!=NULL)
 		{
-			http.getAskRoute(this->getText,"CONNECT",ask,200);
+			http.getAskRoute(getText,"CONNECT",ask,200);
 			if(isDebug)
 				printf("CONNECT url:%s\n",ask);
 			type=CONNECT;
@@ -4948,60 +5163,56 @@ private:
 		if(tempRoute!=NULL)
 		{
 			pnowRoute=tempRoute;
+			http.info.nowRoute=tempRoute;
 			pfunc=tempRoute->pfunc;
 		}
 		if(pfunc!=NULL||noRouteFunc!=NULL)
 		{
-			if(pfunc!=loadFile&&pfunc!=deleteFile)
+			if(pfunc!=loadFile)
 			{
-				http.gram.body="";
-				http.gram.cookie.clear();
-				http.gram.head.clear();
-				http.gram.fileLen=0;
-				http.gram.statusCode=DealHttp::STATUSOK;
-				http.gram.typeFile=DealHttp::TXT;
+				http.gram.clear();
 				if(http.req.isFull)
 					http.req.clear();
 				if(pfunc!=NULL)
 					pfunc(*this,http,num);
 				else
 					noRouteFunc(*this,http,num);
-				if(selfCtrl)
-				{
-					selfCtrl=false;
-					len=selfLen;
-					selfLen=0;
-				}
+				if(http.info.staticLen>0)
+					len=http.info.staticLen;
+				else if(http.info.staticLen<0)
+					return 0;
 				else
 				{
 					if(http.gram.fileLen==0)
 						http.gram.fileLen=http.gram.body.size();
-					len=http.createDatagram(http.gram,this->senText,this->senLen);
+					len=http.createDatagram(http.gram,senText.buffer,senText.getMaxSize());
 					while(len==-1)
 					{
-						this->senText=enlargeMemory(this->senText,this->senLen);
-						len=http.createDatagram(http.gram,this->senText,this->senLen);
+						auto flag=senText.enlargeMemory();
+						if(!flag)
+							http.gram.noFound();
+						len=http.createDatagram(http.gram,senText.buffer,senText.getMaxSize());
 					}
 				}
 			}
 			else
 			{
-				pfunc(*this,http,senLen);
-				len=staticLen(-1);
+				pfunc(*this,http,senText.getMaxSize());
+				len=http.info.staticLen;
 			}
 		}
 		else if(isAutoAnalysis)
 		{
 			if(isDebug)
-				printf("http:%s\n",http.analysisHttpAsk(this->getText));
-			if(http.analysisHttpAsk(this->getText)!=NULL)
+				printf("http:%s\n",http.analysisHttpAsk(getText));
+			if(http.analysisHttpAsk(getText)!=NULL)
 			{
-				strcpy(ask,http.analysisHttpAsk(this->getText));
+				strcpy(ask,http.analysisHttpAsk(getText));
 				do{
-					flag=http.autoAnalysisGet((char*)this->getText,(char*)this->senText,senLen,defaultFile,&len);
-					if(flag==2&&this->senLen<maxLen*1024*1024)
-						this->enlagerSenBuffer();
-				}while(flag==2&&this->senLen<maxLen*1024*1024);
+					flag=http.autoAnalysisGet((char*)getText,senText.buffer,senText.getMaxSize(),defaultFile,&len);
+					if(flag==2&&senText.getMaxSize()<maxLen*1024*1024)
+						senText.enlargeMemory();
+				}while(flag==2&&senText.getMaxSize()<maxLen*1024*1024);
 			}
 			if(flag==1)
 			{
@@ -5014,14 +5225,14 @@ private:
 			{
 				if(logError!=NULL)
 					logError("memory wrong",0);
-				http.createSendMsg(DealHttp::NOFOUND,(char*)this->senText,senLen,NULL,&len);
+				http.createSendMsg(DealHttp::NOFOUND,senText.buffer,senText.getMaxSize(),NULL,&len);
 			}
 		}
 		else
-			http.createSendMsg(DealHttp::NOFOUND,(char*)this->senText,senLen,NULL,&len);
+			http.createSendMsg(DealHttp::NOFOUND,senText.buffer,senText.getMaxSize(),NULL,&len);
 		if(len==0)
-			http.createSendMsg(DealHttp::NOFOUND,(char*)this->senText,senLen,NULL,&len);
-		if(len>=0&&0>=this->sendSocket(num,this->senText,len))
+			http.createSendMsg(DealHttp::NOFOUND,senText.buffer,senText.getMaxSize(),NULL,&len);
+		if(len>=0&&0>=this->sendSocket(num,senText.buffer,len))
 		{
 			if(isDebug)
 				perror("send wrong");
@@ -5067,17 +5278,16 @@ private:
 			{
 				server.textLen=all;
 				if(server.model==MULTIPLEXING)
-					server.func(soc);
+					server.func(soc,server.http,server.getText,server.senBuffer);
 				else
 				{
 #ifndef _WIN32
 					if(fork()==0)
 					{
 						server.closeSocket(server.sock);
-						server.func(soc);
+						server.func(soc,server.http,server.getText,server.senBuffer);
 						server.closeSocket(soc);
 						free(server.getText);
-						free(server.senText);
 						exit(0);
 					}
 #else
@@ -5085,7 +5295,7 @@ private:
 #endif
 				}
 				if(server.logFunc!=NULL)
-					server.logFunc(server.recText(),soc);
+					server.logFunc(server.getText,soc);
 				if(server.isLongCon==false)
 					return soc;
 			}
@@ -5120,18 +5330,27 @@ private:
 	}
 	struct ThreadArg{
 		HttpServer* pserver;
+		Pool<ThreadArg>* pool;
+		DealHttp http;
+		Buffer sen;
 		int soc;
+		ThreadArg():pserver(NULL),pool(NULL),soc(0){};
 	};
 	void threadHttp()
 	{
+		Pool<ThreadArg> httpPool(this->threadNum);
 		while(this->isContinue)
 		{
 			sockaddr_in newaddr={0,0,{0},{0}};
 			int newClient=acceptSocket(newaddr);
 			if(newClient==-1)
 				continue;
-			ThreadArg* temp=(ThreadArg*)malloc(sizeof(ThreadArg));
+			ThreadArg* temp=NULL;
+			do{
+				temp=httpPool.getData();
+			}while(temp==NULL);
 			temp->pserver=this;
+			temp->pool=&httpPool;
 			temp->soc=newClient;
 			ThreadPool::Task task={threadWorker,temp};
 			pool->addTask(task);
@@ -5139,72 +5358,52 @@ private:
 	}
 	static void* threadWorker(void* self)
 	{
-		ThreadArg* argv=(ThreadArg*)self;
-		HttpServer& server=*argv->pserver;
-		int cli=argv->soc;
-		char* rec=(char*)malloc(sizeof(char)*server.recLen);
+		ThreadArg& argv=*(ThreadArg*)self;
+		HttpServer& server=*argv.pserver;
+		int cli=argv.soc;
+		argv.sen.resize(server.senBuffer.getMaxSize()/2);
 		unsigned int size=sizeof(char)*server.recLen;
-		if(rec==NULL)
-		{
-			server.closeSocket(cli);
-			free(self);
-			return NULL;
-		}
-		memset(rec,0,sizeof(char)*server.recLen);
 		if(server.clientIn!=NULL)
 		{
 			int port=0;
-			server.getPeerIp(cli,&port);
-			server.clientIn(server,cli,server.senText,port);
+			std::string ip=server.getPeerIp(cli,&port);
+			strncpy(argv.sen.buffer,ip.c_str(),std::min((unsigned)ip.size(),argv.sen.getMaxSize()));
+			server.clientIn(server,cli,server.senBuffer.buffer,port);
 		}
-		int recLen=server.receiveSocket(cli,rec,size);
-		int all=recLen;
-		while((int)size==all)
+		std::string rec;
+		server.httpRecvAll(cli,rec);
+		while(rec.size()>0)
 		{
-			rec=(char*)server.enlargeMemory(rec,size);
-			recLen=server.receiveSocket(cli,rec,size);
-			if(recLen<=0)
-				break;
-			all+=recLen;
-		}
-		while(all>=10)
-		{
-			server.pool->mutexLock();
-			server.textLen=all;
-			server.getText=rec;
-			server.func(cli);
+			server.func(cli,server.http,rec.c_str(),argv.sen);
 			if(server.logFunc!=NULL)
-				server.logFunc(rec,cli);
-			server.getText=NULL;
-			server.pool->mutexUnlock();
+				server.logFunc(rec.c_str(),cli);
 			if(server.isLongCon==false)
 				break;
-			memset(rec,0,sizeof(char)*server.recLen);
-			all=server.receiveSocket(cli,rec,size);
+			rec.clear();
+			server.httpRecvAll(cli,rec,size);
 		}
 		if(server.clientOut!=NULL)
 		{
 			int port=0;
-			strcpy((char*)server.senText,server.getPeerIp(cli,&port));
-			server.clientOut(server,cli,server.senText,port);
+			strcpy((char*)server.senBuffer.buffer,server.getPeerIp(cli,&port));
+			server.clientOut(server,cli,server.senBuffer.buffer,port);
 		}
-		free(rec);
-		free(self);
 		server.closeSocket(cli);
+		argv.pool->retData(&argv);
 		return NULL;
 	}
 	static void loadFile(HttpServer& server,DealHttp& http,int)
 	{
 		int len=0,flag=0;
 		char ask[200]={0},buf[500]={0},temp[200]={0};
-		http.getAskRoute(server.recText(),"GET",ask,200);
-		HttpServer::RouteFuntion& route=*server.getNowRoute();
+		http.getAskRoute(server.recText(http),"GET",ask,200);
+		HttpServer::RouteFuntion& route=*server.getNowRoute(http.info.nowRoute);
 		http.getWildUrl(ask,route.route,temp,200);
 		sprintf(buf,"GET %s%s HTTP/1.1",route.pathExtra,temp);
 		do
 		{
-			flag=http.autoAnalysisGet(buf,(char*)server.getSenBuffer(),server.senLen,NULL,&len);
-			if(flag==2&&server.senLen<server.maxLen*1024*1024)
+			flag=http.autoAnalysisGet(buf,(char*)server.getSenBuffer(http),server.senBuffer.getMaxSize(),NULL,&len);
+			if(flag==2&&server.senBuffer.getMaxSize()<server.maxLen*1024*1024)
 				server.enlagerSenBuffer();
 			else if(flag==1)
 			{
@@ -5216,30 +5415,17 @@ private:
 			else
 				break;
 		}while(flag==2);
-		staticLen(len);
+		http.info.staticLen=len;
 	}
-	static void deleteFile(HttpServer& server,DealHttp& http,int senLen)
+	static inline void deleteFile(HttpServer&,DealHttp& http,int)
 	{
-		int len=0;
-		http.customizeAddTop(server.getSenBuffer(),senLen,DealHttp::STATUSFORBIDDEN,strlen("403 forbidden"),"text/plain");
-		http.customizeAddBody(server.getSenBuffer(),senLen,"403 forbidden",strlen("403 forbidden"));
-		len=strlen((char*)server.getSenBuffer());
-		staticLen(len);
+		http.gram.forbidden();
 	}
 	static void rediectGram(HttpServer& server,DealHttp& http,int)
 	{
-		auto now=server.getNowRoute();
+		auto now=server.getNowRoute(http.info.nowRoute);
 		http.gram.statusCode=DealHttp::STATUSMOVTEMP;
 		http.gram.head.insert(std::pair<std::string,std::string>{"Location",now->pathExtra});
-	}
-	static unsigned staticLen(int senLen)
-	{
-		static unsigned len=0;
-		if(senLen<0)
-			return len;
-		else
-			len=senLen;
-		return 0;
 	}
 	void* enlargeMemory(void* old,unsigned& oldSize)
 	{
@@ -5588,75 +5774,6 @@ public:
 		}
 		return result;
 	}
-};
-/***********************************************
-* Author: chenxuan-1607772321@qq.com
-* change time:2022-04-16 23:35:16
-* description:http api
-***********************************************/
-class HttpApi{
-private:
-	HttpApi()=delete;
-	HttpApi(const HttpApi&)=delete;
-public:
-	//get complete datagram,result store in buffer,return recv size
-	static int getCompleteHtml(std::string& buffer,int sock,int flag=0)
-	{
-		int len=0;
-		if(buffer.size()==0||buffer.find("\r\n\r\n")==buffer.npos)
-		{
-			SocketApi::recvSockBorder(sock,buffer,"\r\n\r\n",flag);
-			auto temp=DealHttp::findKeyValue("Content-Length",buffer.c_str());
-			if(temp.size()==0)
-				return 0;
-			else
-				sscanf(temp.c_str(),"%d",&len);
-			if(len==0)
-				return buffer.size();
-			SocketApi::recvSockSize(sock,buffer,len);
-		}
-		else
-		{
-			auto pos=buffer.find("\r\n\r\n");
-			pos+=4;
-			auto temp=DealHttp::findKeyValue("Content-Length",buffer.c_str());
-			if(temp.size()==0)
-				return 0;
-			else
-				sscanf(temp.c_str(),"%d",&len);
-			if(len==0)
-				return buffer.size();
-			if(len-((int)buffer.size()-pos)>0)
-				SocketApi::recvSockSize(sock,buffer,len-(buffer.size()-pos));
-		}
-		return buffer.size();
-	}
-#ifdef CPPWEB_OPENSSL
-	static int getCompleteHtmlSSL(std::string& buffer,SSL* ssl,int=0)
-	{
-		int len=0;
-		if(buffer.size()==0||buffer.find("\r\n\r\n")==buffer.npos)
-		{
-			do{
-				int len=SocketApi::receiveSocket(ssl,buffer);
-				if(len==-1)
-					return buffer.size();
-			}while(buffer.find("\r\n\r\n")==buffer.npos);
-		}
-		auto pos=buffer.find("\r\n\r\n");
-		pos+=4;
-		auto temp=DealHttp::findKeyValue("Content-Length",buffer.c_str());
-		if(temp.size()==0)
-			return 0;
-		else
-			sscanf(temp.c_str(),"%d",&len);
-		if(len==0)
-			return buffer.size();
-		if(len-((int)buffer.size()-pos)>0)
-			SocketApi::recvSockSize(ssl,buffer,len-(buffer.size()-pos));
-		return buffer.size();
-	}
-#endif
 };
 }
 #endif
