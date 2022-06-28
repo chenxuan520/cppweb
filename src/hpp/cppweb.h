@@ -300,6 +300,15 @@ public:
 	char* buffer;
 	const char* error;
 	Buffer():maxLen(0),buffer(NULL),error(NULL){};
+	Buffer(const Buffer& old){
+		buffer=(char*)malloc(sizeof(char)*old.maxLen);
+		if(buffer==NULL){
+			error="buffer wrong";
+		}else{
+			memset(buffer,0,old.maxLen);
+			maxLen=old.maxLen;
+		}
+	}
 	Buffer(unsigned len):Buffer(){
 		maxLen=len;
 		buffer=(char*)malloc(sizeof(char)*len);
@@ -2008,6 +2017,8 @@ public:
 		int len=receiveSocket(cliSoc,temp,1024,flag);
 		if(len<=0)
 			return len;
+		else
+			buffer.append(temp,len);
 		while(len==1024)
 		{
 			buffer.append(temp,1024);
@@ -3300,7 +3311,7 @@ public:
 		}
 		return result;
 	}
-	const char* getCookie(void* recText,const char* key,char* value,unsigned int valueLen)
+	const char* getCookie(const void* recText,const char* key,char* value,unsigned int valueLen)
 	{
 		if(recText==NULL||key==NULL||value==NULL||valueLen==0)
 			return NULL;
@@ -3318,7 +3329,7 @@ public:
 		*temp='\r';
 		return value;
 	}
-	static std::string getCookie(void* recText,const char* key)
+	static std::string getCookie(const void* recText,const char* key)
 	{
 		if(recText==NULL||key==NULL)
 			return "";
@@ -3807,7 +3818,7 @@ public:
 			SocketApi::recvSockBorder(sock,buffer,"\r\n\r\n",flag);
 			auto temp=DealHttp::findKeyValue("Content-Length",buffer.c_str());
 			if(temp.size()==0)
-				return 0;
+				return buffer.size();
 			else
 				sscanf(temp.c_str(),"%d",&len);
 			if(len==0)
@@ -3820,7 +3831,7 @@ public:
 			pos+=4;
 			auto temp=DealHttp::findKeyValue("Content-Length",buffer.c_str());
 			if(temp.size()==0)
-				return 0;
+				return buffer.size();
 			else
 				sscanf(temp.c_str(),"%d",&len);
 			if(len==0)
@@ -4522,16 +4533,14 @@ public://main class for http server2.0
 private:
 	RouteFuntion* arrRoute;
 	RouteFuntion* pnowRoute;
-	void* getText;
 	const char* defaultFile;
-	unsigned recLen;
 	unsigned maxLen;
 	unsigned maxNum;
 	unsigned now;
 	unsigned boundPort;
 	unsigned threadNum;
+	int defaultWait;
 	int selfLen;
-	int textLen;
 	bool isDebug;
 	bool isLongCon;
 	bool selfCtrl;
@@ -4539,11 +4548,12 @@ private:
 	bool isAutoAnalysis;
 	void (*middleware)(HttpServer&,DealHttp&,int);
 	void (*noRouteFunc)(HttpServer&,DealHttp&,int);
-	void (*clientIn)(HttpServer&,int num,void* ip,int port);
-	void (*clientOut)(HttpServer&,int num,void* ip,int port);
+	void (*clientIn)(HttpServer&,int num,const void* ip,int port);
+	void (*clientOut)(HttpServer&,int num,const void* ip,int port);
 	void (*logFunc)(const void*,int);
 	void (*logError)(const void*,int);
 	Trie<RouteFuntion> trie;
+	std::string rec;
 	Buffer senBuffer;
 	ThreadPool* pool;
 	RunModel model;
@@ -4553,7 +4563,6 @@ public:
 		:ServerTcpIp(port),model(serverModel)
 	{
 		pool=NULL;
-		getText=NULL;
 		middleware=NULL;
 		noRouteFunc=NULL;
 		defaultFile=NULL;
@@ -4564,8 +4573,8 @@ public:
 		logError=NULL;
 		pnowRoute=NULL;
 		this->threadNum=0;
+		defaultWait=3;
 		maxLen=10;
-		recLen=2048;
 		selfLen=0;
 		boundPort=port;
 		isDebug=debug;
@@ -4573,7 +4582,6 @@ public:
 		isLongCon=true;
 		isContinue=true;
 		isAutoAnalysis=true;
-		textLen=0;
 		now=0;
 		maxNum=20;
 		arrRoute=(RouteFuntion*)malloc(sizeof(RouteFuntion)*20);
@@ -4773,11 +4781,11 @@ public:
 	{//receive all ask type
 		return routeHandle(ALL,route,pfunc);
 	}
-	inline void clientInHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port))
+	inline void clientInHandle(void (*pfunc)(HttpServer&,int num,const void* ip,int port))
 	{//when client in ,it will be call
 		clientIn=pfunc;
 	}
-	inline void clientOutHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port))
+	inline void clientOutHandle(void (*pfunc)(HttpServer&,int num,const void* ip,int port))
 	{//when client out ,itwill be call
 		clientOut=pfunc;
 	}
@@ -4808,16 +4816,14 @@ public:
 	}
 	void run(const char* defaultFile=NULL,bool restart=false)
 	{//server begin to run
-		char* getT=(char*)malloc(sizeof(char)*recLen);
 		auto flag=senBuffer.resize(1024*1024);
-		if(!flag||getT==NULL)
+		if(!flag)
 		{
 			this->error="server:malloc get and sen wrong";
 			if(logError!=NULL)
 				logError(error,0);
 			return;
 		}
-		memset(getT,0,sizeof(char)*recLen);
 		if(!restart)
 		{
 			if(false==this->bondhost())
@@ -4837,7 +4843,6 @@ public:
 		}
 		if(logFunc!=NULL)
 			logFunc("server start",0);
-		this->getText=getT;
 		this->defaultFile=defaultFile;
 		if(isDebug)
 			messagePrint();
@@ -4853,7 +4858,6 @@ public:
 				this->threadHttp();
 			break;
 		}
-		free(getT);
 	}
 	int httpSend(int num,void* buffer,int sendLen,int flag=0)
 	{
@@ -4874,40 +4878,6 @@ public:
 		return HttpApi::getCompleteHtmlSSL(buffer,getSSL(clisoc),flag);
 #endif
 	}
-	int getCompleteMessage(int sockCli,const DealHttp& http)
-	{//some time text is not complete ,it can get left text 
-		void*& message=getText;
-		unsigned messageLen=this->getRecLen(http);
-		if(message==NULL||message==0)
-			return -1;
-		unsigned int len=0,old=messageLen;
-		char* temp=NULL;
-		if((temp=strstr((char*)message,"Content-Length"))==NULL)
-			return -1;
-		if(sscanf(temp+strlen("Content-Length")+1,"%d",&len)<=0)
-			return -1;
-		if((temp=strstr((char*)message,"\r\n\r\n"))==NULL)
-			return -1;
-		temp+=4;
-		if(strlen(temp)>=len)
-			return messageLen;
-		long int leftLen=len-(messageLen-(temp-(char*)message)),getLen=1,all=0;
-		while(len+messageLen>recLen)
-		{
-			recLen*=2;
-			message=enlargeMemory(message,recLen);
-		}
-		unsigned result=messageLen;
-		while(leftLen>5&&getLen>0)
-		{
-			getLen=this->receiveSocket(sockCli,(char*)message+old+all,recLen-old-all);
-			result+=getLen;
-			all+=getLen;
-			leftLen-=getLen;
-		}
-		textLen=result;
-		return result;
-	}
 	void changeSetting(bool debug,bool isLongCon,bool isAuto=true,unsigned maxSendLen=10,unsigned sslWriteTime=5)
 	{//change setting
 		this->isDebug=debug;
@@ -4918,7 +4888,7 @@ public:
 		if(sslWriteTime!=0)
 			this->writeTime=sslWriteTime;
 	}
-	inline void* recText(const DealHttp& http)
+	inline const void* recText(const DealHttp& http)
 	{//get the recv text;
 		return (void*)http.info.recText;
 	}
@@ -5253,41 +5223,33 @@ private:
 		int port=0;
 		if(thing==CPPIN)
 		{
+			if(server.defaultWait>0)
+				SocketApi::setSocReadWait(soc,server.defaultWait);
 			if(server.clientIn!=NULL)
 			{
-				strcpy((char*)server.getText,ServerTcpIp::getPeerIp(soc,&port));
-				server.clientIn(server,soc,server.getText,port);
+				server.rec=ServerTcpIp::getPeerIp(soc,&port);
+				server.clientIn(server,soc,server.rec.c_str(),port);
 			}
 			return 0;
 		}
 		else
 		{
-			memset(server.getText,0,sizeof(char)*server.recLen);
-			int getNum=server.receiveSocket(soc,(char*)server.getText,server.recLen,MSG_DONTWAIT);
-			int all=getNum;
-			while((int)server.recLen==all)
+			server.rec.clear();
+			int getNum=server.httpRecvAll(soc,server.rec);
+			if(getNum>0)
 			{
-				server.getText=server.enlargeMemory(server.getText,server.recLen);
-				getNum=server.receiveSocket(soc,(char*)server.getText+all,server.recLen-all,MSG_DONTWAIT);
-				if(getNum<=0)
-					break;
-				else
-					all+=getNum;
-			}
-			if(all>0)
-			{
-				server.textLen=all;
+				server.http.info.recLen=getNum;
+				server.http.info.recText=server.rec.c_str();
 				if(server.model==MULTIPLEXING)
-					server.func(soc,server.http,server.getText,server.senBuffer);
+					server.func(soc,server.http,server.rec.c_str(),server.senBuffer);
 				else
 				{
 #ifndef _WIN32
 					if(fork()==0)
 					{
 						server.closeSocket(server.sock);
-						server.func(soc,server.http,server.getText,server.senBuffer);
+						server.func(soc,server.http,server.rec.c_str(),server.senBuffer);
 						server.closeSocket(soc);
-						free(server.getText);
 						exit(0);
 					}
 #else
@@ -5295,7 +5257,7 @@ private:
 #endif
 				}
 				if(server.logFunc!=NULL)
-					server.logFunc(server.getText,soc);
+					server.logFunc(server.rec.c_str(),soc);
 				if(server.isLongCon==false)
 					return soc;
 			}
@@ -5304,8 +5266,8 @@ private:
 				if(server.clientOut!=NULL)
 				{
 					int port=0;
-					strcpy((char*)server.getText,server.getPeerIp(soc,&port));
-					server.clientOut(server,soc,server.getText,port);
+					server.rec=ServerTcpIp::getPeerIp(soc,&port);
+					server.clientOut(server,soc,server.rec.c_str(),port);
 				}
 				return soc;
 			}
@@ -5362,7 +5324,6 @@ private:
 		HttpServer& server=*argv.pserver;
 		int cli=argv.soc;
 		argv.sen.resize(server.senBuffer.getMaxSize()/2);
-		unsigned int size=sizeof(char)*server.recLen;
 		if(server.clientIn!=NULL)
 		{
 			int port=0;
@@ -5374,13 +5335,15 @@ private:
 		server.httpRecvAll(cli,rec);
 		while(rec.size()>0)
 		{
-			server.func(cli,server.http,rec.c_str(),argv.sen);
+			argv.http.info.recLen=rec.size();
+			argv.http.info.recText=rec.c_str();
+			server.func(cli,argv.http,rec.c_str(),argv.sen);
 			if(server.logFunc!=NULL)
 				server.logFunc(rec.c_str(),cli);
 			if(server.isLongCon==false)
 				break;
 			rec.clear();
-			server.httpRecvAll(cli,rec,size);
+			server.httpRecvAll(cli,rec);
 		}
 		if(server.clientOut!=NULL)
 		{
