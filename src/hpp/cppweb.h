@@ -2698,7 +2698,7 @@ public:
 		std::unordered_map<std::string,std::string> head;
 		const char* body;
 		const char* error;
-		bool isFull;
+		bool isFull;//judge if the request be analyse
 		Request():version("HTTP/1.1"),body(NULL),error(NULL),isFull(false){};
 		Request(const char* recvText,bool onlyTop=false)
 		{
@@ -2760,9 +2760,9 @@ public:
 				this->error="error request";
 				return false;
 			}
-			isFull=true;
 			sscanf(now,"%128s %512s %512s",one,two,three);
 			now+=strlen(one)+strlen(two)+strlen(three)+4;
+			isFull=true;
 			req.method=one;
 			req.askPath=two;
 			req.version=three;
@@ -2806,7 +2806,7 @@ public:
 			result=getArr[1];
 			return result;
 		}
-		std::string getCookie(const std::string& key,void* buffer=NULL)
+		std::string getCookie(const std::string& key,const void* buffer=NULL)
 		{
 			if(this->head.find("Cookie")!=this->head.end())
 				return DealHttp::findKeyValue(key,this->head["Cookie"].c_str());
@@ -2861,7 +2861,7 @@ public:
 		}
 		void clear()
 		{
-			isFull=false;
+			this->isFull=false;
 			this->body=NULL;
 			this->error=NULL;
 			this->head.clear();
@@ -2971,7 +2971,8 @@ public:
 		Buffer* sendBuffer;
 		int staticLen;
 		int recLen;
-		RouteInfo():nowRoute(NULL),recText(NULL),sendBuffer(NULL),staticLen(0){};
+		bool isContinue;
+		RouteInfo():nowRoute(NULL),recText(NULL),sendBuffer(NULL),staticLen(0),recLen(0),isContinue(false){};
 	};
 private:
 	char ask[512];
@@ -2985,6 +2986,7 @@ public:
 	Request req;//default request to use by user
 	std::unordered_map<std::string,std::string> head;//default head toadd middleware
 	std::unordered_map<std::string,std::string> cookie;//default cookie to add middleware
+	std::unordered_map<std::string,void*> setGet;//set var and get var in route
 	DealHttp()
 	{
 		for(int i=0;i<512;i++)
@@ -2993,6 +2995,9 @@ public:
 		error=NULL;
 		connect="keep-alive";
 		serverName="LCserver/1.1";
+	}
+	~DealHttp(){
+		clean();
 	}
 private:
 	bool cutLineAsk(char* message,const char* pcutIn)
@@ -3164,6 +3169,33 @@ public:
 		if(pstr!=NULL)
 			delete pstr;
 		return result;
+	}
+	inline void clean(){
+		this->head.clear();
+		this->cookie.clear();
+		for(auto iter:setGet){
+			if(iter.second!=NULL){
+				free(iter.second);
+			}
+		}
+	}
+	template<typename T>
+	void setVar(const std::string& key,const T& value){
+		T* temp=(T*)malloc(sizeof(T));
+		if(temp==NULL){
+			error="setvar wrong";
+			return;
+		}else{
+			*temp=value;
+		}
+		setGet.insert({key,temp});
+	}
+	void* getVar(const std::string& key){
+		if(setGet.find(key)==setGet.end()){
+			return NULL;
+		}else{
+			return setGet[key];
+		}
 	}
 	int createSendMsg(FileKind kind,char* buffer,unsigned int bufferLen,const char* pfile,int* plong)
 	{
@@ -3890,284 +3922,6 @@ public:
 	}
 #endif
 };
-/*******************************
- * author:chenxuan
- * class:use to send email easy
- * example:{
- *  Email email("qq.com");
- *  email.CreateSend
- *  email.emailSend
- * }
-******************************/
-class Email{
-public:
-	struct EmailGram{
-		std::string senEmail;
-		std::string recvEmail;
-		std::string token;
-		std::string senName;
-		std::string recvName;
-		std::string subject;
-		std::string body;
-	};
-private:
-	sockaddr_in their_addr;
-	bool isDebug;
-	char error[30];
-	struct Base64Date6
-	{
-		unsigned int d4 : 6;
-		unsigned int d3 : 6;
-		unsigned int d2 : 6;
-		unsigned int d1 : 6;
-	};
-public:
-	Email(const char* domain,bool debug=false)
-	{
-		isDebug=debug;
-		memset(error,0,sizeof(char)*30);
-		memset(&their_addr, 0, sizeof(their_addr));
-		their_addr.sin_family = AF_INET;
-		their_addr.sin_port = htons(25);	
-		if(domain==NULL)
-		{
-			sprintf(error,"wrong domain");
-			return;
-		}
-		hostent* hptr = gethostbyname(domain);		  
-		if(hptr==NULL)
-		{
-			sprintf(error,"wrong domain");
-			return;
-		}
-		memcpy(&their_addr.sin_addr.s_addr, hptr->h_addr_list[0], hptr->h_length);
-	}
-	bool emailSend(const char* sendEmail,const char* passwd,const char* recEmail,const char* body)
-	{
-	  	int sockfd = 0;
-	  	char recBuffer[1000]={0},senBuffer[1000]={0},login[128],pass[128];
-		sockfd = socket(PF_INET, SOCK_STREAM, 0);
-		if (sockfd < 0)
-		{
-			sprintf(error,"open socket wrong");
-			return false;
-		}
-		if (connect(sockfd,(struct sockaddr *)&their_addr, sizeof(struct sockaddr)) < 0)
-		{
-			sprintf(error,"connect wrong");
-			return false;
-		}
-		memset(recBuffer,0,sizeof(char)*1000);
-		while (recv(sockfd, recBuffer, 1000, 0) <= 0)
-		{
-			if(isDebug)
-				printf("reconnecting\n");
-#ifndef _WIN32
-			sleep(2);
-#endif
-			sockfd = socket(PF_INET, SOCK_STREAM, 0);
-			if (sockfd < 0)
-			{
-				sprintf(error,"open socket wrong");
-				return false;
-			}
-			if (connect(sockfd,(struct sockaddr *)&their_addr, sizeof(struct sockaddr)) < 0)
-			{
-				sprintf(error,"connect wrong");
-				return false;
-			}
-			memset(recBuffer, 0, 1000);
-		}
-		if(isDebug)
-			printf("get:%s",recBuffer);
-		
-		memset(senBuffer, 0, 1000);
-		sprintf(senBuffer, "EHLO HYL-PC\r\n");
-		send(sockfd, senBuffer, strlen(senBuffer), 0);
-		memset(recBuffer, 0, 1000);
-		recv(sockfd, recBuffer, 1000, 0);
-		if(isDebug)
-			printf("EHLO REceive:%s\n",recBuffer);
-		
-		memset(senBuffer, 0, 1000);
-		sprintf(senBuffer, "AUTH LOGIN\r\n");
-		send(sockfd, senBuffer, strlen(senBuffer), 0);
-		memset(recBuffer, 0, 1000);
-		recv(sockfd, recBuffer, 1000, 0);
-		if(isDebug)
-			printf("Auth Login Receive:%s\n",recBuffer);
-		
-		memset(senBuffer, 0, 1000);
-		sprintf(senBuffer, "%s",sendEmail);
-		memset(login, 0, 128);
-		EncodeBase64(login, senBuffer, strlen(senBuffer));
-		sprintf(senBuffer, "%s\r\n", login);
-		send(sockfd, senBuffer, strlen(senBuffer), 0);
-		if(isDebug)
-			printf("Base64 UserName:%s\n",senBuffer);
-		memset(recBuffer, 0, 1000);
-		recv(sockfd, recBuffer, 1000, 0);
-		if(isDebug)
-			printf("User Login Receive:%s\n",recBuffer);
-
-		sprintf(senBuffer, "%s",passwd);//password
-		memset(pass, 0, 128);
-		EncodeBase64(pass, senBuffer, strlen(senBuffer));
-		sprintf(senBuffer, "%s\r\n", pass);
-		send(sockfd, senBuffer, strlen(senBuffer), 0);
-		if(isDebug)
-			printf("Base64 Password:%s\n",senBuffer);
-
-		memset(recBuffer, 0, 1000);
-		recv(sockfd, recBuffer, 1000, 0);
-		if(isDebug)
-			printf("Send Password Receive:%s\n",recBuffer);
-
-		// self email
-		memset(recBuffer, 0, 1000);
-		sprintf(senBuffer, "MAIL FROM: <%s>\r\n",sendEmail);  
-		send(sockfd, senBuffer, strlen(senBuffer), 0);
-		memset(recBuffer, 0, 1000);
-		recv(sockfd, recBuffer, 1000, 0);
-		if(isDebug)
-			printf("set Mail From Receive:%s\n",recBuffer);
-
-		// recv email
-		sprintf(recBuffer, "RCPT TO:<%s>\r\n", recEmail);
-		send(sockfd, recBuffer, strlen(recBuffer), 0);
-		memset(recBuffer, 0, 1000);
-		recv(sockfd, recBuffer, 1000, 0);
-		if(isDebug)
-			printf("Tell Sendto Receive:%s\n",recBuffer);
-		int bug=0;
-		sscanf(recBuffer,"%d",&bug);
-		if(bug==550)
-		{
-			sprintf(error,"recemail wrong");
-			return false;
-		}
-		// send body
-		sprintf(senBuffer, "DATA\r\n");
-		send(sockfd, senBuffer, strlen(senBuffer), 0);
-		memset(recBuffer, 0, 1000);
-		recv(sockfd, recBuffer, 1000, 0);
-		if(isDebug)
-			printf("Send Mail Prepare Receive:%s\n",recBuffer);
-
-		// send data
-		sprintf(senBuffer, "%s\r\n.\r\n", body);
-		send(sockfd, senBuffer, strlen(senBuffer), 0);
-		memset(recBuffer, 0, 1000);
-		recv(sockfd, recBuffer, 1000, 0);
-		if(isDebug)
-			printf("Send Mail Receive:%s\n",recBuffer);
-
-		// QUIT
-		sprintf(senBuffer,"QUIT\r\n");
-		send(sockfd, senBuffer, strlen(senBuffer), 0);
-		memset(recBuffer, 0, 1000);
-		recv(sockfd, recBuffer, 1000, 0);
-		if(isDebug)
-			printf("Quit Receive:%s\n",recBuffer);
-		return true;
-	}
-	char ConvertToBase64(char uc)
-	{
-		if (uc < 26)
-			return 'A' + uc;
-		if (uc < 52)
-			return 'a' + (uc - 26);
-		if (uc < 62)
-			return '0' + (uc - 52);
-		if (uc == 62)
-			return '+';
-		return '/';
-	}
-	void EncodeBase64(char *dbuf, char *buf128, int len)
-	{
-		struct Base64Date6 *ddd = NULL;
-		int i = 0;
-		char buf[256] = { 0 };
-		char* tmp = NULL;
-		char cc = '\0';
-		memset(buf, 0, 256);
-		strcpy(buf, buf128);
-		for (i = 1; i <= len / 3; i++)
-		{
-			tmp = buf + (i - 1) * 3;
-			cc = tmp[2];
-			tmp[2] = tmp[0];
-			tmp[0] = cc;
-			ddd = (struct Base64Date6 *)tmp;
-			dbuf[(i - 1) * 4 + 0] = ConvertToBase64((unsigned int)ddd->d1);
-			dbuf[(i - 1) * 4 + 1] = ConvertToBase64((unsigned int)ddd->d2);
-			dbuf[(i - 1) * 4 + 2] = ConvertToBase64((unsigned int)ddd->d3);
-			dbuf[(i - 1) * 4 + 3] = ConvertToBase64((unsigned int)ddd->d4);
-		}
-		if (len % 3 == 1)
-		{
-			tmp = buf + (i - 1) * 3;
-			cc = tmp[2];
-			tmp[2] = tmp[0];
-			tmp[0] = cc;
-			ddd = (struct Base64Date6 *)tmp;
-			dbuf[(i - 1) * 4 + 0] = ConvertToBase64((unsigned int)ddd->d1);
-			dbuf[(i - 1) * 4 + 1] = ConvertToBase64((unsigned int)ddd->d2);
-			dbuf[(i - 1) * 4 + 2] = '=';
-			dbuf[(i - 1) * 4 + 3] = '=';
-		}
-		if (len % 3 == 2)
-		{
-			tmp = buf + (i - 1) * 3;
-			cc = tmp[2];
-			tmp[2] = tmp[0];
-			tmp[0] = cc;
-			ddd = (struct Base64Date6 *)tmp;
-			dbuf[(i - 1) * 4 + 0] = ConvertToBase64((unsigned int)ddd->d1);
-			dbuf[(i - 1) * 4 + 1] = ConvertToBase64((unsigned int)ddd->d2);
-			dbuf[(i - 1) * 4 + 2] = ConvertToBase64((unsigned int)ddd->d3);
-			dbuf[(i - 1) * 4 + 3] = '=';
-		}
-		return;
-	}
-	void CreateSend(const char* youName,const char* toName,const char* from,const char* to,const char* subject,const char* body,char* buf)
-	{
-		sprintf(buf,"From: \"%s\"<%s>\r\n"
-				"To: \"%s\"<%s>\r\n"
-				"Subject:%s\r\n\r\n"
-				"%s\n",youName,from,toName,to,subject,body);
-	}
-	inline const char* lastError()
-	{
-		return error;
-	}
-	static const char* getDomainBySelfEmail(const char* email,char* buffer,int bufferLen)
-	{
-		char* temp=strrchr((char*)email,'@');
-		if(temp==NULL)
-			return NULL;
-		if(bufferLen<=20)
-			return NULL;
-		if(strlen(temp)>15)
-			return NULL;
-		sprintf(buffer,"smtp.%s",temp+1);
-		return buffer;
-	}
-	static const char* sendEmail(const EmailGram& gram)
-	{
-		char domain[32]={0};
-		if(NULL==getDomainBySelfEmail(gram.senEmail.c_str(),domain,32))
-			return "unknown send email";
-		std::string buffer="From: \""+gram.senName+"\"<"+gram.senEmail+">\r\nTo: \""\
-							+gram.recvName+"\"<"+gram.recvEmail+">\r\nSubject:"\
-							+gram.subject+"\r\n\r\n"+gram.body+"\n";
-		Email email(domain,false);
-		auto flag=email.emailSend(gram.senEmail.c_str(),gram.token.c_str(),gram.recvEmail.c_str(),buffer.c_str());
-		if(flag==false)
-			return email.lastError();
-		return NULL;
-	}
-};
 /***********************************************
 * Author: chenxuan-1607772321@qq.com
 * change time:2022-03-18 10:18:50
@@ -4532,17 +4286,35 @@ public://main class for http server2.0
 		RouteType type;
 		char route[128];
 		char pathExtra[128];
-		void (*pfunc)(HttpServer&,DealHttp&,int);
+		std::vector<void(*)(HttpServer&,DealHttp&,int)> pfuncs;
+		RouteFuntion():ask(GET),type(ONEWAY){
+			memset(route,0,128);
+			memset(pathExtra,0,128);
+		};
+		RouteFuntion(const RouteFuntion& old){
+			*this=old;
+		}
+		RouteFuntion& operator=(const RouteFuntion& old){
+			if(&old==this){
+				return *this;
+			}
+			ask=old.ask;
+			type=old.type;
+			strcpy(route,old.route);
+			strcpy(pathExtra,old.pathExtra);
+			pfuncs=old.pfuncs;
+			return *this;
+		}
 	};
 	struct Group{//group class for group api
 		std::string group;
 		HttpServer& server;
 		Group(HttpServer& ser,const char* gropa):group(gropa),server(ser){};
 		Group(const Group& old):group(old.group),server(old.server){}
-		inline bool get(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
+		inline bool get(const char* route,std::initializer_list<void(*)(HttpServer&,DealHttp&,int)> pfuncs)
 		{
 			std::string group=this->group+route;
-			return server.get(group.c_str(),pfunc);
+			return server.get(group.c_str(),pfuncs);
 		}
 		inline bool post(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
 		{
@@ -4559,13 +4331,32 @@ public://main class for http server2.0
 			std::string group=this->group+route;
 			return server.routeHandle(ask,group.c_str(),pfunc);
 		}
+		inline bool get(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
+		{
+			std::string group=this->group+route;
+			return server.get(group.c_str(),pfunc);
+		}
+		inline bool post(const char* route,std::initializer_list<void(*)(HttpServer&,DealHttp&,int)> pfuncs)
+		{
+			std::string group=this->group+route;
+			return server.post(group.c_str(),pfuncs);
+		}
+		inline bool all(const char* route,std::initializer_list<void(*)(HttpServer&,DealHttp&,int)> pfuncs)
+		{
+			std::string group=this->group+route;
+			return server.all(group.c_str(),pfuncs);
+		}
+		inline bool routeHandle(AskType ask,const char* route,std::initializer_list<void(*)(HttpServer&,DealHttp&,int)> pfuncs)
+		{
+			std::string group=this->group+route;
+			return server.routeHandle(ask,group.c_str(),pfuncs);
+		}
 	};
 private:
-	RouteFuntion* arrRoute;
+	std::vector<RouteFuntion> arrRoute;
 	RouteFuntion* pnowRoute;
 	const char* defaultFile;
 	unsigned maxLen;
-	unsigned maxNum;
 	unsigned now;
 	unsigned boundPort;
 	unsigned threadNum;
@@ -4576,7 +4367,7 @@ private:
 	bool selfCtrl;
 	bool isContinue;
 	bool isAutoAnalysis;
-	void (*middleware)(HttpServer&,DealHttp&,int);
+	std::vector<void(*)(HttpServer&,DealHttp&,int)> middlewares;
 	void (*noRouteFunc)(HttpServer&,DealHttp&,int);
 	void (*clientIn)(HttpServer&,int num,const void* ip,int port);
 	void (*clientOut)(HttpServer&,int num,const void* ip,int port);
@@ -4593,20 +4384,20 @@ public:
 	HttpServer(unsigned port,bool debug=false,RunModel serverModel=MULTIPLEXING,unsigned threadNum=5)
 		:ServerTcpIp(port),model(serverModel)
 	{
+		arrRoute.resize(16);
 		pool=NULL;
-		middleware=NULL;
 		noRouteFunc=NULL;
 		defaultFile=NULL;
-		arrRoute=NULL;
 		clientIn=NULL;
 		clientOut=NULL;
 		logFunc=NULL;
 		parg=NULL;
-		logError=NULL;
 		pnowRoute=NULL;
+		logError=NULL;
 		this->threadNum=0;
 		defaultWait=3;
 		maxLen=10;
+		now=0;
 		selfLen=0;
 		boundPort=port;
 		isDebug=debug;
@@ -4614,17 +4405,6 @@ public:
 		isLongCon=true;
 		isContinue=true;
 		isAutoAnalysis=true;
-		now=0;
-		maxNum=20;
-		arrRoute=(RouteFuntion*)malloc(sizeof(RouteFuntion)*20);
-		if(arrRoute==NULL)
-		{
-			this->error=" server route wrong";
-			if(logError!=NULL)
-				logError(this->error,0);
-		}
-		else
-			memset(arrRoute,0,sizeof(RouteFuntion)*20);
 		if(this->model==THREAD||this->model==REACTOR)
 		{
 			if(threadNum==0)
@@ -4654,11 +4434,6 @@ public:
 #endif
 	}
 	HttpServer(const HttpServer& server)=delete;
-	~HttpServer()
-	{
-		if(arrRoute!=NULL)
-			free(arrRoute);
-	}
 #ifdef CPPWEB_OPENSSL
 	//load cert and key,and they must be pem format(such as key.pem,cert.pem)
 	inline bool loadKeyCert(const char* certPath,const char* keyPath,const char* passwd=NULL)
@@ -4709,6 +4484,34 @@ public:
 			signal(SIGCHLD,sigCliDeal);
 #endif
 	}
+	bool routeHandle(AskType ask,const char* route,const std::initializer_list<void(*)(HttpServer&,DealHttp&,int)>& pfuncs){
+		if(strlen(route)>100)
+			return false;
+		RouteFuntion* nowRoute=addRoute();
+		if(nowRoute==NULL)
+			return false;
+		nowRoute->ask=ask;
+		strcpy(nowRoute->route,route);
+		for(auto& now:pfuncs){
+			nowRoute->pfuncs.push_back(now);
+		}
+		if(route[strlen(route)-1]=='*')
+		{
+			nowRoute->route[strlen(route)-1]=0;
+			nowRoute->type=WILD;
+		}
+		else
+			nowRoute->type=ONEWAY;
+		if(false==trie.insert(nowRoute->route,nowRoute))
+		{
+			error="server:route wrong char";
+			if(logError!=NULL)
+				logError(this->error,0);
+			return false;
+		}
+		return true;
+
+	}
 	bool routeHandle(AskType ask,const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
 	{//add route handle in all ask type 
 		if(strlen(route)>100)
@@ -4718,7 +4521,7 @@ public:
 			return false;
 		nowRoute->ask=ask;
 		strcpy(nowRoute->route,route);
-		nowRoute->pfunc=pfunc;
+		nowRoute->pfuncs.push_back(pfunc);
 		if(route[strlen(route)-1]=='*')
 		{
 			nowRoute->route[strlen(route)-1]=0;
@@ -4751,7 +4554,7 @@ public:
 			nowRoute->route[strlen(nowRoute->route)-1]=0;
 			nowRoute->type=STAWILD;
 		}
-		nowRoute->pfunc=rediectGram;
+		nowRoute->pfuncs.push_back(rediectGram);
 		if(false==trie.insert(nowRoute->route,nowRoute))
 		{
 			error="server:route wrong char";
@@ -4778,7 +4581,7 @@ public:
 			nowRoute->route[strlen(nowRoute->route)-1]=0;
 			nowRoute->type=STAWILD;
 		}
-		nowRoute->pfunc=loadFile;
+		nowRoute->pfuncs.push_back(loadFile);
 		if(false==trie.insert(nowRoute->route,nowRoute))
 		{
 			error="server:route wrong char";
@@ -4806,7 +4609,7 @@ public:
 		}
 		else
 			strcpy(nowRoute->route,route);
-		nowRoute->pfunc=deleteFile;
+		nowRoute->pfuncs.push_back(deleteFile);
 		if(false==trie.insert(nowRoute->route,nowRoute))
 		{
 			error="server:route wrong char";
@@ -4825,13 +4628,25 @@ public:
 	{//add routeHandle and ask type is get
 		return routeHandle(GET,route,pfunc);
 	}
+	inline bool get(const char* route,std::initializer_list<void(*)(HttpServer&,DealHttp&,int)> pfuncs)
+	{//add routeHandle and ask type is get
+		return routeHandle(GET,route,pfuncs);
+	}
 	inline bool post(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
 	{//the same to last funtion
 		return routeHandle(POST,route,pfunc);
 	}
+	inline bool post(const char* route,std::initializer_list<void(*)(HttpServer&,DealHttp&,int)> pfuncs)
+	{//the same to last funtion
+		return routeHandle(POST,route,pfuncs);
+	}
 	inline bool all(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
 	{//receive all ask type
 		return routeHandle(ALL,route,pfunc);
+	}
+	inline bool all(const char* route,std::initializer_list<void(*)(HttpServer&,DealHttp&,int)> pfuncs)
+	{//receive all ask type
+		return routeHandle(ALL,route,pfuncs);
 	}
 	inline void clientInHandle(void (*pfunc)(HttpServer&,int num,const void* ip,int port))
 	{//when client in ,it will be call
@@ -4841,21 +4656,13 @@ public:
 	{//when client out ,itwill be call
 		clientOut=pfunc;
 	}
-	bool setMiddleware(void (*pfunc)(HttpServer&,DealHttp&,int))
+	void setMiddleware(void (*pfunc)(HttpServer&,DealHttp&,int))
 	{//middleware funtion after get text it will be called
-		if(middleware!=NULL)
-			return false;
-		middleware=pfunc;
-		return true;
+		middlewares.push_back(pfunc);
 	}
-	inline void continueNext(int cliSock,DealHttp& http)
+	inline void continueNext(DealHttp& http)
 	{//middleware funtion to continue default task
-		if(middleware==NULL)
-			return;
-		auto temp=middleware;
-		middleware=NULL;
-		func(cliSock,http,http.info.recText,*(Buffer*)http.info.sendBuffer);
-		middleware=temp;
+		http.info.isContinue=true;
 	}
 	inline void setLog(void (*pfunc)(const void*,int),void (*errorFunc)(const void*,int))
 	{//log system 
@@ -4973,7 +4780,7 @@ public:
 	inline void resetServer()
 	{//delete all the route
 		this->trie.clean();
-		this->now=0;
+		this->arrRoute.clear();
 	}
 	inline RouteFuntion* getNowRoute()
 	{//get the now route;
@@ -5034,21 +4841,21 @@ private:
 				break;
 			case STATIC:
 			case STAWILD:
-				if(arrRoute[i].pfunc==loadFile)
+				if(arrRoute[i].pfuncs[0]==loadFile)
 				{
 					if(arrRoute[i].type==STATIC)
 						printf("%s\t\t->\t%s\n",arrRoute[i].route,arrRoute[i].pathExtra);
 					else
 						printf("%s*\t\t->\t%s\n",arrRoute[i].route,arrRoute[i].pathExtra);
 				}
-				else if(arrRoute[i].pfunc==deleteFile)
+				else if(arrRoute[i].pfuncs[0]==deleteFile)
 				{
 					if(arrRoute[i].type==STATIC)
 						printf("%s\t\t->\tdelete\n",arrRoute[i].route);
 					else
 						printf("%s*\t\t->\tdelete\n",arrRoute[i].route);
 				}
-				else if(arrRoute[i].pfunc==rediectGram)
+				else if(arrRoute[i].pfuncs[0]==rediectGram)
 				{
 					if(arrRoute[i].type==STATIC)
 						printf("%s\t\t->\t%s\n",arrRoute[i].route,arrRoute[i].pathExtra);
@@ -5090,7 +4897,7 @@ private:
 		}
 		if(noRouteFunc!=NULL)
 			printf("noroute\t\tfunction set\n");
-		if(middleware!=NULL)
+		if(middlewares.size()!=0)
 			printf("middleware\t\tfuntion set\n");
 		if(logFunc!=NULL)
 			printf("log\t\tfunction set\n");
@@ -5110,14 +4917,17 @@ private:
 		http.info.recText=getText;
 		http.info.nowRoute=NULL;
 		http.info.staticLen=0;
+		http.info.isContinue=false;
 		http.info.sendBuffer=&senText;
-		if(middleware!=NULL)
-		{
-			middleware(*this,http,num);
-			return 0;
-		}
 		if(isLongCon==false)
 			http.changeSetting("Close","LCserver/1.1");
+		for(auto& middle:middlewares){
+			middle(*this,http,num);
+			if(!http.info.isContinue){
+				return 0;
+			}
+			http.info.isContinue=false;
+		}
 		sscanf((const char*)getText,"%100s",ask);
 		if(strstr(ask,"GET")!=NULL)
 		{
@@ -5174,7 +4984,8 @@ private:
 				logError(ask,num);
 			type=GET;
 		}
-		void (*pfunc)(HttpServer&,DealHttp&,int)=NULL;
+		int sum=0;
+		void(*pfunc)(HttpServer&,DealHttp&,int)=NULL;
 		RouteFuntion* tempRoute=trie.search(ask,[=](const RouteFuntion* now,bool isLast)->bool{
 					if(now->ask==ALL||now->ask==type)
 					{
@@ -5191,17 +5002,29 @@ private:
 		{
 			pnowRoute=tempRoute;
 			http.info.nowRoute=tempRoute;
-			pfunc=tempRoute->pfunc;
+			if(tempRoute!=NULL){
+				sum=tempRoute->pfuncs.size();
+				pfunc=tempRoute->pfuncs[0];
+			}
 		}
 		if(pfunc!=NULL||noRouteFunc!=NULL)
 		{
 			if(pfunc!=loadFile)
 			{
 				http.gram.clear();
-				if(http.req.isFull)
-					http.req.clear();
-				if(pfunc!=NULL)
-					pfunc(*this,http,num);
+				http.req.clear();
+				http.clean();
+				http.req.analysisRequest(http.info.recText,true);
+				if(pfunc!=NULL){
+					for(auto& now:tempRoute->pfuncs){
+						now(*this,http,num);
+						if(!http.info.isContinue){
+							break;
+						}else{
+							http.info.isContinue=false;
+						}
+					}
+				}
 				else
 					noRouteFunc(*this,http,num);
 				if(http.info.staticLen>0)
@@ -5345,18 +5168,9 @@ private:
 	}
 	RouteFuntion* addRoute()
 	{
-		RouteFuntion* temp=NULL; 
-		if(maxNum-now<=2)
-		{
-			temp=(RouteFuntion*)realloc(arrRoute,sizeof(RouteFuntion)*(maxNum+10));
-			if(temp==NULL)
-				return NULL;
-			arrRoute=temp;
-			maxNum+=10;
-		}
-		temp=arrRoute+now;
+		arrRoute.push_back({});
 		now++;
-		return temp;
+		return &arrRoute[now-1];
 	}
 	void threadHttp()
 	{

@@ -421,7 +421,7 @@ void middleware(HttpServer& server,DealHttp& http,int soc)
 	string getpwd=http.getCookie(server.recText(http),"disk");
 	http.analysisRequest(req,server.recText(http),true);
 	if(req.method=="POST"&&req.askPath.find("login")!=req.askPath.npos)
-		server.continueNext(soc,http);
+		server.continueNext(http);
 	else if(req.method=="GET"&&req.askPath.find("web-link/")!=req.askPath.npos)
 		webLink(server,http,soc);
 	else if(getpwd!=_config.passwd)
@@ -432,7 +432,7 @@ void middleware(HttpServer& server,DealHttp& http,int soc)
 		return;
 	}
 	else
-		server.continueNext(soc,http);
+		server.continueNext(http);
 }
 /***********************************************
 * Author: chenxuan-1607772321@qq.com

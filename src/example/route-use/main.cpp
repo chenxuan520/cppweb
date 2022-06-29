@@ -8,26 +8,25 @@ void pfuncTwo(HttpServer&,DealHttp& http,int)
 	http.gram.statusCode=DealHttp::STATUSOK;
 	http.gram.txt(DealHttp::STATUSOK,temp);
 }
-void pfunc(HttpServer& server,DealHttp& http,int)
+void pfunc(HttpServer&,DealHttp& http,int)
 {
-	http.req.analysisRequest(server.recText(),true);
 	auto url=http.req.getWildUrl("/root/");//get url wild
 	Json json={{"name",url},{"welcome","you"}};
 	http.gram.json(DealHttp::STATUSOK,json());
 }
-void pfuncThree(HttpServer& server,DealHttp& http,int)
+void pfuncThree(HttpServer&,DealHttp& http,int)
 {
-	http.req.analysisRequest(server.recText());
+	http.req.analysisRequest(http.info.recText);
 	unordered_map<string,string> tree;
 	http.req.routePairing("/try/:id/:name",tree);
 	Json json={
 		{"id",tree["id"]},
 		{"name",tree["name"]}
 	};
-	char* sen=(char*)server.getSenBuffer();
-	http.customizeAddTop(sen,server.getMaxSenLen(),200,strlen(json()));
-	int len=http.customizeAddBody(sen,server.getMaxSenLen(),json(),strlen(json()));
-	server.selfCreate(len);
+	char* sen=(char*)http.info.sendBuffer->buffer;
+	http.customizeAddTop(sen,http.info.sendBuffer->getMaxSize(),200,strlen(json()));
+	int len=http.customizeAddBody(sen,http.info.sendBuffer->getMaxSize(),json(),strlen(json()));
+	http.info.staticLen=len;
 }
 int main()  
 {  
