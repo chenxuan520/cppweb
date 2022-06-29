@@ -50,8 +50,6 @@
 
 - class是为编译的一些类，包括一个简单的内存泄漏检测头文件
 
-- 
-
 - install.sh为服务器运行脚本
 
 - old文件夹为1.0版本的头文件和源文件,不推荐
@@ -76,7 +74,7 @@
 
 8. 支持日志生成和实现,日志系统约为30万条每秒
 
-9. 具有io复用,多进程,线程池三种模式
+9. 具有io复用,多进程,线程池,reactor四种模式
    
    > io复用支持epoll(epoll只支持linux)和select模型
 
@@ -110,17 +108,17 @@
 ## 搭建服务器
 
 - 在linux下, ./install.sh为安装脚本,运行就可以安装
-- [doc介绍](./doc/服务器搭建.md)
+- [doc介绍](./doc/serverbuild.cn.md)
 
 ## 框架介绍
 
 #### 服务器运行
 
-- [doc文档](./doc/服务器搭建.md)
+- [doc文档](./doc/serverbuild.cn.md)
 
 #### 安装框架
 
-- [doc介绍](./doc/框架安装.md)
+- [doc介绍](./doc/framework.cn.md)
 
 #### 简单使用
 
@@ -160,14 +158,47 @@ int main()
 #### 路由设置
 
 ```cpp
-    server.get("/lam*",[](HttpServer&,DealHttp& http,int)->void{
+    server.get("/lam*",[](HttpServer&,DealHttp& http,int){
         http.gram.body="text";//设置报文内容
     });
+    server.get("/",{login,message});//多个处理函数
 ```
 
 - 支持lam表达式和普通函数
 
 - 支持路由的*扩展*
+
+- 支持如同gin一样放多个函数顺序处理,要用括号括起来
+
+#### 变量设置
+
+```cpp
+struct Temp{
+    int soc;
+    char cookie[128];
+};
+void login(HttpServer&,DealHttp& http,int soc){
+    auto flag=http.req.getCookie("key",http.info.recText);
+    if(flag.size()>0){
+        Temp temp={soc,{0}};
+        strncpy(temp.cookie,flag.c_str(),128);
+        http.setVar<Temp>("cookie",temp);//可以通过模板放置任何东西
+        http.info.isContinue=true;
+    }else{
+        http.gram.json(DealHttp::STATUSOK,Json::createJson({{"status","find wrong"}}));
+    }
+}
+void message(HttpServer&,DealHttp& http,int){
+    Temp* pstr=(Temp*)http.getVar("cookie");
+    if(pstr==NULL){
+        http.gram.json(DealHttp::STATUSNOFOUND,Json::createJson({{"status","wrong"}}));
+    }else{
+        http.gram.json(DealHttp::STATUSOK,Json::createJson({{"cookie",pstr->cookie},{"soc",pstr->soc}}));
+    }
+}
+```
+
+- set变量类型最好是C类型的,尽量不要出现构造函数
 
 #### html渲染
 
@@ -215,6 +246,7 @@ int main()
 ```
 
 - 支持中间件对报文统一处理
+- 支持多个中间件
 
 #### 日志设置
 
@@ -233,12 +265,11 @@ int main()
 void func(HttpServer& server,DealHttp& http,int)
 {
     DealHttp::Request req;
-    http.analysisRequest(req,server.recText());
-    printf("old:%s\n",(char*)server.recText());
-    printf("new:%s %s %s\n",req.method.c_str(),req.askPath.c_str(),req.version.c_str());
-    for(auto iter=req.head.begin();iter!=req.head.end();iter++)
+    http.req.analysisRequest(http.info.recText);
+    printf("new:%s %s %s\n",http.req.method.c_str(),http.req.askPath.c_str(),req.version.c_str());
+    for(auto iter=http.req.head.begin();iter!=http.req.head.end();iter++)
         printf("%s:%s\n",iter->first.c_str(),iter->second.c_str());
-    printf("body:%s\n",req.body);
+    printf("body:%s\n",http.req.body);
     http.gram.statusCode=DealHttp::STATUSOK;
     http.gram.typeFile=DealHttp::JSON;
     http.gram.body="{\"ha\":\"ha\"}";
@@ -248,11 +279,6 @@ int main()
     HttpServer server(5200,true);//input the port bound
     server.all("/root",func);
     server.run("./index.html");
-    if(server.lastError()!=NULL)
-    {
-        std::cout<<server.lastError()<<std::endl;
-        return -1;
-    }
     return 0; 
 }  
 ```
@@ -401,6 +427,47 @@ msecs/connect: 143.062 mean, 7316.08 max, 21.651 min
 msecs/first-response: 334.025 mean, 13735.1 max, 21.481 min
 HTTP response codes:
   code 200 -- 1792
+```
+
+- 四种模式速度测试
+
+```shell
+reactor
+1419 fetches, 100 max parallel, 905322 bytes, in 10 seconds
+638 mean bytes/connection
+141.9 fetches/sec, 90532.2 bytes/sec
+msecs/connect: 30.5315 mean, 1048.08 max, 12.051 min
+msecs/first-response: 160.906 mean, 7268.44 max, 13.543 min
+HTTP response codes:
+  code 200 -- 1419
+
+IO
+1415 fetches, 100 max parallel, 902770 bytes, in 10 seconds
+638 mean bytes/connection
+141.5 fetches/sec, 90277 bytes/sec
+msecs/connect: 38.5241 mean, 3052.13 max, 12.052 min
+msecs/first-response: 189.096 mean, 7839.18 max, 13.543 min
+HTTP response codes:
+  code 200 -- 1415
+
+thread
+1405 fetches, 100 max parallel, 894476 bytes, in 10 seconds
+636.638 mean bytes/connection
+140.5 fetches/sec, 89447.6 bytes/sec
+msecs/connect: 40.6892 mean, 1046.36 max, 12.054 min
+msecs/first-response: 207.844 mean, 8081.35 max, 13.576 min
+3 bad byte counts
+HTTP response codes:
+  code 200 -- 1402
+
+fork
+1410 fetches, 100 max parallel, 899580 bytes, in 10 seconds
+638 mean bytes/connection
+141 fetches/sec, 89958 bytes/sec
+msecs/connect: 37.9042 mean, 2035.83 max, 12.043 min
+msecs/first-response: 178.578 mean, 7550.83 max, 13.764 min
+HTTP response codes:
+  code 200 -- 1410
 ```
 
 ## 更多文档
