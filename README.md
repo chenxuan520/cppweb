@@ -53,6 +53,8 @@
 - install.sh为服务器运行脚本
 
 - old文件夹为1.0版本的头文件和源文件,不推荐
+  
+  ![rector.png](https://s2.loli.net/2022/06/29/VtrYdBQkm8p3RSu.png)
 
 ## 项目特点
 
