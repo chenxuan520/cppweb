@@ -4413,13 +4413,11 @@ public:
 				return;
 			}
 			pool=new ThreadPool(threadNum);
-			if(this->model==REACTOR){
-				this->edgeTrigger=true;
-				parg=new Pool<ThreadArg>(threadNum);
-				if(parg==NULL){
-					error="arg wrong";
-					return;
-				}
+			this->edgeTrigger=true;
+			parg=new Pool<ThreadArg>(threadNum);
+			if(parg==NULL){
+				error="arg wrong";
+				return;
 			}
 			this->threadNum=threadNum;
 			if(pool==NULL)
@@ -4460,17 +4458,15 @@ public:
 			}
 			if(pool!=NULL)
 				delete pool;
-			if(this->model==REACTOR){
-				this->edgeTrigger=true;
-				if(parg!=NULL){
-					delete parg;
-					parg=NULL;
-				}
-				parg=new Pool<ThreadArg>(threadNum);
-				if(parg==NULL){
-					error="arg wrong";
-					return;
-				}
+			this->edgeTrigger=true;
+			if(parg!=NULL){
+				delete parg;
+				parg=NULL;
+			}
+			parg=new Pool<ThreadArg>(threadNum);
+			if(parg==NULL){
+				error="arg wrong";
+				return;
 			}
 			pool=new ThreadPool(threadNum);
 			if(pool==NULL)
