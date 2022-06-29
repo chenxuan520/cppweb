@@ -161,6 +161,8 @@ public:
 			model=HttpServer::THREAD;
 		else if(_config.model=="FORK")
 			model=HttpServer::FORK;
+		else if(_config.model=="REACTOR")
+			model=HttpServer::REACTOR;
 		else
 			model=HttpServer::MULTIPLEXING;
 		HttpServer server(_config.port,_config.isDebug,model);
@@ -199,6 +201,8 @@ private:
 		}
 		if(_config.model=="THREAD"&&_config.threadNum!=0)
 			server.changeModel(HttpServer::THREAD,_config.threadNum);
+		if(_config.model=="REACTOR"&&_config.threadNum!=0)
+			server.changeModel(HttpServer::REACTOR,_config.threadNum);
 		for(auto& now:_config.deletePath)
 			server.deletePath(now.c_str());
 		for(auto& now:_config.replacePath)

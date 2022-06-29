@@ -5,7 +5,7 @@ using namespace cppweb;
 void pfunc(HttpServer& server,DealHttp& http,int soc)
 {
 	http.head["hahah"]="en";
-	server.continueNext(soc);
+	server.continueNext(soc,http);
 	/* char temp[1000]={0}; */
 	/* Json json; */
 	/* char* text=json.createObject(200); */

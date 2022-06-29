@@ -162,12 +162,12 @@ public:
 				all=0;
 			}
 			if(len<=0)
-				break;
+				return -1;
 			if(now==firstCh)
 			{
 				len=recv(fd,(char*)left,leftsize,MSG_PEEK);
 				if(len<=0)
-					break;
+					return -1;
 				if(strncmp(left,border+1,leftsize)==0)
 				{
 					len=recv(fd,(char*)left,leftsize,flag);
@@ -1714,6 +1714,7 @@ protected:
 	int writeTime;//useful only in ssl model,for write time
 	int readTime;//useful only in ssl model,for read time
 	bool reuseAddr;//if reuse the addr
+	bool edgeTrigger;//if open epoll edge trigger
 	char* hostip;//host IP 
 	char* hostname;//host name
 	const char* error;//error hapen
@@ -1803,6 +1804,7 @@ public:
 		writeTime=5;
 		readTime=1;
 		reuseAddr=true;
+		edgeTrigger=false;
 		error=NULL;
 		hostip=(char*)malloc(sizeof(char)*200);
 		if(hostip==NULL)
@@ -2285,7 +2287,10 @@ public:
 				sockaddr_in newaddr={0,0,{0},{0}};
 				int newClient=acceptSocket(newaddr);
 				nowEvent.data.fd=newClient;
-				nowEvent.events=EPOLLIN;
+				if(!edgeTrigger)
+					nowEvent.events=EPOLLIN;
+				else
+					nowEvent.events=EPOLLIN|EPOLLET;
 				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
 				if(pfunc!=NULL)
 				{
@@ -2328,7 +2333,10 @@ public:
 				sockaddr_in newaddr={0,0,{0},{0}};
 				int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
 				nowEvent.data.fd=newClient;
-				nowEvent.events=EPOLLIN;
+				if(!edgeTrigger)
+					nowEvent.events=EPOLLIN;
+				else
+					nowEvent.events=EPOLLIN|EPOLLET;
 				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
 				strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
 				if(pfunc!=NULL)
@@ -3815,7 +3823,10 @@ public:
 		int len=0;
 		if(buffer.size()==0||buffer.find("\r\n\r\n")==buffer.npos)
 		{
-			SocketApi::recvSockBorder(sock,buffer,"\r\n\r\n",flag);
+			int now=SocketApi::recvSockBorder(sock,buffer,"\r\n\r\n",flag);
+			if(now<0){
+				return now;
+			}
 			auto temp=DealHttp::findKeyValue("Content-Length",buffer.c_str());
 			if(temp.size()==0)
 				return buffer.size();
@@ -3823,7 +3834,10 @@ public:
 				sscanf(temp.c_str(),"%d",&len);
 			if(len==0)
 				return buffer.size();
-			SocketApi::recvSockSize(sock,buffer,len);
+			now=SocketApi::recvSockSize(sock,buffer,len);
+			if(now<0){
+				return now;
+			}
 		}
 		else
 		{
@@ -3836,8 +3850,12 @@ public:
 				sscanf(temp.c_str(),"%d",&len);
 			if(len==0)
 				return buffer.size();
-			if(len-((int)buffer.size()-pos)>0)
-				SocketApi::recvSockSize(sock,buffer,len-(buffer.size()-pos));
+			if(len-((int)buffer.size()-pos)>0){
+				int now=SocketApi::recvSockSize(sock,buffer,len-(buffer.size()-pos));
+				if(now<0){
+					return now;
+				}
+			}
 		}
 		return buffer.size();
 	}
@@ -3850,7 +3868,7 @@ public:
 			do{
 				int len=SocketApi::receiveSocket(ssl,buffer);
 				if(len==-1)
-					return buffer.size();
+					return len;
 			}while(buffer.find("\r\n\r\n")==buffer.npos);
 		}
 		auto pos=buffer.find("\r\n\r\n");
@@ -3862,8 +3880,12 @@ public:
 			sscanf(temp.c_str(),"%d",&len);
 		if(len==0)
 			return buffer.size();
-		if(len-((int)buffer.size()-pos)>0)
-			SocketApi::recvSockSize(ssl,buffer,len-(buffer.size()-pos));
+		if(len-((int)buffer.size()-pos)>0){
+			int now=SocketApi::recvSockSize(ssl,buffer,len-(buffer.size()-pos));
+			if(now<0){
+				return now;
+			}
+		}
 		return buffer.size();
 	}
 #endif
@@ -4484,9 +4506,17 @@ private:
 	enum RouteType{//oneway stand for like /hahah,wild if /hahah/*,static is recource static
 		ONEWAY,WILD,STATIC,STAWILD
 	};
+	struct ThreadArg{// struct for thread to approve argv
+		HttpServer* pserver;
+		Pool<ThreadArg>* pool;
+		DealHttp http;
+		Buffer sen;
+		int soc;
+		ThreadArg():pserver(NULL),pool(NULL),soc(0){};
+	};
 public://main class for http server2.0
 	enum RunModel{//the server model of run
-		FORK,MULTIPLEXING,THREAD
+		FORK,MULTIPLEXING,THREAD,REACTOR
 	};
 #ifndef _WIN32
 	enum AskType{//different ask ways in http
@@ -4558,6 +4588,7 @@ private:
 	ThreadPool* pool;
 	RunModel model;
 	DealHttp http;
+	Pool<ThreadArg>* parg;
 public:
 	HttpServer(unsigned port,bool debug=false,RunModel serverModel=MULTIPLEXING,unsigned threadNum=5)
 		:ServerTcpIp(port),model(serverModel)
@@ -4570,6 +4601,7 @@ public:
 		clientIn=NULL;
 		clientOut=NULL;
 		logFunc=NULL;
+		parg=NULL;
 		logError=NULL;
 		pnowRoute=NULL;
 		this->threadNum=0;
@@ -4593,7 +4625,7 @@ public:
 		}
 		else
 			memset(arrRoute,0,sizeof(RouteFuntion)*20);
-		if(this->model==THREAD)
+		if(this->model==THREAD||this->model==REACTOR)
 		{
 			if(threadNum==0)
 			{
@@ -4601,6 +4633,14 @@ public:
 				return;
 			}
 			pool=new ThreadPool(threadNum);
+			if(this->model==REACTOR){
+				this->edgeTrigger=true;
+				parg=new Pool<ThreadArg>(threadNum);
+				if(parg==NULL){
+					error="arg wrong";
+					return;
+				}
+			}
 			this->threadNum=threadNum;
 			if(pool==NULL)
 			{
@@ -4633,10 +4673,10 @@ public:
 #endif
 	void changeModel(RunModel model,unsigned threadNum=5)
 	{//change model for server
-		if(this->model==model&&model!=THREAD)
+		if(this->model==model&&model!=THREAD&&model!=REACTOR)
 			return;
 		this->model=model;
-		if(this->model==THREAD)
+		if(this->model==THREAD||this->model==REACTOR)
 		{
 			if(threadNum==0)
 			{
@@ -4645,6 +4685,18 @@ public:
 			}
 			if(pool!=NULL)
 				delete pool;
+			if(this->model==REACTOR){
+				this->edgeTrigger=true;
+				if(parg!=NULL){
+					delete parg;
+					parg=NULL;
+				}
+				parg=new Pool<ThreadArg>(threadNum);
+				if(parg==NULL){
+					error="arg wrong";
+					return;
+				}
+			}
 			pool=new ThreadPool(threadNum);
 			if(pool==NULL)
 			{
@@ -4811,7 +4863,7 @@ public:
 		logError=errorFunc;
 	}
 	inline void setNoRouteFunc(void (*pfunc)(HttpServer&,DealHttp&,int))
-	{
+	{//if no pair route this will work
 		noRouteFunc=pfunc;
 	}
 	void run(const char* defaultFile=NULL,bool restart=false)
@@ -4850,6 +4902,7 @@ public:
 		{
 		case FORK:
 		case MULTIPLEXING:
+		case REACTOR:
 			while(isContinue)
 				this->epollModel(epollHttp,this);
 			break;
@@ -4878,11 +4931,12 @@ public:
 		return HttpApi::getCompleteHtmlSSL(buffer,getSSL(clisoc),flag);
 #endif
 	}
-	void changeSetting(bool debug,bool isLongCon,bool isAuto=true,unsigned maxSendLen=10,unsigned sslWriteTime=5)
+	void changeSetting(bool debug,bool isLongCon,bool isAuto=true,unsigned maxSendLen=10,unsigned sslWriteTime=5,int recvWaitTime=3)
 	{//change setting
 		this->isDebug=debug;
 		this->isLongCon=isLongCon;
 		this->isAutoAnalysis=isAuto;
+		this->defaultWait=recvWaitTime;
 		if(maxSendLen>1)
 			this->maxLen=maxSendLen;
 		if(sslWriteTime!=0)
@@ -4951,6 +5005,9 @@ private:
 			break;
 		case FORK:
 			printf("model:\t\tProcess Pool\n");
+			break;
+		case REACTOR:
+			printf("model:\t\tReactor\n");
 			break;
 		}
 		printf("port:\t\t%u\n",boundPort);
@@ -5235,6 +5292,17 @@ private:
 		else
 		{
 			server.rec.clear();
+			if(server.model==REACTOR){
+				auto now=server.parg->getData();
+				while(now==NULL){
+					now=server.parg->getData();
+				}
+				now->pserver=&server;
+				now->soc=soc;
+				now->pool=server.parg;
+				server.pool->addTask({server.epollWorker,now});
+				return 0;
+			}
 			int getNum=server.httpRecvAll(soc,server.rec);
 			if(getNum>0)
 			{
@@ -5290,33 +5358,54 @@ private:
 		now++;
 		return temp;
 	}
-	struct ThreadArg{
-		HttpServer* pserver;
-		Pool<ThreadArg>* pool;
-		DealHttp http;
-		Buffer sen;
-		int soc;
-		ThreadArg():pserver(NULL),pool(NULL),soc(0){};
-	};
 	void threadHttp()
 	{
-		Pool<ThreadArg> httpPool(this->threadNum);
 		while(this->isContinue)
 		{
 			sockaddr_in newaddr={0,0,{0},{0}};
 			int newClient=acceptSocket(newaddr);
 			if(newClient==-1)
 				continue;
+			if(defaultWait>0)
+				SocketApi::setSocReadWait(newClient,defaultWait);
 			ThreadArg* temp=NULL;
 			do{
-				temp=httpPool.getData();
+				temp=this->parg->getData();
 			}while(temp==NULL);
 			temp->pserver=this;
-			temp->pool=&httpPool;
+			temp->pool=parg;
 			temp->soc=newClient;
 			ThreadPool::Task task={threadWorker,temp};
 			pool->addTask(task);
 		}
+	}
+	static void* epollWorker(void* self){
+		ThreadArg& argv=*(ThreadArg*)self;
+		HttpServer& server=*argv.pserver;
+		int cli=argv.soc;
+		argv.sen.resize(server.senBuffer.getMaxSize()/2);
+		std::string rec;
+		int flag=server.httpRecvAll(cli,rec);
+		if(flag<0){
+			if(server.clientOut!=NULL){
+				int port=0;
+				strcpy((char*)server.senBuffer.buffer,server.getPeerIp(cli,&port));
+				server.clientOut(server,cli,server.senBuffer.buffer,port);
+			}
+			server.cleanSocket(argv.soc);
+		}else{
+			argv.http.info.recLen=rec.size();
+			argv.http.info.recText=rec.c_str();
+			server.func(cli,argv.http,rec.c_str(),argv.sen);
+			if(server.logFunc!=NULL)
+				server.logFunc(rec.c_str(),cli);
+			rec.clear();
+			if(server.isLongCon==false){
+				server.cleanSocket(argv.soc);
+			}
+		}
+		argv.pool->retData(&argv);
+		return NULL;
 	}
 	static void* threadWorker(void* self)
 	{
@@ -5332,8 +5421,8 @@ private:
 			server.clientIn(server,cli,server.senBuffer.buffer,port);
 		}
 		std::string rec;
-		server.httpRecvAll(cli,rec);
-		while(rec.size()>0)
+		int flag=server.httpRecvAll(cli,rec);
+		while(flag>=0&&rec.size()>0)
 		{
 			argv.http.info.recLen=rec.size();
 			argv.http.info.recText=rec.c_str();
@@ -5343,7 +5432,7 @@ private:
 			if(server.isLongCon==false)
 				break;
 			rec.clear();
-			server.httpRecvAll(cli,rec);
+			flag=server.httpRecvAll(cli,rec);
 		}
 		if(server.clientOut!=NULL)
 		{
@@ -5411,229 +5500,6 @@ private:
 		while(waitpid(-1, NULL, WNOHANG)>0);
 	}
 #endif
-};
-/*******************************
- * author:chenxuan
- * class:the same as servertcpip but it use threadpool
- * example:see ServerTcpIp
-******************************/
-class ServerPool:public ServerTcpIp{
-private:
-	struct Argv{
-		ServerPool* pserver;
-		void (*func)(ServerPool&,int);
-		int soc;
-		Argv()
-		{
-			pserver=NULL;
-			soc=-1;
-			func=NULL;
-		}
-	};
-private:
-	ThreadPool* pool;
-	pthread_mutex_t mutex;
-	unsigned int threadNum;
-	bool isEpoll;
-private:
-#ifndef _WIN32
-	static void sigCliDeal(int )
-	{
-		while(waitpid(-1, NULL, WNOHANG)>0);
-	}
-#endif
-	static void* worker(void* argc)
-	{
-		Argv argv=*(Argv*)argc;
-		delete (Argv*)argc;
-		if(argv.func!=NULL)
-			argv.func(*argv.pserver,argv.soc);
-		return NULL;
-	}
-public:
-	ServerPool(unsigned short port,unsigned int threadNum=0):ServerTcpIp(port)
-	{
-		this->threadNum=threadNum;
-		if(threadNum>0)
-		{	
-			pool=new ThreadPool(threadNum);
-			if(pool==NULL)
-			{
-				this->error="malloc wrong";
-				return;
-			}
-		}
-		pthread_mutex_init(&mutex,NULL);
-		isEpoll=false;
-	}
-	~ServerPool()
-	{
-		delete pool;
-	   	pthread_mutex_destroy(&mutex);
-	}
-	inline void mutexLock()
-	{
-		pthread_mutex_lock(&mutex);
-	}
-	inline void mutexUnlock()
-	{
-		pthread_mutex_unlock(&mutex);
-	}
-	bool mutexTryLock()
-	{
-		if(0==pthread_mutex_trylock(&mutex))
-			return true;
-		else
-			return false;
-	}
-	void threadModel(void (*pfunc)(ServerPool&,int))
-	{
-		if(this->threadNum==0)
-		{
-			this->error="thread wrong init";
-			return;
-		}
-		while(1)
-		{
-			sockaddr_in newaddr={0,0,{0},{0}};
-			int newClient=acceptSocket(newaddr);
-			if(newClient==-1)
-				continue;
-			Argv* temp=new Argv;
-			if(temp==NULL)
-			{
-				error="malloc wrong";
-				return;
-			}
-			temp->pserver=this;
-			temp->func=pfunc;
-			temp->soc=newClient;
-			ThreadPool::Task task={worker,temp};
-			pool->addTask(task);
-		}
-	}
-#ifndef _WIN32
-	void forkModel(void* pneed,void (*pfunc)(ServerPool&,int,void*))
-	{
-		signal(SIGCHLD,sigCliDeal);
-		while(1)
-		{
-			sockaddr_in newaddr={0,0,{0},{0}};
-			int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
-			if(newClient==-1)
-				continue;
-			if(fork()==0)
-			{
-				close(sock);
-				pfunc(*this,newClient,pneed);
-			}
-			close(newClient);
-		}
-	}
-	void forkEpoll(unsigned int senBufChar,unsigned int recBufChar,void (*pfunc)(ServerPool::Thing,int,int,void*,void*,ServerPool&))
-	{
-		signal(SIGCHLD,sigCliDeal);
-		char* pneed=(char*)malloc(sizeof(char)*senBufChar),*pget=(char*)malloc(sizeof(char)*recBufChar);
-		if(pneed==NULL||pget==NULL)
-		{
-			this->error="malloc worng";
-			return;
-		}
-		memset(pneed,0,sizeof(char)*senBufChar);
-		memset(pget,0,sizeof(char)*recBufChar);
-		while(1)
-		{
-			int eventNum=epoll_wait(epfd,pevent,512,-1),thing=0;
-			for(int i=0;i<eventNum;i++)
-			{
-				epoll_event temp=pevent[i];
-				if(temp.data.fd==sock)
-				{
-					sockaddr_in newaddr={0,0,{0},{0}};
-					int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
-					nowEvent.data.fd=newClient;
-					nowEvent.events=EPOLLIN;
-					epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
-					strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
-				}
-				else
-				{
-					memset(pget,0,sizeof(char)*recBufChar);
-					int getNum=recv(temp.data.fd,(char*)pget,recBufChar,0);
-					if(getNum>0)
-						thing=2;
-					else
-					{
-						*(char*)pget=0;
-						thing=0;
-						epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
-						close(temp.data.fd);
-					}
-					if(pfunc!=NULL&&thing==2)
-					{
-						if(fork()==0)
-						{
-							close(sock);
-							pfunc(CPPSAY,temp.data.fd,getNum,pget,pneed,*this);
-							close(temp.data.fd);
-							free(pneed);
-							free(pget);
-							exit(0);
-						}
-						else
-						{
-							epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
-							close(temp.data.fd);
-						}
-					}
-				}
-			}
-		}
-	}
-	void epollThread(void (*pfunc)(ServerPool&,int))
-	{
-		if(this->threadNum==0)
-		{
-			this->error="thread wrong init";
-			return;
-		}
-		isEpoll=true;
-		int eventNum=epoll_wait(epfd,pevent,512,-1);
-		for(int i=0;i<eventNum;i++)
-		{
-			epoll_event temp=pevent[i];
-			if(temp.data.fd==sock)
-			{
-				sockaddr_in newaddr={0,0,{0},{0}};
-				int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
-				nowEvent.data.fd=newClient;
-				nowEvent.events=EPOLLIN|EPOLLET;
-				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
-			}
-			else
-			{
-				if(pfunc!=NULL)
-				{
-					Argv* argv=new Argv;
-					argv->func=pfunc;
-					argv->soc=temp.data.fd;
-					argv->pserver=this;
-					ThreadPool::Task task={worker,argv};
-					pool->addTask(task);
-				}
-			}
-		}
-		return;
-	}
-#endif
-	inline void threadDeleteSoc(int clisoc)
-	{
-		closeSocket(clisoc);
-#ifndef _WIN32
-		if(isEpoll)
-			epoll_ctl(epfd,clisoc,EPOLL_CTL_DEL,NULL);
-#endif
-	}
 };
 /*******************************
  * author:chenxuan

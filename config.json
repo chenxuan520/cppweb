@@ -5,8 +5,8 @@
 	"port":5200,
 	//default file when ask /
 	"default file":"index.html",
-	//if fork model,use "MULTIPLEXING" or "FORK" or"THREAD"
-	"model":"THREAD",
+	//if fork model,use "MULTIPLEXING" or "FORK" or"THREAD" or "REACTOR"
+	"model":"REACTOR",
 	//if long connect
 	"long connect":true,
 	//if run in background
