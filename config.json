@@ -5,10 +5,10 @@
 	"port":5200,
 	//default file when ask /
 	"default file":"index.html",
-	//if fork model,use "MULTIPLEXING" or "FORK" or"THREAD"
-	"model":"MULTIPLEXING",
+	//if fork model,use "MULTIPLEXING" or "FORK" or"THREAD" or "REACTOR"
+	"model":"REACTOR",
 	//if long connect
-	"long connect":true,
+	"long connect":false,
 	//if run in background
 	"background":false,
 	//if use guard
@@ -20,7 +20,7 @@
 	//auto find the file
 	"auto":true,
 	//message print to stdout or not
-	"message print":true,
+	"message print":false,
 	//forward proxy,only be useful if model is fork or thread
 	"forward proxy":false,
 	//301 redirect,the arr must is a objext and have path and redirect,use as this

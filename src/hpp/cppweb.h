@@ -35,6 +35,7 @@
 #include<stack>
 #include<string>
 #include<regex>
+#include<mutex>
 #include<codecvt>
 #include<functional>
 #include<type_traits>
@@ -161,12 +162,12 @@ public:
 				all=0;
 			}
 			if(len<=0)
-				break;
+				return -1;
 			if(now==firstCh)
 			{
 				len=recv(fd,(char*)left,leftsize,MSG_PEEK);
 				if(len<=0)
-					break;
+					return -1;
 				if(strncmp(left,border+1,leftsize)==0)
 				{
 					len=recv(fd,(char*)left,leftsize,flag);
@@ -286,6 +287,132 @@ public:
 		return all;
 	}
 #endif
+};
+/***********************************************
+* Author: chenxuan-1607772321@qq.com
+* change time:2022-06-27 12:40:51
+* description:the buffer of memory
+***********************************************/
+class Buffer{
+private:
+	unsigned maxLen;
+public:
+	char* buffer;
+	const char* error;
+	Buffer():maxLen(0),buffer(NULL),error(NULL){};
+	Buffer(const Buffer& old){
+		buffer=(char*)malloc(sizeof(char)*old.maxLen);
+		if(buffer==NULL){
+			error="buffer wrong";
+		}else{
+			memset(buffer,0,old.maxLen);
+			maxLen=old.maxLen;
+		}
+	}
+	Buffer(unsigned len):Buffer(){
+		maxLen=len;
+		buffer=(char*)malloc(sizeof(char)*len);
+		if(buffer==NULL){
+			error="malloc wrong";
+			return;
+		}else{
+			memset(buffer,0,sizeof(char)*len);
+		}
+	}
+	~Buffer(){
+		if(buffer!=NULL){
+			free(buffer);
+			buffer=NULL;
+		}
+	}
+	inline unsigned getMaxSize(){
+		return maxLen;
+	}
+	bool resize(unsigned len){
+		if(len<=maxLen){
+			return true;
+		}else if(buffer!=NULL){
+			char* temp=(char*)realloc(buffer,len);
+			if(temp==NULL){
+				error="realloc wrong";
+				return false;
+			}else{
+				buffer=temp;
+				maxLen=len;
+			}
+		}else{
+			buffer=(char*)malloc(sizeof(char)*len);
+			if(buffer==NULL){
+				error="malloc wrong";
+				return false;
+			}else{
+				memset(buffer,0,sizeof(char)*len);
+				maxLen=len;
+			}
+		}
+		return true;
+	}
+	bool enlargeMemory(){
+		if(buffer!=NULL){
+			char* temp=(char*)realloc(buffer,maxLen*2);
+			if(temp==NULL){
+				error="realloc wrong";
+				return false;
+			}else{
+				maxLen*=2;
+				buffer=temp;
+			}
+		}
+		return true;
+	}
+};
+/***********************************************
+* Author: chenxuan-1607772321@qq.com
+* change time:2022-06-27 16:10:43
+* description:the pool to deal thread argc
+***********************************************/
+template<class T>
+class Pool{
+private:
+	std::vector<T> data;
+	std::queue<T*> que;
+	std::mutex mut;
+public:
+	Pool(){}
+	Pool(unsigned poolSize){
+		data.resize(poolSize);
+		for(auto& now:data){
+			que.push(&now);
+		}
+	}
+	Pool(const std::vector<T>& data){
+		this->data=data;
+		for(auto& now:data){
+			que.push(&now);
+		}
+	}
+	void addData(const T& thing){
+		this->data.push_back(thing);
+		mut.lock();
+		this->que.push(&data[data.size()-1]);
+		mut.unlock();
+	}
+	T* getData(){
+		mut.lock();
+		if(que.empty()){
+			mut.unlock();
+			return NULL;
+		}
+		T* temp=que.front();
+		que.pop();
+		mut.unlock();
+		return temp;
+	}
+	void retData(T* thing){
+		mut.lock();
+		que.push(thing);
+		mut.unlock();
+	}
 };
 /*******************************
  * author:chenxuan
@@ -1587,6 +1714,7 @@ protected:
 	int writeTime;//useful only in ssl model,for write time
 	int readTime;//useful only in ssl model,for read time
 	bool reuseAddr;//if reuse the addr
+	bool edgeTrigger;//if open epoll edge trigger
 	char* hostip;//host IP 
 	char* hostname;//host name
 	const char* error;//error hapen
@@ -1676,6 +1804,7 @@ public:
 		writeTime=5;
 		readTime=1;
 		reuseAddr=true;
+		edgeTrigger=false;
 		error=NULL;
 		hostip=(char*)malloc(sizeof(char)*200);
 		if(hostip==NULL)
@@ -1890,6 +2019,8 @@ public:
 		int len=receiveSocket(cliSoc,temp,1024,flag);
 		if(len<=0)
 			return len;
+		else
+			buffer.append(temp,len);
 		while(len==1024)
 		{
 			buffer.append(temp,1024);
@@ -2156,7 +2287,10 @@ public:
 				sockaddr_in newaddr={0,0,{0},{0}};
 				int newClient=acceptSocket(newaddr);
 				nowEvent.data.fd=newClient;
-				nowEvent.events=EPOLLIN;
+				if(!edgeTrigger)
+					nowEvent.events=EPOLLIN;
+				else
+					nowEvent.events=EPOLLIN|EPOLLET;
 				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
 				if(pfunc!=NULL)
 				{
@@ -2199,7 +2333,10 @@ public:
 				sockaddr_in newaddr={0,0,{0},{0}};
 				int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
 				nowEvent.data.fd=newClient;
-				nowEvent.events=EPOLLIN;
+				if(!edgeTrigger)
+					nowEvent.events=EPOLLIN;
+				else
+					nowEvent.events=EPOLLIN|EPOLLET;
 				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
 				strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
 				if(pfunc!=NULL)
@@ -2478,6 +2615,16 @@ public:
 		std::string typeName;
 		std::string body;
 		Datagram():statusCode(STATUSOK),typeFile(TXT),fileLen(0){};
+		inline void clear()
+		{
+			head.clear();
+			cookie.clear();
+			body="";
+			typeName="";
+			statusCode=STATUSOK;
+			typeFile=TXT;
+			fileLen=0;
+		}
 		inline void json(Status staCode,const std::string& data)
 		{
 			typeFile=FileKind::JSON;
@@ -2551,7 +2698,7 @@ public:
 		std::unordered_map<std::string,std::string> head;
 		const char* body;
 		const char* error;
-		bool isFull;
+		bool isFull;//judge if the request be analyse
 		Request():version("HTTP/1.1"),body(NULL),error(NULL),isFull(false){};
 		Request(const char* recvText,bool onlyTop=false)
 		{
@@ -2613,9 +2760,9 @@ public:
 				this->error="error request";
 				return false;
 			}
-			isFull=true;
 			sscanf(now,"%128s %512s %512s",one,two,three);
 			now+=strlen(one)+strlen(two)+strlen(three)+4;
+			isFull=true;
 			req.method=one;
 			req.askPath=two;
 			req.version=three;
@@ -2659,7 +2806,7 @@ public:
 			result=getArr[1];
 			return result;
 		}
-		std::string getCookie(const std::string& key,void* buffer=NULL)
+		std::string getCookie(const std::string& key,const void* buffer=NULL)
 		{
 			if(this->head.find("Cookie")!=this->head.end())
 				return DealHttp::findKeyValue(key,this->head["Cookie"].c_str());
@@ -2714,7 +2861,7 @@ public:
 		}
 		void clear()
 		{
-			isFull=false;
+			this->isFull=false;
 			this->body=NULL;
 			this->error=NULL;
 			this->head.clear();
@@ -2818,6 +2965,15 @@ public:
 			return result;
 		}
 	};
+	struct RouteInfo{
+		const void* nowRoute;
+		const void* recText;
+		Buffer* sendBuffer;
+		int staticLen;
+		int recLen;
+		bool isContinue;
+		RouteInfo():nowRoute(NULL),recText(NULL),sendBuffer(NULL),staticLen(0),recLen(0),isContinue(false){};
+	};
 private:
 	char ask[512];
 	char* pfind;
@@ -2825,10 +2981,12 @@ private:
 	const char* connect;
 	const char* serverName;
 public:
+	RouteInfo info;
 	Datagram gram;//default gram to create gram
 	Request req;//default request to use by user
 	std::unordered_map<std::string,std::string> head;//default head toadd middleware
 	std::unordered_map<std::string,std::string> cookie;//default cookie to add middleware
+	std::unordered_map<std::string,void*> setGet;//set var and get var in route
 	DealHttp()
 	{
 		for(int i=0;i<512;i++)
@@ -2838,7 +2996,9 @@ public:
 		connect="keep-alive";
 		serverName="LCserver/1.1";
 	}
-	DealHttp(const DealHttp&)=delete;
+	~DealHttp(){
+		clean();
+	}
 private:
 	bool cutLineAsk(char* message,const char* pcutIn)
 	{
@@ -3010,6 +3170,33 @@ public:
 			delete pstr;
 		return result;
 	}
+	inline void clean(){
+		this->head.clear();
+		this->cookie.clear();
+		for(auto iter:setGet){
+			if(iter.second!=NULL){
+				free(iter.second);
+			}
+		}
+	}
+	template<typename T>
+	void setVar(const std::string& key,const T& value){
+		T* temp=(T*)malloc(sizeof(T));
+		if(temp==NULL){
+			error="setvar wrong";
+			return;
+		}else{
+			*temp=value;
+		}
+		setGet.insert({key,temp});
+	}
+	void* getVar(const std::string& key){
+		if(setGet.find(key)==setGet.end()){
+			return NULL;
+		}else{
+			return setGet[key];
+		}
+	}
 	int createSendMsg(FileKind kind,char* buffer,unsigned int bufferLen,const char* pfile,int* plong)
 	{
 		int temp=0;
@@ -3030,7 +3217,7 @@ public:
 		*plong=len+temp+1;
 		return 0;
 	}
-	const char* analysisHttpAsk(void* message,const char* pneed="GET")
+	const char* analysisHttpAsk(const void* message,const char* pneed="GET")
 	{
 		if(message==NULL)
 		{
@@ -3164,7 +3351,7 @@ public:
 		}
 		return result;
 	}
-	const char* getCookie(void* recText,const char* key,char* value,unsigned int valueLen)
+	const char* getCookie(const void* recText,const char* key,char* value,unsigned int valueLen)
 	{
 		if(recText==NULL||key==NULL||value==NULL||valueLen==0)
 			return NULL;
@@ -3182,7 +3369,7 @@ public:
 		*temp='\r';
 		return value;
 	}
-	static std::string getCookie(void* recText,const char* key)
+	static std::string getCookie(const void* recText,const char* key)
 	{
 		if(recText==NULL||key==NULL)
 			return "";
@@ -3652,283 +3839,88 @@ public:
 	}
 #endif
 };
-/*******************************
- * author:chenxuan
- * class:use to send email easy
- * example:{
- *  Email email("qq.com");
- *  email.CreateSend
- *  email.emailSend
- * }
-******************************/
-class Email{
-public:
-	struct EmailGram{
-		std::string senEmail;
-		std::string recvEmail;
-		std::string token;
-		std::string senName;
-		std::string recvName;
-		std::string subject;
-		std::string body;
-	};
+/***********************************************
+* Author: chenxuan-1607772321@qq.com
+* change time:2022-04-16 23:35:16
+* description:http api
+***********************************************/
+class HttpApi{
 private:
-	sockaddr_in their_addr;
-	bool isDebug;
-	char error[30];
-	struct Base64Date6
-	{
-		unsigned int d4 : 6;
-		unsigned int d3 : 6;
-		unsigned int d2 : 6;
-		unsigned int d1 : 6;
-	};
+	HttpApi()=delete;
+	HttpApi(const HttpApi&)=delete;
 public:
-	Email(const char* domain,bool debug=false)
+	//get complete datagram,result store in buffer,return recv size
+	static int getCompleteHtml(std::string& buffer,int sock,int flag=0)
 	{
-		isDebug=debug;
-		memset(error,0,sizeof(char)*30);
-		memset(&their_addr, 0, sizeof(their_addr));
-		their_addr.sin_family = AF_INET;
-		their_addr.sin_port = htons(25);	
-		if(domain==NULL)
+		int len=0;
+		if(buffer.size()==0||buffer.find("\r\n\r\n")==buffer.npos)
 		{
-			sprintf(error,"wrong domain");
-			return;
+			int now=SocketApi::recvSockBorder(sock,buffer,"\r\n\r\n",flag);
+			if(now<0){
+				return now;
+			}
+			auto temp=DealHttp::findKeyValue("Content-Length",buffer.c_str());
+			if(temp.size()==0)
+				return buffer.size();
+			else
+				sscanf(temp.c_str(),"%d",&len);
+			if(len==0)
+				return buffer.size();
+			now=SocketApi::recvSockSize(sock,buffer,len);
+			if(now<0){
+				return now;
+			}
 		}
-		hostent* hptr = gethostbyname(domain);		  
-		if(hptr==NULL)
+		else
 		{
-			sprintf(error,"wrong domain");
-			return;
+			auto pos=buffer.find("\r\n\r\n");
+			pos+=4;
+			auto temp=DealHttp::findKeyValue("Content-Length",buffer.c_str());
+			if(temp.size()==0)
+				return buffer.size();
+			else
+				sscanf(temp.c_str(),"%d",&len);
+			if(len==0)
+				return buffer.size();
+			if(len-((int)buffer.size()-pos)>0){
+				int now=SocketApi::recvSockSize(sock,buffer,len-(buffer.size()-pos));
+				if(now<0){
+					return now;
+				}
+			}
 		}
-		memcpy(&their_addr.sin_addr.s_addr, hptr->h_addr_list[0], hptr->h_length);
+		return buffer.size();
 	}
-	bool emailSend(const char* sendEmail,const char* passwd,const char* recEmail,const char* body)
+#ifdef CPPWEB_OPENSSL
+	static int getCompleteHtmlSSL(std::string& buffer,SSL* ssl,int=0)
 	{
-	  	int sockfd = 0;
-	  	char recBuffer[1000]={0},senBuffer[1000]={0},login[128],pass[128];
-		sockfd = socket(PF_INET, SOCK_STREAM, 0);
-		if (sockfd < 0)
+		int len=0;
+		if(buffer.size()==0||buffer.find("\r\n\r\n")==buffer.npos)
 		{
-			sprintf(error,"open socket wrong");
-			return false;
+			do{
+				int len=SocketApi::receiveSocket(ssl,buffer);
+				if(len==-1)
+					return len;
+			}while(buffer.find("\r\n\r\n")==buffer.npos);
 		}
-		if (connect(sockfd,(struct sockaddr *)&their_addr, sizeof(struct sockaddr)) < 0)
-		{
-			sprintf(error,"connect wrong");
-			return false;
+		auto pos=buffer.find("\r\n\r\n");
+		pos+=4;
+		auto temp=DealHttp::findKeyValue("Content-Length",buffer.c_str());
+		if(temp.size()==0)
+			return 0;
+		else
+			sscanf(temp.c_str(),"%d",&len);
+		if(len==0)
+			return buffer.size();
+		if(len-((int)buffer.size()-pos)>0){
+			int now=SocketApi::recvSockSize(ssl,buffer,len-(buffer.size()-pos));
+			if(now<0){
+				return now;
+			}
 		}
-		memset(recBuffer,0,sizeof(char)*1000);
-		while (recv(sockfd, recBuffer, 1000, 0) <= 0)
-		{
-			if(isDebug)
-				printf("reconnecting\n");
-#ifndef _WIN32
-			sleep(2);
+		return buffer.size();
+	}
 #endif
-			sockfd = socket(PF_INET, SOCK_STREAM, 0);
-			if (sockfd < 0)
-			{
-				sprintf(error,"open socket wrong");
-				return false;
-			}
-			if (connect(sockfd,(struct sockaddr *)&their_addr, sizeof(struct sockaddr)) < 0)
-			{
-				sprintf(error,"connect wrong");
-				return false;
-			}
-			memset(recBuffer, 0, 1000);
-		}
-		if(isDebug)
-			printf("get:%s",recBuffer);
-		
-		memset(senBuffer, 0, 1000);
-		sprintf(senBuffer, "EHLO HYL-PC\r\n");
-		send(sockfd, senBuffer, strlen(senBuffer), 0);
-		memset(recBuffer, 0, 1000);
-		recv(sockfd, recBuffer, 1000, 0);
-		if(isDebug)
-			printf("EHLO REceive:%s\n",recBuffer);
-		
-		memset(senBuffer, 0, 1000);
-		sprintf(senBuffer, "AUTH LOGIN\r\n");
-		send(sockfd, senBuffer, strlen(senBuffer), 0);
-		memset(recBuffer, 0, 1000);
-		recv(sockfd, recBuffer, 1000, 0);
-		if(isDebug)
-			printf("Auth Login Receive:%s\n",recBuffer);
-		
-		memset(senBuffer, 0, 1000);
-		sprintf(senBuffer, "%s",sendEmail);
-		memset(login, 0, 128);
-		EncodeBase64(login, senBuffer, strlen(senBuffer));
-		sprintf(senBuffer, "%s\r\n", login);
-		send(sockfd, senBuffer, strlen(senBuffer), 0);
-		if(isDebug)
-			printf("Base64 UserName:%s\n",senBuffer);
-		memset(recBuffer, 0, 1000);
-		recv(sockfd, recBuffer, 1000, 0);
-		if(isDebug)
-			printf("User Login Receive:%s\n",recBuffer);
-
-		sprintf(senBuffer, "%s",passwd);//password
-		memset(pass, 0, 128);
-		EncodeBase64(pass, senBuffer, strlen(senBuffer));
-		sprintf(senBuffer, "%s\r\n", pass);
-		send(sockfd, senBuffer, strlen(senBuffer), 0);
-		if(isDebug)
-			printf("Base64 Password:%s\n",senBuffer);
-
-		memset(recBuffer, 0, 1000);
-		recv(sockfd, recBuffer, 1000, 0);
-		if(isDebug)
-			printf("Send Password Receive:%s\n",recBuffer);
-
-		// self email
-		memset(recBuffer, 0, 1000);
-		sprintf(senBuffer, "MAIL FROM: <%s>\r\n",sendEmail);  
-		send(sockfd, senBuffer, strlen(senBuffer), 0);
-		memset(recBuffer, 0, 1000);
-		recv(sockfd, recBuffer, 1000, 0);
-		if(isDebug)
-			printf("set Mail From Receive:%s\n",recBuffer);
-
-		// recv email
-		sprintf(recBuffer, "RCPT TO:<%s>\r\n", recEmail);
-		send(sockfd, recBuffer, strlen(recBuffer), 0);
-		memset(recBuffer, 0, 1000);
-		recv(sockfd, recBuffer, 1000, 0);
-		if(isDebug)
-			printf("Tell Sendto Receive:%s\n",recBuffer);
-		int bug=0;
-		sscanf(recBuffer,"%d",&bug);
-		if(bug==550)
-		{
-			sprintf(error,"recemail wrong");
-			return false;
-		}
-		// send body
-		sprintf(senBuffer, "DATA\r\n");
-		send(sockfd, senBuffer, strlen(senBuffer), 0);
-		memset(recBuffer, 0, 1000);
-		recv(sockfd, recBuffer, 1000, 0);
-		if(isDebug)
-			printf("Send Mail Prepare Receive:%s\n",recBuffer);
-
-		// send data
-		sprintf(senBuffer, "%s\r\n.\r\n", body);
-		send(sockfd, senBuffer, strlen(senBuffer), 0);
-		memset(recBuffer, 0, 1000);
-		recv(sockfd, recBuffer, 1000, 0);
-		if(isDebug)
-			printf("Send Mail Receive:%s\n",recBuffer);
-
-		// QUIT
-		sprintf(senBuffer,"QUIT\r\n");
-		send(sockfd, senBuffer, strlen(senBuffer), 0);
-		memset(recBuffer, 0, 1000);
-		recv(sockfd, recBuffer, 1000, 0);
-		if(isDebug)
-			printf("Quit Receive:%s\n",recBuffer);
-		return true;
-	}
-	char ConvertToBase64(char uc)
-	{
-		if (uc < 26)
-			return 'A' + uc;
-		if (uc < 52)
-			return 'a' + (uc - 26);
-		if (uc < 62)
-			return '0' + (uc - 52);
-		if (uc == 62)
-			return '+';
-		return '/';
-	}
-	void EncodeBase64(char *dbuf, char *buf128, int len)
-	{
-		struct Base64Date6 *ddd = NULL;
-		int i = 0;
-		char buf[256] = { 0 };
-		char* tmp = NULL;
-		char cc = '\0';
-		memset(buf, 0, 256);
-		strcpy(buf, buf128);
-		for (i = 1; i <= len / 3; i++)
-		{
-			tmp = buf + (i - 1) * 3;
-			cc = tmp[2];
-			tmp[2] = tmp[0];
-			tmp[0] = cc;
-			ddd = (struct Base64Date6 *)tmp;
-			dbuf[(i - 1) * 4 + 0] = ConvertToBase64((unsigned int)ddd->d1);
-			dbuf[(i - 1) * 4 + 1] = ConvertToBase64((unsigned int)ddd->d2);
-			dbuf[(i - 1) * 4 + 2] = ConvertToBase64((unsigned int)ddd->d3);
-			dbuf[(i - 1) * 4 + 3] = ConvertToBase64((unsigned int)ddd->d4);
-		}
-		if (len % 3 == 1)
-		{
-			tmp = buf + (i - 1) * 3;
-			cc = tmp[2];
-			tmp[2] = tmp[0];
-			tmp[0] = cc;
-			ddd = (struct Base64Date6 *)tmp;
-			dbuf[(i - 1) * 4 + 0] = ConvertToBase64((unsigned int)ddd->d1);
-			dbuf[(i - 1) * 4 + 1] = ConvertToBase64((unsigned int)ddd->d2);
-			dbuf[(i - 1) * 4 + 2] = '=';
-			dbuf[(i - 1) * 4 + 3] = '=';
-		}
-		if (len % 3 == 2)
-		{
-			tmp = buf + (i - 1) * 3;
-			cc = tmp[2];
-			tmp[2] = tmp[0];
-			tmp[0] = cc;
-			ddd = (struct Base64Date6 *)tmp;
-			dbuf[(i - 1) * 4 + 0] = ConvertToBase64((unsigned int)ddd->d1);
-			dbuf[(i - 1) * 4 + 1] = ConvertToBase64((unsigned int)ddd->d2);
-			dbuf[(i - 1) * 4 + 2] = ConvertToBase64((unsigned int)ddd->d3);
-			dbuf[(i - 1) * 4 + 3] = '=';
-		}
-		return;
-	}
-	void CreateSend(const char* youName,const char* toName,const char* from,const char* to,const char* subject,const char* body,char* buf)
-	{
-		sprintf(buf,"From: \"%s\"<%s>\r\n"
-				"To: \"%s\"<%s>\r\n"
-				"Subject:%s\r\n\r\n"
-				"%s\n",youName,from,toName,to,subject,body);
-	}
-	inline const char* lastError()
-	{
-		return error;
-	}
-	static const char* getDomainBySelfEmail(const char* email,char* buffer,int bufferLen)
-	{
-		char* temp=strrchr((char*)email,'@');
-		if(temp==NULL)
-			return NULL;
-		if(bufferLen<=20)
-			return NULL;
-		if(strlen(temp)>15)
-			return NULL;
-		sprintf(buffer,"smtp.%s",temp+1);
-		return buffer;
-	}
-	static const char* sendEmail(const EmailGram& gram)
-	{
-		char domain[32]={0};
-		if(NULL==getDomainBySelfEmail(gram.senEmail.c_str(),domain,32))
-			return "unknown send email";
-		std::string buffer="From: \""+gram.senName+"\"<"+gram.senEmail+">\r\nTo: \""\
-							+gram.recvName+"\"<"+gram.recvEmail+">\r\nSubject:"\
-							+gram.subject+"\r\n\r\n"+gram.body+"\n";
-		Email email(domain,false);
-		auto flag=email.emailSend(gram.senEmail.c_str(),gram.token.c_str(),gram.recvEmail.c_str(),buffer.c_str());
-		if(flag==false)
-			return email.lastError();
-		return NULL;
-	}
 };
 /***********************************************
 * Author: chenxuan-1607772321@qq.com
@@ -4268,9 +4260,17 @@ private:
 	enum RouteType{//oneway stand for like /hahah,wild if /hahah/*,static is recource static
 		ONEWAY,WILD,STATIC,STAWILD
 	};
+	struct ThreadArg{// struct for thread to approve argv
+		HttpServer* pserver;
+		Pool<ThreadArg>* pool;
+		DealHttp http;
+		Buffer sen;
+		int soc;
+		ThreadArg():pserver(NULL),pool(NULL),soc(0){};
+	};
 public://main class for http server2.0
 	enum RunModel{//the server model of run
-		FORK,MULTIPLEXING,THREAD
+		FORK,MULTIPLEXING,THREAD,REACTOR
 	};
 #ifndef _WIN32
 	enum AskType{//different ask ways in http
@@ -4286,17 +4286,35 @@ public://main class for http server2.0
 		RouteType type;
 		char route[128];
 		char pathExtra[128];
-		void (*pfunc)(HttpServer&,DealHttp&,int);
+		std::vector<void(*)(HttpServer&,DealHttp&,int)> pfuncs;
+		RouteFuntion():ask(GET),type(ONEWAY){
+			memset(route,0,128);
+			memset(pathExtra,0,128);
+		};
+		RouteFuntion(const RouteFuntion& old){
+			*this=old;
+		}
+		RouteFuntion& operator=(const RouteFuntion& old){
+			if(&old==this){
+				return *this;
+			}
+			ask=old.ask;
+			type=old.type;
+			strcpy(route,old.route);
+			strcpy(pathExtra,old.pathExtra);
+			pfuncs=old.pfuncs;
+			return *this;
+		}
 	};
 	struct Group{//group class for group api
 		std::string group;
 		HttpServer& server;
 		Group(HttpServer& ser,const char* gropa):group(gropa),server(ser){};
 		Group(const Group& old):group(old.group),server(old.server){}
-		inline bool get(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
+		inline bool get(const char* route,std::initializer_list<void(*)(HttpServer&,DealHttp&,int)> pfuncs)
 		{
 			std::string group=this->group+route;
-			return server.get(group.c_str(),pfunc);
+			return server.get(group.c_str(),pfuncs);
 		}
 		inline bool post(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
 		{
@@ -4313,55 +4331,73 @@ public://main class for http server2.0
 			std::string group=this->group+route;
 			return server.routeHandle(ask,group.c_str(),pfunc);
 		}
+		inline bool get(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
+		{
+			std::string group=this->group+route;
+			return server.get(group.c_str(),pfunc);
+		}
+		inline bool post(const char* route,std::initializer_list<void(*)(HttpServer&,DealHttp&,int)> pfuncs)
+		{
+			std::string group=this->group+route;
+			return server.post(group.c_str(),pfuncs);
+		}
+		inline bool all(const char* route,std::initializer_list<void(*)(HttpServer&,DealHttp&,int)> pfuncs)
+		{
+			std::string group=this->group+route;
+			return server.all(group.c_str(),pfuncs);
+		}
+		inline bool routeHandle(AskType ask,const char* route,std::initializer_list<void(*)(HttpServer&,DealHttp&,int)> pfuncs)
+		{
+			std::string group=this->group+route;
+			return server.routeHandle(ask,group.c_str(),pfuncs);
+		}
 	};
 private:
-	RouteFuntion* arrRoute;
+	std::vector<RouteFuntion> arrRoute;
 	RouteFuntion* pnowRoute;
-	void* getText;
-	void* senText;
 	const char* defaultFile;
-	unsigned int senLen;
-	unsigned int recLen;
-	unsigned int maxLen;
-	unsigned int maxNum;
-	unsigned int now;
-	unsigned int boundPort;
+	unsigned maxLen;
+	unsigned now;
+	unsigned boundPort;
+	unsigned threadNum;
+	int defaultWait;
 	int selfLen;
-	int textLen;
 	bool isDebug;
 	bool isLongCon;
 	bool selfCtrl;
 	bool isContinue;
 	bool isAutoAnalysis;
-	void (*middleware)(HttpServer&,DealHttp&,int);
+	std::vector<void(*)(HttpServer&,DealHttp&,int)> middlewares;
 	void (*noRouteFunc)(HttpServer&,DealHttp&,int);
-	void (*clientIn)(HttpServer&,int num,void* ip,int port);
-	void (*clientOut)(HttpServer&,int num,void* ip,int port);
+	void (*clientIn)(HttpServer&,int num,const void* ip,int port);
+	void (*clientOut)(HttpServer&,int num,const void* ip,int port);
 	void (*logFunc)(const void*,int);
 	void (*logError)(const void*,int);
 	Trie<RouteFuntion> trie;
+	std::string rec;
+	Buffer senBuffer;
 	ThreadPool* pool;
 	RunModel model;
 	DealHttp http;
+	Pool<ThreadArg>* parg;
 public:
 	HttpServer(unsigned port,bool debug=false,RunModel serverModel=MULTIPLEXING,unsigned threadNum=5)
 		:ServerTcpIp(port),model(serverModel)
 	{
+		arrRoute.resize(16);
 		pool=NULL;
-		getText=NULL;
-		senText=NULL;
-		middleware=NULL;
 		noRouteFunc=NULL;
 		defaultFile=NULL;
-		arrRoute=NULL;
 		clientIn=NULL;
 		clientOut=NULL;
 		logFunc=NULL;
-		logError=NULL;
+		parg=NULL;
 		pnowRoute=NULL;
-		senLen=1024*1024;
+		logError=NULL;
+		this->threadNum=0;
+		defaultWait=3;
 		maxLen=10;
-		recLen=2048;
+		now=0;
 		selfLen=0;
 		boundPort=port;
 		isDebug=debug;
@@ -4369,19 +4405,7 @@ public:
 		isLongCon=true;
 		isContinue=true;
 		isAutoAnalysis=true;
-		textLen=0;
-		now=0;
-		maxNum=20;
-		arrRoute=(RouteFuntion*)malloc(sizeof(RouteFuntion)*20);
-		if(arrRoute==NULL)
-		{
-			this->error=" server route wrong";
-			if(logError!=NULL)
-				logError(this->error,0);
-		}
-		else
-			memset(arrRoute,0,sizeof(RouteFuntion)*20);
-		if(this->model==THREAD)
+		if(this->model==THREAD||this->model==REACTOR)
 		{
 			if(threadNum==0)
 			{
@@ -4389,6 +4413,13 @@ public:
 				return;
 			}
 			pool=new ThreadPool(threadNum);
+			this->edgeTrigger=true;
+			parg=new Pool<ThreadArg>(threadNum);
+			if(parg==NULL){
+				error="arg wrong";
+				return;
+			}
+			this->threadNum=threadNum;
 			if(pool==NULL)
 			{
 				error="pool new wrong";
@@ -4401,11 +4432,6 @@ public:
 #endif
 	}
 	HttpServer(const HttpServer& server)=delete;
-	~HttpServer()
-	{
-		if(arrRoute!=NULL)
-			free(arrRoute);
-	}
 #ifdef CPPWEB_OPENSSL
 	//load cert and key,and they must be pem format(such as key.pem,cert.pem)
 	inline bool loadKeyCert(const char* certPath,const char* keyPath,const char* passwd=NULL)
@@ -4420,10 +4446,10 @@ public:
 #endif
 	void changeModel(RunModel model,unsigned threadNum=5)
 	{//change model for server
-		if(this->model==model&&model!=THREAD)
+		if(this->model==model&&model!=THREAD&&model!=REACTOR)
 			return;
 		this->model=model;
-		if(this->model==THREAD)
+		if(this->model==THREAD||this->model==REACTOR)
 		{
 			if(threadNum==0)
 			{
@@ -4432,6 +4458,16 @@ public:
 			}
 			if(pool!=NULL)
 				delete pool;
+			this->edgeTrigger=true;
+			if(parg!=NULL){
+				delete parg;
+				parg=NULL;
+			}
+			parg=new Pool<ThreadArg>(threadNum);
+			if(parg==NULL){
+				error="arg wrong";
+				return;
+			}
 			pool=new ThreadPool(threadNum);
 			if(pool==NULL)
 			{
@@ -4444,6 +4480,34 @@ public:
 			signal(SIGCHLD,sigCliDeal);
 #endif
 	}
+	bool routeHandle(AskType ask,const char* route,const std::initializer_list<void(*)(HttpServer&,DealHttp&,int)>& pfuncs){
+		if(strlen(route)>100)
+			return false;
+		RouteFuntion* nowRoute=addRoute();
+		if(nowRoute==NULL)
+			return false;
+		nowRoute->ask=ask;
+		strcpy(nowRoute->route,route);
+		for(auto& now:pfuncs){
+			nowRoute->pfuncs.push_back(now);
+		}
+		if(route[strlen(route)-1]=='*')
+		{
+			nowRoute->route[strlen(route)-1]=0;
+			nowRoute->type=WILD;
+		}
+		else
+			nowRoute->type=ONEWAY;
+		if(false==trie.insert(nowRoute->route,nowRoute))
+		{
+			error="server:route wrong char";
+			if(logError!=NULL)
+				logError(this->error,0);
+			return false;
+		}
+		return true;
+
+	}
 	bool routeHandle(AskType ask,const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
 	{//add route handle in all ask type 
 		if(strlen(route)>100)
@@ -4453,7 +4517,7 @@ public:
 			return false;
 		nowRoute->ask=ask;
 		strcpy(nowRoute->route,route);
-		nowRoute->pfunc=pfunc;
+		nowRoute->pfuncs.push_back(pfunc);
 		if(route[strlen(route)-1]=='*')
 		{
 			nowRoute->route[strlen(route)-1]=0;
@@ -4486,7 +4550,7 @@ public:
 			nowRoute->route[strlen(nowRoute->route)-1]=0;
 			nowRoute->type=STAWILD;
 		}
-		nowRoute->pfunc=rediectGram;
+		nowRoute->pfuncs.push_back(rediectGram);
 		if(false==trie.insert(nowRoute->route,nowRoute))
 		{
 			error="server:route wrong char";
@@ -4513,7 +4577,7 @@ public:
 			nowRoute->route[strlen(nowRoute->route)-1]=0;
 			nowRoute->type=STAWILD;
 		}
-		nowRoute->pfunc=loadFile;
+		nowRoute->pfuncs.push_back(loadFile);
 		if(false==trie.insert(nowRoute->route,nowRoute))
 		{
 			error="server:route wrong char";
@@ -4541,7 +4605,7 @@ public:
 		}
 		else
 			strcpy(nowRoute->route,route);
-		nowRoute->pfunc=deleteFile;
+		nowRoute->pfuncs.push_back(deleteFile);
 		if(false==trie.insert(nowRoute->route,nowRoute))
 		{
 			error="server:route wrong char";
@@ -4560,37 +4624,41 @@ public:
 	{//add routeHandle and ask type is get
 		return routeHandle(GET,route,pfunc);
 	}
+	inline bool get(const char* route,std::initializer_list<void(*)(HttpServer&,DealHttp&,int)> pfuncs)
+	{//add routeHandle and ask type is get
+		return routeHandle(GET,route,pfuncs);
+	}
 	inline bool post(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
 	{//the same to last funtion
 		return routeHandle(POST,route,pfunc);
+	}
+	inline bool post(const char* route,std::initializer_list<void(*)(HttpServer&,DealHttp&,int)> pfuncs)
+	{//the same to last funtion
+		return routeHandle(POST,route,pfuncs);
 	}
 	inline bool all(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
 	{//receive all ask type
 		return routeHandle(ALL,route,pfunc);
 	}
-	inline void clientInHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port))
+	inline bool all(const char* route,std::initializer_list<void(*)(HttpServer&,DealHttp&,int)> pfuncs)
+	{//receive all ask type
+		return routeHandle(ALL,route,pfuncs);
+	}
+	inline void clientInHandle(void (*pfunc)(HttpServer&,int num,const void* ip,int port))
 	{//when client in ,it will be call
 		clientIn=pfunc;
 	}
-	inline void clientOutHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port))
+	inline void clientOutHandle(void (*pfunc)(HttpServer&,int num,const void* ip,int port))
 	{//when client out ,itwill be call
 		clientOut=pfunc;
 	}
-	bool setMiddleware(void (*pfunc)(HttpServer&,DealHttp&,int))
+	void setMiddleware(void (*pfunc)(HttpServer&,DealHttp&,int))
 	{//middleware funtion after get text it will be called
-		if(middleware!=NULL)
-			return false;
-		middleware=pfunc;
-		return true;
+		middlewares.push_back(pfunc);
 	}
-	inline void continueNext(int cliSock)
+	inline void continueNext(DealHttp& http)
 	{//middleware funtion to continue default task
-		if(middleware==NULL)
-			return;
-		auto temp=middleware;
-		middleware=NULL;
-		func(cliSock);
-		middleware=temp;
+		http.info.isContinue=true;
 	}
 	inline void setLog(void (*pfunc)(const void*,int),void (*errorFunc)(const void*,int))
 	{//log system 
@@ -4598,22 +4666,19 @@ public:
 		logError=errorFunc;
 	}
 	inline void setNoRouteFunc(void (*pfunc)(HttpServer&,DealHttp&,int))
-	{
+	{//if no pair route this will work
 		noRouteFunc=pfunc;
 	}
 	void run(const char* defaultFile=NULL,bool restart=false)
 	{//server begin to run
-		char* getT=(char*)malloc(sizeof(char)*recLen);
-		char* sen=(char*)malloc(sizeof(char)*senLen);
-		if(sen==NULL||getT==NULL)
+		auto flag=senBuffer.resize(1024*1024);
+		if(!flag)
 		{
 			this->error="server:malloc get and sen wrong";
 			if(logError!=NULL)
 				logError(error,0);
 			return;
 		}
-		memset(getT,0,sizeof(char)*recLen);
-		memset(sen,0,sizeof(char)*senLen);
 		if(!restart)
 		{
 			if(false==this->bondhost())
@@ -4633,8 +4698,6 @@ public:
 		}
 		if(logFunc!=NULL)
 			logFunc("server start",0);
-		this->getText=getT;
-		this->senText=sen;
 		this->defaultFile=defaultFile;
 		if(isDebug)
 			messagePrint();
@@ -4642,6 +4705,7 @@ public:
 		{
 		case FORK:
 		case MULTIPLEXING:
+		case REACTOR:
 			while(isContinue)
 				this->epollModel(epollHttp,this);
 			break;
@@ -4650,8 +4714,6 @@ public:
 				this->threadHttp();
 			break;
 		}
-		free(sen);
-		free(getT);
 	}
 	int httpSend(int num,void* buffer,int sendLen,int flag=0)
 	{
@@ -4661,61 +4723,35 @@ public:
 	{
 		return this->receiveSocket(num,buffer,bufferLen,flag);
 	}
-	int httpRecv(int num,std::string& buffer,int flag)
+	int httpRecv(int num,std::string& buffer,int flag=0)
 	{
 		return this->receiveSocket(num,buffer,flag);
 	}
-	int getCompleteMessage(int sockCli)
-	{//some time text is not complete ,it can get left text 
-		void*& message=getText;
-		unsigned messageLen=this->getRecLen();
-		if(message==NULL||message==0)
-			return -1;
-		unsigned int len=0,old=messageLen;
-		char* temp=NULL;
-		if((temp=strstr((char*)message,"Content-Length"))==NULL)
-			return -1;
-		if(sscanf(temp+strlen("Content-Length")+1,"%d",&len)<=0)
-			return -1;
-		if((temp=strstr((char*)message,"\r\n\r\n"))==NULL)
-			return -1;
-		temp+=4;
-		if(strlen(temp)>=len)
-			return messageLen;
-		long int leftLen=len-(messageLen-(temp-(char*)message)),getLen=1,all=0;
-		while(len+messageLen>recLen)
-		{
-			recLen*=2;
-			message=enlargeMemory(message,recLen);
-		}
-		unsigned result=messageLen;
-		while(leftLen>5&&getLen>0)
-		{
-			getLen=this->receiveSocket(sockCli,(char*)message+old+all,recLen-old-all);
-			result+=getLen;
-			all+=getLen;
-			leftLen-=getLen;
-		}
-		textLen=result;
-		return result;
+	int httpRecvAll(int clisoc,std::string& buffer,int flag=0){
+#ifndef CPPWEB_OPENSSL
+		return HttpApi::getCompleteHtml(buffer,clisoc,flag);
+#else
+		return HttpApi::getCompleteHtmlSSL(buffer,getSSL(clisoc),flag);
+#endif
 	}
-	void changeSetting(bool debug,bool isLongCon,bool isAuto=true,unsigned maxSendLen=10,unsigned sslWriteTime=5)
+	void changeSetting(bool debug,bool isLongCon,bool isAuto=true,unsigned maxSendLen=10,unsigned sslWriteTime=5,int recvWaitTime=3)
 	{//change setting
 		this->isDebug=debug;
 		this->isLongCon=isLongCon;
 		this->isAutoAnalysis=isAuto;
+		this->defaultWait=recvWaitTime;
 		if(maxSendLen>1)
 			this->maxLen=maxSendLen;
 		if(sslWriteTime!=0)
 			this->writeTime=sslWriteTime;
 	}
-	inline void* recText()
+	inline const void* recText(const DealHttp& http)
 	{//get the recv text;
-		return this->getText;
+		return (void*)http.info.recText;
 	}
-	inline int getRecLen()
+	inline int getRecLen(const DealHttp& http)
 	{//get the recv text len
-		return this->textLen;
+		return http.info.recLen;
 	}
 	inline const char* lastError()
 	{//get the error of server
@@ -4725,18 +4761,13 @@ public:
 	{//active dicconnect socket
 		this->cleanSocket(soc);
 	}
-	inline void selfCreate(int senLen)
-	{//use getSenBuff to create task by self
-		selfCtrl=true;
-		selfLen=senLen;
-	}
-	inline void* getSenBuffer()
+	inline void* getSenBuffer(const DealHttp& http)
 	{//get the sen buffer
-		return senText;
+		return http.info.sendBuffer->buffer;
 	}
-	inline unsigned getMaxSenLen()
+	inline unsigned getMaxSenLen(const DealHttp& http)
 	{//get sen buffer size
-		return this->senLen;
+		return http.info.sendBuffer->getMaxSize();
 	}
 	inline void stopServer()
 	{//stop server run;
@@ -4745,16 +4776,23 @@ public:
 	inline void resetServer()
 	{//delete all the route
 		this->trie.clean();
-		this->now=0;
+		this->arrRoute.clear();
 	}
 	inline RouteFuntion* getNowRoute()
 	{//get the now route;
 		return pnowRoute;
 	}
+	inline RouteFuntion* getNowRoute(const void* message)
+	{//thread model to get now route
+		return (RouteFuntion*)message;
+	}
 	inline void* enlagerSenBuffer()
 	{//Proactively scale up sen buffer
-		this->senText=enlargeMemory(this->senText,this->senLen);
-		return this->senText;
+		auto flag=this->senBuffer.enlargeMemory();
+		if(!flag){
+			return NULL;
+		}
+		return this->senBuffer.buffer;
 	}
 private:
 	void messagePrint()
@@ -4770,6 +4808,9 @@ private:
 			break;
 		case FORK:
 			printf("model:\t\tProcess Pool\n");
+			break;
+		case REACTOR:
+			printf("model:\t\tReactor\n");
 			break;
 		}
 		printf("port:\t\t%u\n",boundPort);
@@ -4796,21 +4837,21 @@ private:
 				break;
 			case STATIC:
 			case STAWILD:
-				if(arrRoute[i].pfunc==loadFile)
+				if(arrRoute[i].pfuncs[0]==loadFile)
 				{
 					if(arrRoute[i].type==STATIC)
 						printf("%s\t\t->\t%s\n",arrRoute[i].route,arrRoute[i].pathExtra);
 					else
 						printf("%s*\t\t->\t%s\n",arrRoute[i].route,arrRoute[i].pathExtra);
 				}
-				else if(arrRoute[i].pfunc==deleteFile)
+				else if(arrRoute[i].pfuncs[0]==deleteFile)
 				{
 					if(arrRoute[i].type==STATIC)
 						printf("%s\t\t->\tdelete\n",arrRoute[i].route);
 					else
 						printf("%s*\t\t->\tdelete\n",arrRoute[i].route);
 				}
-				else if(arrRoute[i].pfunc==rediectGram)
+				else if(arrRoute[i].pfuncs[0]==rediectGram)
 				{
 					if(arrRoute[i].type==STATIC)
 						printf("%s\t\t->\t%s\n",arrRoute[i].route,arrRoute[i].pathExtra);
@@ -4852,7 +4893,7 @@ private:
 		}
 		if(noRouteFunc!=NULL)
 			printf("noroute\t\tfunction set\n");
-		if(middleware!=NULL)
+		if(middlewares.size()!=0)
 			printf("middleware\t\tfuntion set\n");
 		if(logFunc!=NULL)
 			printf("log\t\tfunction set\n");
@@ -4864,43 +4905,50 @@ private:
 			printf("clientout\t\tfunction set\n");
 		printf("\n");
 	}
-	int func(int num)
+	int func(int num,DealHttp& http,const void* getText,Buffer& senText)
 	{
 		AskType type=GET;
 		int len=0,flag=1;
 		char ask[200]={0};
-		if(middleware!=NULL)
-		{
-			middleware(*this,http,num);
-			return 0;
-		}
+		http.info.recText=getText;
+		http.info.nowRoute=NULL;
+		http.info.staticLen=0;
+		http.info.isContinue=false;
+		http.info.sendBuffer=&senText;
 		if(isLongCon==false)
 			http.changeSetting("Close","LCserver/1.1");
-		sscanf((char*)this->getText,"%100s",ask);
+		for(auto& middle:middlewares){
+			middle(*this,http,num);
+			if(!http.info.isContinue){
+				return 0;
+			}
+			http.info.isContinue=false;
+		}
+		sscanf((const char*)getText,"%100s",ask);
 		if(strstr(ask,"GET")!=NULL)
 		{
-			http.getAskRoute(this->getText,"GET",ask,200);
+			http.getAskRoute(getText,"GET",ask,200);
 			if(isDebug)
 				printf("Get url:%s\n",ask);
 			type=GET;
 		}
 		else if(strstr(ask,"POST")!=NULL)
 		{
-			http.getAskRoute(this->getText,"POST",ask,200);
+			http.getAskRoute(getText,"POST",ask,200);
 			if(isDebug)
 				printf("POST url:%s\n",ask);
 			type=POST;
 		}
 		else if(strstr(ask,"PUT")!=NULL)
 		{
-			http.getAskRoute(this->getText,"PUT",ask,200);
+			http.getAskRoute(getText,"PUT",ask,200);
 			if(isDebug)
 				printf("PUT url:%s\n",ask);
 			type=PUT;
 		}
 		else if(strstr(ask,"DELETE")!=NULL)
 		{
-			http.getAskRoute(this->getText,"DELETE",ask,200);
+			http.getAskRoute(getText,"DELETE",ask,200);
 			if(isDebug)
 				printf("DELETE url:%s\n",ask);
 #ifndef _WIN32
@@ -4911,14 +4959,14 @@ private:
 		}
 		else if(strstr(ask,"OPTIONS")!=NULL)
 		{
-			http.getAskRoute(this->getText,"OPTIONS",ask,200);
+			http.getAskRoute(getText,"OPTIONS",ask,200);
 			if(isDebug)
 				printf("OPTIONS url:%s\n",ask);
 			type=OPTIONS;
 		}
 		else if(strstr(ask,"CONNECT")!=NULL)
 		{
-			http.getAskRoute(this->getText,"CONNECT",ask,200);
+			http.getAskRoute(getText,"CONNECT",ask,200);
 			if(isDebug)
 				printf("CONNECT url:%s\n",ask);
 			type=CONNECT;
@@ -4932,7 +4980,8 @@ private:
 				logError(ask,num);
 			type=GET;
 		}
-		void (*pfunc)(HttpServer&,DealHttp&,int)=NULL;
+		int sum=0;
+		void(*pfunc)(HttpServer&,DealHttp&,int)=NULL;
 		RouteFuntion* tempRoute=trie.search(ask,[=](const RouteFuntion* now,bool isLast)->bool{
 					if(now->ask==ALL||now->ask==type)
 					{
@@ -4948,60 +4997,68 @@ private:
 		if(tempRoute!=NULL)
 		{
 			pnowRoute=tempRoute;
-			pfunc=tempRoute->pfunc;
+			http.info.nowRoute=tempRoute;
+			if(tempRoute!=NULL){
+				sum=tempRoute->pfuncs.size();
+				pfunc=tempRoute->pfuncs[0];
+			}
 		}
 		if(pfunc!=NULL||noRouteFunc!=NULL)
 		{
-			if(pfunc!=loadFile&&pfunc!=deleteFile)
+			if(pfunc!=loadFile)
 			{
-				http.gram.body="";
-				http.gram.cookie.clear();
-				http.gram.head.clear();
-				http.gram.fileLen=0;
-				http.gram.statusCode=DealHttp::STATUSOK;
-				http.gram.typeFile=DealHttp::TXT;
-				if(http.req.isFull)
-					http.req.clear();
-				if(pfunc!=NULL)
-					pfunc(*this,http,num);
+				http.gram.clear();
+				http.req.clear();
+				http.clean();
+				http.req.analysisRequest(http.info.recText,true);
+				if(pfunc!=NULL){
+					for(auto& now:tempRoute->pfuncs){
+						now(*this,http,num);
+						if(!http.info.isContinue){
+							break;
+						}else{
+							http.info.isContinue=false;
+						}
+					}
+				}
 				else
 					noRouteFunc(*this,http,num);
-				if(selfCtrl)
-				{
-					selfCtrl=false;
-					len=selfLen;
-					selfLen=0;
-				}
+				if(http.info.staticLen>0)
+					len=http.info.staticLen;
+				else if(http.info.staticLen<0)
+					return 0;
 				else
 				{
 					if(http.gram.fileLen==0)
 						http.gram.fileLen=http.gram.body.size();
-					len=http.createDatagram(http.gram,this->senText,this->senLen);
+					len=http.createDatagram(http.gram,senText.buffer,senText.getMaxSize());
 					while(len==-1)
 					{
-						this->senText=enlargeMemory(this->senText,this->senLen);
-						len=http.createDatagram(http.gram,this->senText,this->senLen);
+						auto flag=senText.enlargeMemory();
+						if(!flag)
+							http.gram.noFound();
+						len=http.createDatagram(http.gram,senText.buffer,senText.getMaxSize());
 					}
 				}
 			}
 			else
 			{
-				pfunc(*this,http,senLen);
-				len=staticLen(-1);
+				pfunc(*this,http,senText.getMaxSize());
+				len=http.info.staticLen;
 			}
 		}
 		else if(isAutoAnalysis)
 		{
 			if(isDebug)
-				printf("http:%s\n",http.analysisHttpAsk(this->getText));
-			if(http.analysisHttpAsk(this->getText)!=NULL)
+				printf("http:%s\n",http.analysisHttpAsk(getText));
+			if(http.analysisHttpAsk(getText)!=NULL)
 			{
-				strcpy(ask,http.analysisHttpAsk(this->getText));
+				strcpy(ask,http.analysisHttpAsk(getText));
 				do{
-					flag=http.autoAnalysisGet((char*)this->getText,(char*)this->senText,senLen,defaultFile,&len);
-					if(flag==2&&this->senLen<maxLen*1024*1024)
-						this->enlagerSenBuffer();
-				}while(flag==2&&this->senLen<maxLen*1024*1024);
+					flag=http.autoAnalysisGet((char*)getText,senText.buffer,senText.getMaxSize(),defaultFile,&len);
+					if(flag==2&&senText.getMaxSize()<maxLen*1024*1024)
+						senText.enlargeMemory();
+				}while(flag==2&&senText.getMaxSize()<maxLen*1024*1024);
 			}
 			if(flag==1)
 			{
@@ -5014,14 +5071,14 @@ private:
 			{
 				if(logError!=NULL)
 					logError("memory wrong",0);
-				http.createSendMsg(DealHttp::NOFOUND,(char*)this->senText,senLen,NULL,&len);
+				http.createSendMsg(DealHttp::NOFOUND,senText.buffer,senText.getMaxSize(),NULL,&len);
 			}
 		}
 		else
-			http.createSendMsg(DealHttp::NOFOUND,(char*)this->senText,senLen,NULL,&len);
+			http.createSendMsg(DealHttp::NOFOUND,senText.buffer,senText.getMaxSize(),NULL,&len);
 		if(len==0)
-			http.createSendMsg(DealHttp::NOFOUND,(char*)this->senText,senLen,NULL,&len);
-		if(len>=0&&0>=this->sendSocket(num,this->senText,len))
+			http.createSendMsg(DealHttp::NOFOUND,senText.buffer,senText.getMaxSize(),NULL,&len);
+		if(len>=0&&0>=this->sendSocket(num,senText.buffer,len))
 		{
 			if(isDebug)
 				perror("send wrong");
@@ -5042,42 +5099,44 @@ private:
 		int port=0;
 		if(thing==CPPIN)
 		{
+			if(server.defaultWait>0)
+				SocketApi::setSocReadWait(soc,server.defaultWait);
 			if(server.clientIn!=NULL)
 			{
-				strcpy((char*)server.getText,ServerTcpIp::getPeerIp(soc,&port));
-				server.clientIn(server,soc,server.getText,port);
+				server.rec=ServerTcpIp::getPeerIp(soc,&port);
+				server.clientIn(server,soc,server.rec.c_str(),port);
 			}
 			return 0;
 		}
 		else
 		{
-			memset(server.getText,0,sizeof(char)*server.recLen);
-			int getNum=server.receiveSocket(soc,(char*)server.getText,server.recLen,MSG_DONTWAIT);
-			int all=getNum;
-			while((int)server.recLen==all)
-			{
-				server.getText=server.enlargeMemory(server.getText,server.recLen);
-				getNum=server.receiveSocket(soc,(char*)server.getText+all,server.recLen-all,MSG_DONTWAIT);
-				if(getNum<=0)
-					break;
-				else
-					all+=getNum;
+			server.rec.clear();
+			if(server.model==REACTOR){
+				auto now=server.parg->getData();
+				while(now==NULL){
+					now=server.parg->getData();
+				}
+				now->pserver=&server;
+				now->soc=soc;
+				now->pool=server.parg;
+				server.pool->addTask({server.epollWorker,now});
+				return 0;
 			}
-			if(all>0)
+			int getNum=server.httpRecvAll(soc,server.rec);
+			if(getNum>0)
 			{
-				server.textLen=all;
+				server.http.info.recLen=getNum;
+				server.http.info.recText=server.rec.c_str();
 				if(server.model==MULTIPLEXING)
-					server.func(soc);
+					server.func(soc,server.http,server.rec.c_str(),server.senBuffer);
 				else
 				{
 #ifndef _WIN32
 					if(fork()==0)
 					{
 						server.closeSocket(server.sock);
-						server.func(soc);
+						server.func(soc,server.http,server.rec.c_str(),server.senBuffer);
 						server.closeSocket(soc);
-						free(server.getText);
-						free(server.senText);
 						exit(0);
 					}
 #else
@@ -5085,7 +5144,7 @@ private:
 #endif
 				}
 				if(server.logFunc!=NULL)
-					server.logFunc(server.recText(),soc);
+					server.logFunc(server.rec.c_str(),soc);
 				if(server.isLongCon==false)
 					return soc;
 			}
@@ -5094,8 +5153,8 @@ private:
 				if(server.clientOut!=NULL)
 				{
 					int port=0;
-					strcpy((char*)server.getText,server.getPeerIp(soc,&port));
-					server.clientOut(server,soc,server.getText,port);
+					server.rec=ServerTcpIp::getPeerIp(soc,&port);
+					server.clientOut(server,soc,server.rec.c_str(),port);
 				}
 				return soc;
 			}
@@ -5105,23 +5164,10 @@ private:
 	}
 	RouteFuntion* addRoute()
 	{
-		RouteFuntion* temp=NULL; 
-		if(maxNum-now<=2)
-		{
-			temp=(RouteFuntion*)realloc(arrRoute,sizeof(RouteFuntion)*(maxNum+10));
-			if(temp==NULL)
-				return NULL;
-			arrRoute=temp;
-			maxNum+=10;
-		}
-		temp=arrRoute+now;
+		arrRoute.push_back({});
 		now++;
-		return temp;
+		return &arrRoute[now-1];
 	}
-	struct ThreadArg{
-		HttpServer* pserver;
-		int soc;
-	};
 	void threadHttp()
 	{
 		while(this->isContinue)
@@ -5130,81 +5176,96 @@ private:
 			int newClient=acceptSocket(newaddr);
 			if(newClient==-1)
 				continue;
-			ThreadArg* temp=(ThreadArg*)malloc(sizeof(ThreadArg));
+			if(defaultWait>0)
+				SocketApi::setSocReadWait(newClient,defaultWait);
+			ThreadArg* temp=NULL;
+			do{
+				temp=this->parg->getData();
+			}while(temp==NULL);
 			temp->pserver=this;
+			temp->pool=parg;
 			temp->soc=newClient;
 			ThreadPool::Task task={threadWorker,temp};
 			pool->addTask(task);
 		}
 	}
+	static void* epollWorker(void* self){
+		ThreadArg& argv=*(ThreadArg*)self;
+		HttpServer& server=*argv.pserver;
+		int cli=argv.soc;
+		argv.sen.resize(server.senBuffer.getMaxSize()/2);
+		std::string rec;
+		int flag=server.httpRecvAll(cli,rec);
+		if(flag<0){
+			if(server.clientOut!=NULL){
+				int port=0;
+				strcpy((char*)server.senBuffer.buffer,server.getPeerIp(cli,&port));
+				server.clientOut(server,cli,server.senBuffer.buffer,port);
+			}
+			server.cleanSocket(argv.soc);
+		}else{
+			argv.http.info.recLen=rec.size();
+			argv.http.info.recText=rec.c_str();
+			server.func(cli,argv.http,rec.c_str(),argv.sen);
+			if(server.logFunc!=NULL)
+				server.logFunc(rec.c_str(),cli);
+			rec.clear();
+			if(server.isLongCon==false){
+				server.cleanSocket(argv.soc);
+			}
+		}
+		argv.pool->retData(&argv);
+		return NULL;
+	}
 	static void* threadWorker(void* self)
 	{
-		ThreadArg* argv=(ThreadArg*)self;
-		HttpServer& server=*argv->pserver;
-		int cli=argv->soc;
-		char* rec=(char*)malloc(sizeof(char)*server.recLen);
-		unsigned int size=sizeof(char)*server.recLen;
-		if(rec==NULL)
-		{
-			server.closeSocket(cli);
-			free(self);
-			return NULL;
-		}
-		memset(rec,0,sizeof(char)*server.recLen);
+		ThreadArg& argv=*(ThreadArg*)self;
+		HttpServer& server=*argv.pserver;
+		int cli=argv.soc;
+		argv.sen.resize(server.senBuffer.getMaxSize()/2);
 		if(server.clientIn!=NULL)
 		{
 			int port=0;
-			server.getPeerIp(cli,&port);
-			server.clientIn(server,cli,server.senText,port);
+			std::string ip=server.getPeerIp(cli,&port);
+			strncpy(argv.sen.buffer,ip.c_str(),std::min((unsigned)ip.size(),argv.sen.getMaxSize()));
+			server.clientIn(server,cli,server.senBuffer.buffer,port);
 		}
-		int recLen=server.receiveSocket(cli,rec,size);
-		int all=recLen;
-		while((int)size==all)
+		std::string rec;
+		int flag=server.httpRecvAll(cli,rec);
+		while(flag>=0&&rec.size()>0)
 		{
-			rec=(char*)server.enlargeMemory(rec,size);
-			recLen=server.receiveSocket(cli,rec,size);
-			if(recLen<=0)
-				break;
-			all+=recLen;
-		}
-		while(all>=10)
-		{
-			server.pool->mutexLock();
-			server.textLen=all;
-			server.getText=rec;
-			server.func(cli);
+			argv.http.info.recLen=rec.size();
+			argv.http.info.recText=rec.c_str();
+			server.func(cli,argv.http,rec.c_str(),argv.sen);
 			if(server.logFunc!=NULL)
-				server.logFunc(rec,cli);
-			server.getText=NULL;
-			server.pool->mutexUnlock();
+				server.logFunc(rec.c_str(),cli);
 			if(server.isLongCon==false)
 				break;
-			memset(rec,0,sizeof(char)*server.recLen);
-			all=server.receiveSocket(cli,rec,size);
+			rec.clear();
+			flag=server.httpRecvAll(cli,rec);
 		}
 		if(server.clientOut!=NULL)
 		{
 			int port=0;
-			strcpy((char*)server.senText,server.getPeerIp(cli,&port));
-			server.clientOut(server,cli,server.senText,port);
+			strcpy((char*)server.senBuffer.buffer,server.getPeerIp(cli,&port));
+			server.clientOut(server,cli,server.senBuffer.buffer,port);
 		}
-		free(rec);
-		free(self);
 		server.closeSocket(cli);
+		argv.pool->retData(&argv);
 		return NULL;
 	}
 	static void loadFile(HttpServer& server,DealHttp& http,int)
 	{
 		int len=0,flag=0;
 		char ask[200]={0},buf[500]={0},temp[200]={0};
-		http.getAskRoute(server.recText(),"GET",ask,200);
-		HttpServer::RouteFuntion& route=*server.getNowRoute();
+		http.getAskRoute(server.recText(http),"GET",ask,200);
+		HttpServer::RouteFuntion& route=*server.getNowRoute(http.info.nowRoute);
 		http.getWildUrl(ask,route.route,temp,200);
 		sprintf(buf,"GET %s%s HTTP/1.1",route.pathExtra,temp);
 		do
 		{
-			flag=http.autoAnalysisGet(buf,(char*)server.getSenBuffer(),server.senLen,NULL,&len);
-			if(flag==2&&server.senLen<server.maxLen*1024*1024)
+			flag=http.autoAnalysisGet(buf,(char*)server.getSenBuffer(http),server.senBuffer.getMaxSize(),NULL,&len);
+			if(flag==2&&server.senBuffer.getMaxSize()<server.maxLen*1024*1024)
 				server.enlagerSenBuffer();
 			else if(flag==1)
 			{
@@ -5216,30 +5277,17 @@ private:
 			else
 				break;
 		}while(flag==2);
-		staticLen(len);
+		http.info.staticLen=len;
 	}
-	static void deleteFile(HttpServer& server,DealHttp& http,int senLen)
+	static inline void deleteFile(HttpServer&,DealHttp& http,int)
 	{
-		int len=0;
-		http.customizeAddTop(server.getSenBuffer(),senLen,DealHttp::STATUSFORBIDDEN,strlen("403 forbidden"),"text/plain");
-		http.customizeAddBody(server.getSenBuffer(),senLen,"403 forbidden",strlen("403 forbidden"));
-		len=strlen((char*)server.getSenBuffer());
-		staticLen(len);
+		http.gram.forbidden();
 	}
 	static void rediectGram(HttpServer& server,DealHttp& http,int)
 	{
-		auto now=server.getNowRoute();
+		auto now=server.getNowRoute(http.info.nowRoute);
 		http.gram.statusCode=DealHttp::STATUSMOVTEMP;
 		http.gram.head.insert(std::pair<std::string,std::string>{"Location",now->pathExtra});
-	}
-	static unsigned staticLen(int senLen)
-	{
-		static unsigned len=0;
-		if(senLen<0)
-			return len;
-		else
-			len=senLen;
-		return 0;
 	}
 	void* enlargeMemory(void* old,unsigned& oldSize)
 	{
@@ -5262,229 +5310,6 @@ private:
 		while(waitpid(-1, NULL, WNOHANG)>0);
 	}
 #endif
-};
-/*******************************
- * author:chenxuan
- * class:the same as servertcpip but it use threadpool
- * example:see ServerTcpIp
-******************************/
-class ServerPool:public ServerTcpIp{
-private:
-	struct Argv{
-		ServerPool* pserver;
-		void (*func)(ServerPool&,int);
-		int soc;
-		Argv()
-		{
-			pserver=NULL;
-			soc=-1;
-			func=NULL;
-		}
-	};
-private:
-	ThreadPool* pool;
-	pthread_mutex_t mutex;
-	unsigned int threadNum;
-	bool isEpoll;
-private:
-#ifndef _WIN32
-	static void sigCliDeal(int )
-	{
-		while(waitpid(-1, NULL, WNOHANG)>0);
-	}
-#endif
-	static void* worker(void* argc)
-	{
-		Argv argv=*(Argv*)argc;
-		delete (Argv*)argc;
-		if(argv.func!=NULL)
-			argv.func(*argv.pserver,argv.soc);
-		return NULL;
-	}
-public:
-	ServerPool(unsigned short port,unsigned int threadNum=0):ServerTcpIp(port)
-	{
-		this->threadNum=threadNum;
-		if(threadNum>0)
-		{	
-			pool=new ThreadPool(threadNum);
-			if(pool==NULL)
-			{
-				this->error="malloc wrong";
-				return;
-			}
-		}
-		pthread_mutex_init(&mutex,NULL);
-		isEpoll=false;
-	}
-	~ServerPool()
-	{
-		delete pool;
-	   	pthread_mutex_destroy(&mutex);
-	}
-	inline void mutexLock()
-	{
-		pthread_mutex_lock(&mutex);
-	}
-	inline void mutexUnlock()
-	{
-		pthread_mutex_unlock(&mutex);
-	}
-	bool mutexTryLock()
-	{
-		if(0==pthread_mutex_trylock(&mutex))
-			return true;
-		else
-			return false;
-	}
-	void threadModel(void (*pfunc)(ServerPool&,int))
-	{
-		if(this->threadNum==0)
-		{
-			this->error="thread wrong init";
-			return;
-		}
-		while(1)
-		{
-			sockaddr_in newaddr={0,0,{0},{0}};
-			int newClient=acceptSocket(newaddr);
-			if(newClient==-1)
-				continue;
-			Argv* temp=new Argv;
-			if(temp==NULL)
-			{
-				error="malloc wrong";
-				return;
-			}
-			temp->pserver=this;
-			temp->func=pfunc;
-			temp->soc=newClient;
-			ThreadPool::Task task={worker,temp};
-			pool->addTask(task);
-		}
-	}
-#ifndef _WIN32
-	void forkModel(void* pneed,void (*pfunc)(ServerPool&,int,void*))
-	{
-		signal(SIGCHLD,sigCliDeal);
-		while(1)
-		{
-			sockaddr_in newaddr={0,0,{0},{0}};
-			int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
-			if(newClient==-1)
-				continue;
-			if(fork()==0)
-			{
-				close(sock);
-				pfunc(*this,newClient,pneed);
-			}
-			close(newClient);
-		}
-	}
-	void forkEpoll(unsigned int senBufChar,unsigned int recBufChar,void (*pfunc)(ServerPool::Thing,int,int,void*,void*,ServerPool&))
-	{
-		signal(SIGCHLD,sigCliDeal);
-		char* pneed=(char*)malloc(sizeof(char)*senBufChar),*pget=(char*)malloc(sizeof(char)*recBufChar);
-		if(pneed==NULL||pget==NULL)
-		{
-			this->error="malloc worng";
-			return;
-		}
-		memset(pneed,0,sizeof(char)*senBufChar);
-		memset(pget,0,sizeof(char)*recBufChar);
-		while(1)
-		{
-			int eventNum=epoll_wait(epfd,pevent,512,-1),thing=0;
-			for(int i=0;i<eventNum;i++)
-			{
-				epoll_event temp=pevent[i];
-				if(temp.data.fd==sock)
-				{
-					sockaddr_in newaddr={0,0,{0},{0}};
-					int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
-					nowEvent.data.fd=newClient;
-					nowEvent.events=EPOLLIN;
-					epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
-					strcpy((char*)pget,inet_ntoa(newaddr.sin_addr));
-				}
-				else
-				{
-					memset(pget,0,sizeof(char)*recBufChar);
-					int getNum=recv(temp.data.fd,(char*)pget,recBufChar,0);
-					if(getNum>0)
-						thing=2;
-					else
-					{
-						*(char*)pget=0;
-						thing=0;
-						epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
-						close(temp.data.fd);
-					}
-					if(pfunc!=NULL&&thing==2)
-					{
-						if(fork()==0)
-						{
-							close(sock);
-							pfunc(CPPSAY,temp.data.fd,getNum,pget,pneed,*this);
-							close(temp.data.fd);
-							free(pneed);
-							free(pget);
-							exit(0);
-						}
-						else
-						{
-							epoll_ctl(epfd,temp.data.fd,EPOLL_CTL_DEL,NULL);
-							close(temp.data.fd);
-						}
-					}
-				}
-			}
-		}
-	}
-	void epollThread(void (*pfunc)(ServerPool&,int))
-	{
-		if(this->threadNum==0)
-		{
-			this->error="thread wrong init";
-			return;
-		}
-		isEpoll=true;
-		int eventNum=epoll_wait(epfd,pevent,512,-1);
-		for(int i=0;i<eventNum;i++)
-		{
-			epoll_event temp=pevent[i];
-			if(temp.data.fd==sock)
-			{
-				sockaddr_in newaddr={0,0,{0},{0}};
-				int newClient=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
-				nowEvent.data.fd=newClient;
-				nowEvent.events=EPOLLIN|EPOLLET;
-				epoll_ctl(epfd,EPOLL_CTL_ADD,newClient,&nowEvent);
-			}
-			else
-			{
-				if(pfunc!=NULL)
-				{
-					Argv* argv=new Argv;
-					argv->func=pfunc;
-					argv->soc=temp.data.fd;
-					argv->pserver=this;
-					ThreadPool::Task task={worker,argv};
-					pool->addTask(task);
-				}
-			}
-		}
-		return;
-	}
-#endif
-	inline void threadDeleteSoc(int clisoc)
-	{
-		closeSocket(clisoc);
-#ifndef _WIN32
-		if(isEpoll)
-			epoll_ctl(epfd,clisoc,EPOLL_CTL_DEL,NULL);
-#endif
-	}
 };
 /*******************************
  * author:chenxuan
@@ -5588,75 +5413,6 @@ public:
 		}
 		return result;
 	}
-};
-/***********************************************
-* Author: chenxuan-1607772321@qq.com
-* change time:2022-04-16 23:35:16
-* description:http api
-***********************************************/
-class HttpApi{
-private:
-	HttpApi()=delete;
-	HttpApi(const HttpApi&)=delete;
-public:
-	//get complete datagram,result store in buffer,return recv size
-	static int getCompleteHtml(std::string& buffer,int sock,int flag=0)
-	{
-		int len=0;
-		if(buffer.size()==0||buffer.find("\r\n\r\n")==buffer.npos)
-		{
-			SocketApi::recvSockBorder(sock,buffer,"\r\n\r\n",flag);
-			auto temp=DealHttp::findKeyValue("Content-Length",buffer.c_str());
-			if(temp.size()==0)
-				return 0;
-			else
-				sscanf(temp.c_str(),"%d",&len);
-			if(len==0)
-				return buffer.size();
-			SocketApi::recvSockSize(sock,buffer,len);
-		}
-		else
-		{
-			auto pos=buffer.find("\r\n\r\n");
-			pos+=4;
-			auto temp=DealHttp::findKeyValue("Content-Length",buffer.c_str());
-			if(temp.size()==0)
-				return 0;
-			else
-				sscanf(temp.c_str(),"%d",&len);
-			if(len==0)
-				return buffer.size();
-			if(len-((int)buffer.size()-pos)>0)
-				SocketApi::recvSockSize(sock,buffer,len-(buffer.size()-pos));
-		}
-		return buffer.size();
-	}
-#ifdef CPPWEB_OPENSSL
-	static int getCompleteHtmlSSL(std::string& buffer,SSL* ssl,int=0)
-	{
-		int len=0;
-		if(buffer.size()==0||buffer.find("\r\n\r\n")==buffer.npos)
-		{
-			do{
-				int len=SocketApi::receiveSocket(ssl,buffer);
-				if(len==-1)
-					return buffer.size();
-			}while(buffer.find("\r\n\r\n")==buffer.npos);
-		}
-		auto pos=buffer.find("\r\n\r\n");
-		pos+=4;
-		auto temp=DealHttp::findKeyValue("Content-Length",buffer.c_str());
-		if(temp.size()==0)
-			return 0;
-		else
-			sscanf(temp.c_str(),"%d",&len);
-		if(len==0)
-			return buffer.size();
-		if(len-((int)buffer.size()-pos)>0)
-			SocketApi::recvSockSize(ssl,buffer,len-(buffer.size()-pos));
-		return buffer.size();
-	}
-#endif
 };
 }
 #endif

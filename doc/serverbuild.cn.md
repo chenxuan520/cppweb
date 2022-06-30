@@ -34,7 +34,7 @@
    
    > 如果有https证书也可以make ssl
 
-3. 修改config.json,[介绍](./配置文件说明.md)
+3. 修改config.json,[介绍](./configjson.cn.md)
 
 4. ./main
 
@@ -69,7 +69,7 @@
 1. 用于修改配置法,脚本法无效
 
 2. 需要提前安装openssl
-   
+
 ```shell
     sudo apt install openssl libssl-dev
 ```
