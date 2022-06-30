@@ -257,8 +257,10 @@ public:
 			len=SSL_read(ssl,temp,1024);
 			if(len>0)
 				buffer+=std::string(temp,len);
-			else
+			else if(len==0)
 				break;
+			else
+				return len;
 		}while(len==1024);
 		return buffer.size()>0?buffer.size():len;
 	}
@@ -1662,7 +1664,7 @@ public:
 		}
 		return NULL;
 	}
-	bool check(const char* word)
+	bool check(const char* word,T* data=NULL)
 	{
 		Node* temp=root;
 		for(unsigned i=0;word[i]!=0;i++)
@@ -1674,8 +1676,10 @@ public:
 			else
 				temp=temp->next[word[i]-46];
 		}
-		if(temp->stop==true)
+		if(temp->stop==false)
 			return false;
+		if(data!=NULL)
+			temp->data=data;
 		return true;
 	}
 	void clean()
@@ -3899,7 +3903,7 @@ public:
 		{
 			do{
 				int len=SocketApi::receiveSocket(ssl,buffer);
-				if(len==-1)
+				if(len<=0)
 					return len;
 			}while(buffer.find("\r\n\r\n")==buffer.npos);
 		}
@@ -3907,7 +3911,7 @@ public:
 		pos+=4;
 		auto temp=DealHttp::findKeyValue("Content-Length",buffer.c_str());
 		if(temp.size()==0)
-			return 0;
+			return buffer.size();
 		else
 			sscanf(temp.c_str(),"%d",&len);
 		if(len==0)
@@ -4368,6 +4372,7 @@ private:
 	bool isContinue;
 	bool isAutoAnalysis;
 	std::vector<void(*)(HttpServer&,DealHttp&,int)> middlewares;
+	std::unordered_map<std::string,int> location;
 	void (*noRouteFunc)(HttpServer&,DealHttp&,int);
 	void (*clientIn)(HttpServer&,int num,const void* ip,int port);
 	void (*clientOut)(HttpServer&,int num,const void* ip,int port);
@@ -4395,7 +4400,7 @@ public:
 		pnowRoute=NULL;
 		logError=NULL;
 		this->threadNum=0;
-		defaultWait=3;
+		defaultWait=1;
 		maxLen=10;
 		now=0;
 		selfLen=0;
@@ -4480,6 +4485,10 @@ public:
 			signal(SIGCHLD,sigCliDeal);
 #endif
 	}
+	inline bool routeHandle(AskType ask,const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
+	{//add route handle in all ask type
+		return routeHandle(ask,route,{pfunc});
+	}
 	bool routeHandle(AskType ask,const char* route,const std::initializer_list<void(*)(HttpServer&,DealHttp&,int)>& pfuncs){
 		if(strlen(route)>100)
 			return false;
@@ -4498,41 +4507,7 @@ public:
 		}
 		else
 			nowRoute->type=ONEWAY;
-		if(false==trie.insert(nowRoute->route,nowRoute))
-		{
-			error="server:route wrong char";
-			if(logError!=NULL)
-				logError(this->error,0);
-			return false;
-		}
-		return true;
-
-	}
-	bool routeHandle(AskType ask,const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
-	{//add route handle in all ask type 
-		if(strlen(route)>100)
-			return false;
-		RouteFuntion* nowRoute=addRoute();
-		if(nowRoute==NULL)
-			return false;
-		nowRoute->ask=ask;
-		strcpy(nowRoute->route,route);
-		nowRoute->pfuncs.push_back(pfunc);
-		if(route[strlen(route)-1]=='*')
-		{
-			nowRoute->route[strlen(route)-1]=0;
-			nowRoute->type=WILD;
-		}
-		else
-			nowRoute->type=ONEWAY;
-		if(false==trie.insert(nowRoute->route,nowRoute))
-		{
-			error="server:route wrong char";
-			if(logError!=NULL)
-				logError(this->error,0);
-			return false;
-		}
-		return true;
+		return insertTrie(nowRoute);
 	}
 	bool redirect(const char* route,const char* location)
 	{//301 redirect
@@ -4551,15 +4526,7 @@ public:
 			nowRoute->type=STAWILD;
 		}
 		nowRoute->pfuncs.push_back(rediectGram);
-		if(false==trie.insert(nowRoute->route,nowRoute))
-		{
-			error="server:route wrong char";
-			if(logError!=NULL)
-				logError(this->error,0);
-			return false;
-		}
-		return true;
-
+		return insertTrie(nowRoute);
 	}
 	bool loadStatic(const char* route,const char* staticFile)
 	{//load file such as / -> index.html
@@ -4578,14 +4545,7 @@ public:
 			nowRoute->type=STAWILD;
 		}
 		nowRoute->pfuncs.push_back(loadFile);
-		if(false==trie.insert(nowRoute->route,nowRoute))
-		{
-			error="server:route wrong char";
-			if(logError!=NULL)
-				logError(this->error,0);
-			return false;
-		}
-		return true;
+		return insertTrie(nowRoute);
 	}
 	bool deletePath(const char* route)
 	{// forbidden the file path
@@ -4606,14 +4566,7 @@ public:
 		else
 			strcpy(nowRoute->route,route);
 		nowRoute->pfuncs.push_back(deleteFile);
-		if(false==trie.insert(nowRoute->route,nowRoute))
-		{
-			error="server:route wrong char";
-			if(logError!=NULL)
-				logError(this->error,0);
-			return false;
-		}
-		return true;
+		return insertTrie(nowRoute);
 	}
 	inline Group createGroup(const char* route)
 	{//create route group
@@ -5164,9 +5117,29 @@ private:
 	}
 	RouteFuntion* addRoute()
 	{
-		arrRoute.push_back({});
 		now++;
+		if(now>=arrRoute.size()){
+			arrRoute.resize(now*2);
+			for(auto& iter:location){
+				trie.check(iter.first.c_str(),&arrRoute[iter.second]);
+			}
+		}
 		return &arrRoute[now-1];
+	}
+	bool insertTrie(RouteFuntion* nowRoute){
+		if(nowRoute==NULL){
+			return false;
+		}
+		if(false==trie.insert(nowRoute->route,nowRoute))
+		{
+			error="server:route wrong char";
+			if(logError!=NULL)
+				logError(this->error,0);
+			return false;
+		}
+		else
+			location.insert({nowRoute->route,now-1});
+		return true;
 	}
 	void threadHttp()
 	{
