@@ -1,18 +1,18 @@
 #include <iostream>  
 #include "../../hpp/cppweb.h"
 using namespace cppweb;
-void func(HttpServer& server,DealHttp& http,int)
+void func(HttpServer&,DealHttp& http,int)
 {
-	http.req.analysisRequest(server.recText());
+	http.req.analysisRequest(http.info.recText);
 	Json json={
 		{"ads",http.req.formValue("ads")},
 		{"fgf",http.req.formValue("fgf")}
 	};
 	http.gram.json(DealHttp::STATUSOK,json());
 }
-void getValue(HttpServer& server,DealHttp& http,int)
+void getValue(HttpServer&,DealHttp& http,int)
 {
-	http.req.analysisRequest(server.recText());
+	http.req.analysisRequest(http.info.recText);
 	auto value=http.req.routeValue("key");
 	std::cout<<"get:"<<http.req.getWildUrl("/get")<<std::endl;
 	http.req.urlDecode(value);

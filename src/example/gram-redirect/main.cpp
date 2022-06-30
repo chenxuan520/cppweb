@@ -13,7 +13,7 @@ int main()
 	}
 	server.get("/*",[](HttpServer& ser,DealHttp& http,int){
 			   unordered_map<string,string> route;
-			   http.req.routePairing("/:route",route,(char*)ser.recText());
+			   http.req.routePairing("/:route",route,(char*)ser.recText(http));
 			   auto result="https://chenxuanweb.top/"+route["route"];
 			   http.gram.redirect(result);
 			   });

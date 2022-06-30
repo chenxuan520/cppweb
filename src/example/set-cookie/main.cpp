@@ -3,15 +3,15 @@
 using namespace cppweb;
 void cookie(HttpServer& server,DealHttp& http,int)
 {
-	http.req.analysisRequest(server.recText());
+	http.req.analysisRequest(http.info.recText);
 	auto buf=http.req.getCookie("key");
-	printf("%s\n",(const char*)server.recText());
+	printf("%s\n",(const char*)server.recText(http));
 	if(http.req.head.find("Cookie")==http.req.head.end())
 		printf("fing wrong\n");
 	else
 		printf("cookie:%s\n\n",http.req.head["Cookie"].c_str());
 	std::unordered_map<std::string,std::string> temp;
-	http.req.routePairing("/cookie/:cookie/:time",temp,(char*)server.recText());
+	http.req.routePairing("/cookie/:cookie/:time",temp,(char*)http.info.recText);
 	if(buf.size()==0)
 	{
 		int live=5;

@@ -21,14 +21,16 @@ using namespace std;
 	date:2021.7.17
 	funtion:this is a class for thread pool
 *********************************/
+template<class T=void*>
 class ThreadPool{
 public://a struct for you to add task
 	struct Task{
-		void* (*ptask)(void*);
-		void* arg;
+		void* (*ptask)(T);
+		T arg;
 	};
 private:
 	mutex queLock;
+	mutex userLock;
 	condition_variable condition;
 	queue<Task> que;
 	unsigned threadNum;
@@ -54,6 +56,14 @@ public:
 			arr[i]->join();
 			delete arr[i];
 		}
+	}
+	inline void mutexLock()
+	{
+		userLock.lock();
+	}
+	inline void mutexUnlock()
+	{
+		userLock.unlock();
 	}
 	void addTask(Task task)
 	{
@@ -265,27 +275,27 @@ private:
 	}
 };
 int temp=0;
-void* print(void* pha)
+void* print(int arg)
 {
 	/* unsigned int pid=(unsigned)this_thread::get_id(); */
 	temp++;
-	*(int*)pha+=1;
 //	cout<<pid<<":"<<temp<<endl;
 	/* cout<<temp<<" "<<this_thread::get_id()<<" ing"<<endl; */
 	/* printf("%u:%d ing\n",pid,temp); */
-	printf("%d %d\n",(int)temp,*(int*)pha);
+	printf("arg %d temp %d\n",arg,temp);
 	usleep(3);
 	return NULL;
 }
 int main()
 {
-	ThreadPool pool(10);
+	ThreadPool<int> pool(10);
 	int ha=0;
-	ThreadPool::Task task{print,&ha};
+	ThreadPool<int>::Task task{print,ha};
 	unsigned int thread=1;
 	unsigned int busy=0;
 	for(unsigned int i=0;i<1000;i++)
 	{
+		task.arg++;
 		pool.addTask(task);
 	}
 	while(thread>0)

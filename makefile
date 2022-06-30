@@ -8,7 +8,7 @@ all:main
 cc=g++
 obj=main
 obj_source=./src/cpp/main.cpp
-pro_source=./src/hpp/cppweb.h
+pro_source=./src/hpp/cppweb.h ./src/hpp/argc.h ./src/hpp/email.h 
 source=./src/cpp/main.cpp ./src/hpp/cppweb.h ./src/hpp/proxy.h ./src/hpp/config.h ./src/hpp/route.h ./src/hpp/argc.h
 link=-lpthread
 link_ssl=-lpthread -lssl -lcrypto

@@ -1,6 +1,6 @@
 # cppweb framework introduction
 
-#### 中文 [介绍](./README.md)
+#### Introduction in [English](./README.en.md)
 
 ## author
 
@@ -10,7 +10,7 @@
 
 ## Original intention
 
-When I was building a C++ server, I found that the boost library was too large and not friendly to novices, and that libevent applied to specialization was unfriendly to newcomers. Using C++ to develop the http backend is very cumbersome and the code reuse rate is low. When using the gin framework of go At that time, I came up with the idea of ​​writing a similar back-end lightweight library and simple server.
+When I was building a C++ server, I found that the boost library is too large and not friendly to novices, and libevent is not friendly to newcomers when it is applied to specialization. It is very cumbersome to develop the http backend with C++ and the code reuse rate is low. When using the gin framework of go At that time, I came up with the idea of ​​writing a similar back-end lightweight library and simple server.
 
 ## Official website
 
@@ -42,7 +42,7 @@ When I was building a C++ server, I found that the boost library was too large a
 
 - cppweb.h in hpp is all code, including this header file can be used
 
-- Hpp cpp is the project source file directory
+- hpp cpp is the project source file directory
 
 - example is an example of use, it is recommended to read first
 
@@ -74,7 +74,7 @@ When I was building a C++ server, I found that the boost library was too large a
 
 8. Support log generation and implementation, the log system is about 300,000 per second
 
-9. With io multiplexing, multi-process, thread pool three modes
+9. With io multiplexing, multi-process, thread pool, reactor four modes
    
    > io multiplexing supports epoll (epoll only supports linux) and select models
 
@@ -89,8 +89,8 @@ When I was building a C++ server, I found that the boost library was too large a
     1. Support route 301 forwarding
     
     2. Support reverse proxy, load balancing
-       
-       > Load balancing supports four methods: round robin, random, hash, etc.
+    
+    > Load balancing supports four methods: round robin, random, hash, etc.
     
     3. Support path replacement
     
@@ -140,7 +140,7 @@ int main()
 ```cpp
 #define CPPWEB_OPENSSL
 #include "../../hpp/cppweb.h"
-using namespace std;
+using namespace cppweb;
 int main()
 {
     HttpServer server(5201);
@@ -158,14 +158,47 @@ int main()
 #### Routing settings
 
 ```cpp
-    server.get("/lam*",[](HttpServer&,DealHttp& http,int)->void{
+    server.get("/lam*",[](HttpServer&,DealHttp& http,int){
         http.gram.body="text";//Set the message content
     });
+    server.get("/",{login,message});//Multiple processing functions
 ```
 
 - Supports lam expressions and normal functions
 
 - *Extensions* to support routing
+
+- Supports sequential processing of multiple functions like gin, enclosed in parentheses
+
+#### Variable settings
+
+```cpp
+structTemp{
+    int soc;
+    char cookie[128];
+};
+void login(HttpServer&,DealHttp& http,int soc){
+    auto flag=http.req.getCookie("key",http.info.recText);
+    if(flag.size()>0){
+        Temp temp={soc,{0}};
+        strncpy(temp.cookie,flag.c_str(),128);
+        http.setVar<Temp>("cookie",temp);//You can place anything through the template
+        http.info.isContinue=true;
+    }else{
+        http.gram.json(DealHttp::STATUSOK,Json::createJson({{"status","find wrong"}}));
+    }
+}
+void message(HttpServer&,DealHttp& http,int){
+    Temp* pstr=(Temp*)http.getVar("cookie");
+    if(pstr==NULL){
+        http.gram.json(DealHttp::STATUSNOFOUND,Json::createJson({{"status","wrong"}}));
+    }else{
+        http.gram.json(DealHttp::STATUSOK,Json::createJson({{"cookie",pstr->cookie},{"soc",pstr->soc}}));
+    }
+}
+```
+
+- The type of the set variable is preferably the C type, and try not to have a constructor
 
 #### html rendering
 
@@ -213,6 +246,7 @@ int main()
 ```
 
 - Support middleware to uniformly process messages
+- Support for multiple middleware
 
 #### log settings
 
@@ -231,12 +265,11 @@ int main()
 void func(HttpServer& server, DealHttp& http, int)
 {
     DealHttp::Request req;
-    http.analysisRequest(req,server.recText());
-    printf("old:%s\n",(char*)server.recText());
-    printf("new:%s %s %s\n",req.method.c_str(),req.askPath.c_str(),req.version.c_str());
-    for(auto iter=req.head.begin();iter!=req.head.end();iter++)
+    http.req.analysisRequest(http.info.recText);
+    printf("new:%s %s %s\n",http.req.method.c_str(),http.req.askPath.c_str(),req.version.c_str());
+    for(auto iter=http.req.head.begin();iter!=http.req.head.end();iter++)
         printf("%s:%s\n",iter->first.c_str(),iter->second.c_str());
-    printf("body:%s\n",req.body);
+    printf("body:%s\n",http.req.body);
     http.gram.statusCode=DealHttp::STATUSOK;
     http.gram.typeFile=DealHttp::JSON;
     http.gram.body="{\"ha\":\"ha\"}";
@@ -246,11 +279,6 @@ int main()
     HttpServer server(5200,true);//input the port bound
     server.all("/root",func);
     server.run("./index.html");
-    if(server.lastError()!=NULL)
-    {
-        std::cout<<server.lastError()<<std::endl;
-        return -1;
-    }
     return 0;
 }
 ```
@@ -258,7 +286,20 @@ int main()
 - Parse through http built-in structure
 - DealHttp class [introduction](./doc/DealHttp.en.md)
 
-#### Gets the routing key value
+#### Get route key value
+
+```cpp
+    DealHttp::Request req;
+    unordered_map<string,string> tree;
+    req.routePairing("/try/:id/:name",tree);
+    Json json={
+        {"id",tree["id"]},
+        {"name",tree["name"]}
+    };
+```
+
+> via: split key
+> the result is stored in the second parameter
 
 #### set cookies
 
@@ -274,7 +315,7 @@ void cookie(HttpServer& server, DealHttp& http, int)
         return;
     }
     Json json={
-        {"key",(const char*)buffer},
+        {"key",buffer},
         {"status","ok"}
     };
     http.gram.body=json();
@@ -283,7 +324,8 @@ void cookie(HttpServer& server, DealHttp& http, int)
 int main()
 {
     HttpServer server(5200, true);
-    server.get("/cookie",cotml");
+    server.get("/cookie",cookie);
+    server.run("index.html");
     return 0;
 }
 ```
@@ -387,8 +429,46 @@ HTTP response codes:
   code 200 -- 1792
 ```
 
-> By: Split key
-> results are saved in the third parameter
+- Four modes speed test
+
+```shell
+reactor
+1419 fetches, 100 max parallel, 905322 bytes, in 10 seconds
+638 mean bytes/connection
+141.9 fetches/sec, 90532.2 bytes/sec
+msecs/connect: 30.5315 mean, 1048.08 max, 12.051 min
+msecs/first-response: 160.906 mean, 7268.44 max, 13.543 min
+HTTP response codes:
+  code 200 -- 1419
+
+IO
+1415 fetches, 100 max parallel, 902770 bytes, in 10 seconds
+638 mean bytes/connection
+141.5 fetches/sec, 90277 bytes/sec
+msecs/connect: 38.5241 mean, 3052.13 max, 12.052 min
+msecs/first-response: 189.096 mean, 7839.18 max, 13.543 min
+HTTP response codes:
+  code 200 -- 1415
+
+thread
+1405 fetches, 100 max parallel, 894476 bytes, in 10 seconds
+636.638 mean bytes/connection
+140.5 fetches/sec, 89447.6 bytes/sec
+msecs/connect: 40.6892 mean, 1046.36 max, 12.054 min
+msecs/first-response: 207.844 mean, 8081.35 max, 13.576 min
+3 bad byte counts
+HTTP response codes:
+  code 200 -- 1402
+
+fork
+1410 fetches, 100 max parallel, 899580 bytes, in 10 seconds
+638 mean bytes/connection
+141 fetches/sec, 89958 bytes/sec
+msecs/connect: 37.9042 mean, 2035.83 max, 12.043 min
+msecs/first-response: 178.578 mean, 7550.83 max, 13.764 min
+HTTP response codes:
+  code 200 -- 1410
+```
 
 ## more documentation
 
@@ -398,7 +478,7 @@ HTTP response codes:
 
 **logo**
 
-![logo](./logo.png)
+![logo](file:///home/chaiquan/code/gitee/server-for-static-web/logo.png?msec=1656509528131)
 
 ---
 

@@ -13,14 +13,14 @@ using namespace std;
 void nowPwdFile(HttpServer& server,DealHttp& http,int)
 {
 	DealHttp::Request req;
-	if(false==http.analysisRequest(req,server.recText()))
+	if(false==http.analysisRequest(req,server.recText(http)))
 	{
 		Json json={{"status","analysisHttpAsk wrong"}};
 		http.gram.json(DealHttp::STATUSOK,json());
 		return;
 	}
 	char path[128]={0};
-	http.getWildUrl(server.recText(),server.getNowRoute()->route,path,sizeof(char)*128);
+	http.getWildUrl(server.recText(http),server.getNowRoute()->route,path,sizeof(char)*128);
 	req.askPath=".";
 	req.askPath+=path;
 	cout<<"path:"<<req.askPath<<endl;
@@ -74,10 +74,10 @@ void nowPwdFile(HttpServer& server,DealHttp& http,int)
 * change time:2022-03-24 17:27:06
 * description: sen the get text
 ***********************************************/
-void sendHtml(HttpServer& server,DealHttp& http,int)
+void sendHtml(HttpServer&,DealHttp& http,int)
 {
 	DealHttp::Request req;
-	if(false==http.analysisRequest(req,server.recText()))
+	if(false==http.analysisRequest(req,http.info.recText))
 	{
 		http.gram.statusCode=DealHttp::STATUSNOFOUND;
 		return;
@@ -116,11 +116,11 @@ void sendHtml(HttpServer& server,DealHttp& http,int)
 * change time:2022-03-24 18:58:36
 * description: upload file to server
 ***********************************************/
-void upload(HttpServer& server,DealHttp& http,int soc)
+void upload(HttpServer& server,DealHttp& http,int)
 {
     char name[100]={0};
 	DealHttp::Request req;
-	if(false==http.analysisRequest(req,server.recText()))
+	if(false==http.analysisRequest(req,server.recText(http)))
 	{
 		Json json={{"status","analysisHttpAsk wrong"}};
 		http.gram.json(DealHttp::STATUSOK,json());
@@ -132,7 +132,7 @@ void upload(HttpServer& server,DealHttp& http,int soc)
 		return;
 	}
 	char path[128]={0};
-	http.getWildUrl(server.recText(),server.getNowRoute()->route,path,sizeof(char)*128);
+	http.getWildUrl(server.recText(http),server.getNowRoute()->route,path,sizeof(char)*128);
 	req.askPath=".";
 	req.askPath+=path;
 	int flen=0;
@@ -144,8 +144,7 @@ void upload(HttpServer& server,DealHttp& http,int soc)
 		return;
 	}
 	memset(temp,0,sizeof(char)*(flen+1000));
-	unsigned len=server.getCompleteMessage(soc);
-    flen=http.getRecFile(server.recText(),len,name,100,(char*)temp,sizeof(char)*(flen+1000));
+    flen=http.getRecFile(server.recText(http),server.getRecLen(http),name,100,(char*)temp,sizeof(char)*(flen+1000));
 	req.askPath+=name;
 	cout<<"file:"<<req.askPath<<endl;
     FileGet::writeToFile(req.askPath.c_str(),(char*)temp,flen);
@@ -160,7 +159,7 @@ void upload(HttpServer& server,DealHttp& http,int soc)
 void mkdirNow(HttpServer& server,DealHttp& http,int)
 {
 	DealHttp::Request req;
-	if(false==http.analysisRequest(req,server.recText()))
+	if(false==http.analysisRequest(req,server.recText(http)))
 	{
 		Json json={{"status","analysisHttpAsk wrong"}};
 		http.gram.json(DealHttp::STATUSOK,json());
@@ -169,7 +168,7 @@ void mkdirNow(HttpServer& server,DealHttp& http,int)
 	bool isDelete=false;
 	isDelete=strstr(req.askPath.c_str(),"delete")!=NULL;
 	char path[128]={0};
-	http.getWildUrl(server.recText(),server.getNowRoute()->route,path,sizeof(char)*128);
+	http.getWildUrl(server.recText(http),server.getNowRoute()->route,path,sizeof(char)*128);
 	req.askPath=".";
 	req.askPath+=path;
 	int flag=0;
@@ -211,7 +210,7 @@ void mkdirNow(HttpServer& server,DealHttp& http,int)
 void moveFile(HttpServer& server,DealHttp& http,int)
 {
 	DealHttp::Request req;
-	if(false==http.analysisRequest(req,server.recText()))
+	if(false==http.analysisRequest(req,server.recText(http)))
 	{
 		Json json={{"status","analysisHttpAsk wrong"}};
 		http.gram.json(DealHttp::STATUSOK,json());
@@ -220,7 +219,7 @@ void moveFile(HttpServer& server,DealHttp& http,int)
 	bool isDelete=false;
 	isDelete=strstr(req.askPath.c_str(),"delete")!=NULL;
 	char path[128]={0};
-	http.getWildUrl(server.recText(),server.getNowRoute()->route,path,sizeof(char)*128);
+	http.getWildUrl(server.recText(http),server.getNowRoute()->route,path,sizeof(char)*128);
 	req.askPath=".";
 	req.askPath+=path;
 	Json json(req.body);
@@ -254,7 +253,7 @@ void moveFile(HttpServer& server,DealHttp& http,int)
 ***********************************************/
 void loginIn(HttpServer& server,DealHttp& http,int)
 {
-	http.req.analysisRequest(server.recText());
+	http.req.analysisRequest(server.recText(http));
 	auto value=http.req.formValue("passwd");
 	if(value.size()==0)
 	{
@@ -284,7 +283,7 @@ void saveEdit(HttpServer& server,DealHttp& http,int)
 {
 	DealHttp::Request req;
 	Json json;
-	if(false==req.analysisRequest(server.recText()))
+	if(false==req.analysisRequest(server.recText(http)))
 	{
 		json[ "status" ]=req.error;
 		http.gram.json(DealHttp::STATUSOK,json());
@@ -309,7 +308,7 @@ void saveEdit(HttpServer& server,DealHttp& http,int)
 ***********************************************/
 void webLink(HttpServer& server,DealHttp& http,int soc)
 {
-	auto flag=http.req.analysisRequest(server.recText(),true);
+	auto flag=http.req.analysisRequest(server.recText(http),true);
 	auto pos=http.req.askPath.find("web-link/");
 	int len=0;
 	if(!flag||pos==http.req.askPath.npos)
@@ -319,14 +318,14 @@ void webLink(HttpServer& server,DealHttp& http,int soc)
 	}
 	auto temp=http.req.askPath.substr(pos+strlen("web-link/"));
 	string file="./link/"+temp;
-	http.createSendMsg(DealHttp::UNKNOWN,(char*)server.getSenBuffer(),server.getMaxSenLen(),file.c_str(),&len);
+	http.createSendMsg(DealHttp::UNKNOWN,(char*)server.getSenBuffer(http),server.getMaxSenLen(http),file.c_str(),&len);
 	if(len==0)
 	{
 		http.gram.noFound();
-		len=http.createDatagram(http.gram,server.getSenBuffer(),server.getMaxSenLen());
+		len=http.createDatagram(http.gram,server.getSenBuffer(http),server.getMaxSenLen(http));
 	}
 	if(len>0)
-		server.httpSend(soc,server.getSenBuffer(),len);
+		server.httpSend(soc,server.getSenBuffer(http),len);
 }
 /***********************************************
 * description:create soft link
@@ -348,13 +347,13 @@ string createLink(string from,string link)
 void apiLink(HttpServer& server,DealHttp& http,int)
 {
 	char path[128]={0};
-	auto flag=http.req.analysisRequest(server.recText(),true);
+	auto flag=http.req.analysisRequest(server.recText(http),true);
 	if(!flag)
 	{
 		http.gram.json(DealHttp::STATUSNOFOUND,Json::createJson(Json::Node()={{"status","message wrong"}}));
 		return;
 	}
-	http.getWildUrl(server.recText(),server.getNowRoute()->route,path,sizeof(char)*128);
+	http.getWildUrl(server.recText(http),server.getNowRoute()->route,path,sizeof(char)*128);
 	char pwd[256]={0};
 	flag=getcwd(pwd,256);
 	if(!flag)
@@ -386,7 +385,7 @@ void getEdit(HttpServer& server,DealHttp& http,int)
 {
 	DealHttp::Request req;
 	Json json;
-	if(false==req.analysisRequest(server.recText()))
+	if(false==req.analysisRequest(server.recText(http)))
 	{
 		json[ "status" ]=req.error;
 		json[ "content" ]=nullptr;
@@ -419,21 +418,21 @@ void loginOut(HttpServer&,DealHttp& http,int)
 void middleware(HttpServer& server,DealHttp& http,int soc)
 {
 	static DealHttp::Request req;
-	string getpwd=http.getCookie(server.recText(),"disk");
-	http.analysisRequest(req,server.recText(),true);
+	string getpwd=http.getCookie(server.recText(http),"disk");
+	http.analysisRequest(req,server.recText(http),true);
 	if(req.method=="POST"&&req.askPath.find("login")!=req.askPath.npos)
-		server.continueNext(soc);
+		server.continueNext(http);
 	else if(req.method=="GET"&&req.askPath.find("web-link/")!=req.askPath.npos)
 		webLink(server,http,soc);
 	else if(getpwd!=_config.passwd)
 	{
 		int len=0;
-		http.createSendMsg(DealHttp::HTML,(char*)server.getSenBuffer(),server.getMaxSenLen(),"../login.html",&len);
-		server.httpSend(soc,server.getSenBuffer(),len);
+		http.createSendMsg(DealHttp::HTML,(char*)server.getSenBuffer(http),server.getMaxSenLen(http),"../login.html",&len);
+		server.httpSend(soc,server.getSenBuffer(http),len);
 		return;
 	}
 	else
-		server.continueNext(soc);
+		server.continueNext(http);
 }
 /***********************************************
 * Author: chenxuan-1607772321@qq.com

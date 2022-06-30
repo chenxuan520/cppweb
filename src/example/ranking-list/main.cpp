@@ -7,7 +7,7 @@ using namespace cppweb;
 multimap<int,string> tree;
 void addCLi(HttpServer& server,DealHttp& http,int)
 {
-	http.req.analysisRequest(server.recText());
+	http.req.analysisRequest(server.recText(http));
 	auto name=http.req.formValue("name");
 	auto scoStr=http.req.formValue("score");
 	if(scoStr.size()==0)
@@ -59,7 +59,6 @@ void addCLi(HttpServer& server,DealHttp& http,int)
 void getList(HttpServer&,DealHttp& http,int)
 {
 	auto begin=tree.begin();
-	http.gram.typeFile=DealHttp::JSON;
 	vector<Json::Node> buf;
 	Json json={{"status","ok"}};
 	while(begin!=tree.end())
@@ -74,6 +73,7 @@ void getList(HttpServer&,DealHttp& http,int)
 	}
 	json["array"]=buf;
 	http.gram.body=json();
+	http.gram.json(DealHttp::STATUSOK,json());
 }
 int main()  
 {  

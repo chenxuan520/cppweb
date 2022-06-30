@@ -160,13 +160,13 @@ public:
 	static void httpProxy(HttpServer &server, DealHttp &http, int)
 	{
 		DealHttp::Request req;
-		http.analysisRequest(req, server.recText());
+		http.analysisRequest(req, server.recText(http));
 		char top[128] = {0}, end[128] = {0}, ip[32] = {0};
 		DealHttp::dealUrl(req.askPath.c_str(), top, end, 128, 128);
 		req.askPath = end;
-		http.createAskRequest(req, server.getSenBuffer(), server.getMaxSenLen());
+		http.createAskRequest(req, server.getSenBuffer(http), server.getMaxSenLen(http));
 		ClientTcpIp::getDnsIp(top, ip, 32);
-		char *sen = (char *)server.getSenBuffer();
+		char *sen = (char *)server.getSenBuffer(http);
 		ClientTcpIp client(ip, 80);
 		if (client.tryConnect() == false)
 		{
@@ -185,18 +185,18 @@ public:
 			http.gram.statusCode = DealHttp::STATUSNOFOUND;
 			return;
 		}
-		if (server.getMaxSenLen() < rec.size())
+		if (server.getMaxSenLen(http) < rec.size())
 		{
 			server.enlagerSenBuffer();
 		}
-		memcpy(server.getSenBuffer(), rec.c_str(), rec.size());
-		server.selfCreate(rec.size());
+		memcpy(server.getSenBuffer(http), rec.c_str(), rec.size());
+		http.info.staticLen=rec.size();
 	}
 	static void httpsProxy(HttpServer &server, DealHttp &http, int soc)
 	{
 		DealHttp::Request req;
 		int port = 0;
-		http.analysisRequest(req, server.recText());
+		http.analysisRequest(req, http.info.recText);
 		char buffer[2048] = {0}, ip[32] = {0};
 		sscanf(req.askPath.c_str(), "%[^:]:%d", buffer, &port);
 		ClientTcpIp::getDnsIp(buffer, ip, 32);
@@ -212,8 +212,8 @@ public:
 		server.httpSend(soc, buffer, len);
 		std::pair<int, int> now = {soc, client.getSocket()};
 		ThreadPool::createDetachPthread(&now,httpsTunnel);
-		char *temp = (char *)server.getSenBuffer();
-		int maxLen = server.getMaxSenLen();
+		char *temp = (char *)server.getSenBuffer(http);
+		int maxLen = server.getMaxSenLen(http);
 		while (true)
 		{
 			len = server.httpRecv(soc, temp, maxLen);
@@ -223,6 +223,6 @@ public:
 			if (len <= 0)
 				break;
 		}
-		server.selfCreate(-1);
+		http.info.staticLen=0;
 	}
 };
