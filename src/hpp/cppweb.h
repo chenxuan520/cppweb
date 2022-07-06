@@ -1950,9 +1950,10 @@ public:
 	{
 		if(sslHash.find(cli)!=sslHash.end())
 		{
-			SSL_shutdown(sslHash[cli]);
-			SSL_free(sslHash[cli]);
+			auto temp=sslHash[cli];
 			sslHash.erase(sslHash.find(cli));
+			SSL_shutdown(temp);
+			SSL_free(temp);
 		}
 #ifndef _WIN32
 		return close(cli);
@@ -4932,6 +4933,12 @@ private:
 			if(logError!=NULL)
 				logError(ask,num);
 			type=GET;
+			http.createSendMsg(DealHttp::NOFOUND,senText.buffer,senText.getMaxSize(),NULL,&len);
+			len=this->sendSocket(num,senText.buffer,len);
+			if(len<=0){
+				this->cleanSocket(num);
+			}
+			return 0;
 		}
 		int sum=0;
 		void(*pfunc)(HttpServer&,DealHttp&,int)=NULL;
@@ -5093,7 +5100,7 @@ private:
 						exit(0);
 					}
 #else
-					server.func(soc);
+					server.func(soc,server.http,server.rec.c_str(),server.senBuffer);
 #endif
 				}
 				if(server.logFunc!=NULL)
