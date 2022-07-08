@@ -2986,7 +2986,7 @@ private:
 	const char* connect;
 	const char* serverName;
 public:
-	RouteInfo info;
+	RouteInfo info;//all route infomation
 	Datagram gram;//default gram to create gram
 	Request req;//default request to use by user
 	std::unordered_map<std::string,std::string> head;//default head toadd middleware
@@ -3203,8 +3203,13 @@ public:
 		}
 	}
 	template<typename T>
-	void setVar(const std::string& key,const T& value){
-		T* temp=(T*)malloc(sizeof(T));
+	void setVar(const std::string& key,const T& value,bool selfDelete=false){
+		T* temp=NULL;
+		if(!selfDelete){
+			temp=(T*)malloc(sizeof(T));
+		}else{
+			temp=new T;
+		}
 		if(temp==NULL){
 			error="setvar wrong";
 			return;
@@ -3212,6 +3217,14 @@ public:
 			*temp=value;
 		}
 		setGet.insert({key,temp});
+	}
+	template<typename T>
+	void deleteVar(const std::string& key){
+		if(setGet.find(key)==setGet.end()){
+			return;
+		}else{
+			delete (T*)setGet[key];
+		}
 	}
 	void* getVar(const std::string& key){
 		if(setGet.find(key)==setGet.end()){
@@ -5090,6 +5103,7 @@ private:
 		else
 		{
 			server.rec.clear();
+#ifndef _WIN32
 			if(server.model==REACTOR){
 				auto now=server.parg->getData();
 				while(now==NULL){
@@ -5101,6 +5115,7 @@ private:
 				server.pool->addTask({server.epollWorker,now});
 				return 0;
 			}
+#endif
 			int getNum=server.httpRecvAll(soc,server.rec);
 			if(getNum>0)
 			{
