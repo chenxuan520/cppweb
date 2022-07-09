@@ -12,9 +12,9 @@
    ### RouteType
    
    ```cpp
-       enum RouteType{//oneway stand for like /hahah,wild if /hahah/*,static is recource static
-           ONEWAY,WILD,STATIC,STAWILD
-       };
+      enum RouteType{//oneway stand for like /hahah,wild if /hahah/*,static is recource static
+          ONEWAY,WILD,STATIC,STAWILD
+      };
    ```
 - ONEWAY means single parsing, parsed as the message of the content
 
@@ -27,7 +27,7 @@
   ### AskType
   
   ```cpp
-  enum AskType{//different ask ways in http
+      enum AskType{//different ask ways in http
           GET,POST,PUT,DELETE,OPTIONS,CONNECT,ALL,
       };
   ```
@@ -35,16 +35,16 @@
 - Type of application message
 
 - GET is a get request, POST is a post request, ALL means all requests are registered, and so on
-
-### RunModel
-
-```cpp
-enum RunModel{//the server model of run
-    FORK,MULTIPLEXING,THREAD
-};
-```
-
-- The mode in which the server is running
+  
+  ### RunModel
+  
+  ```cpp
+  enum RunModel{//the server model of run
+      FORK,MULTIPLEXING,THREAD,RECTOR
+  };
+  ```
+  
+  - The mode in which the server is running
 
 ## Function introduction
 
@@ -89,7 +89,8 @@ bool clientInHandle(void (*pfunc)(HttpServer&,int num,void* ip,int port));
 ### **routeHandle**
 
 ```cpp
-bool routeHandle(AskType ask,const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
+bool routeHandle(AskType ask,const char* route,void (*pfunc)(HttpServer&,DealHttp&,int)
+bool routeHandle(AskType ask,const char* route,const std::initializer_list<void(*)(HttpServer&,DealHttp&,int)>& pfuncs))
 ```
 
 - Core function, providing callbacks for routing processing, the number is not limited
@@ -118,24 +119,6 @@ int httpSend(int num, void* buffer, int sendLen);
 - Extra send function, generally not called unless additional data is sent
 - The first parameter is the value of the socket, the second is the send content buffer, and the third is the send length
 
-### recText
-
-```cpp
-inline void* recText()
-```
-
-- Get accepted content
-- Returns a pointer to the message
-
-### recLen
-
-```cpp
-inline int recLen()
-```
-
-- get accepted length
-- the return value is the length
-
 ### lastError
 
 ```cpp
@@ -159,6 +142,7 @@ inline bool disconnect(int soc)
 bool get(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&));
   bool post(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&));
   bool all(RouteType type,const char* route,void (*pfunc)(DealHttp&,HttpServer&,int,void*,int&));
+    inline bool get(const char* route,std::initializer_list<void(*)(HttpServer&,DealHttp&,int)> pfuncs)
 ```
 
 - The function is a simplified version of routehandle
@@ -192,13 +176,14 @@ bool deletePath(const char* path);
 ### changeSetting
 
 ```cpp
-void changeSetting(bool debug,bool isLongCon,bool isForkModel);
+    void changeSetting(bool debug,bool isLongCon,bool isAuto=true,unsigned maxSendLen=10,unsigned sslWriteTime=5,int recvWaitTime=3)
 ```
 
 - Modify server configuration
 - One parameter is whether to enable debug mode
 - The second parameter is whether to use http long connection
-- The three parameters are whether to use multi-process mode
+- The three parameters are automatically inferred routing files
+- Four parameters are the maximum memory usage, the default is 10M
 
 ### setMiddleware
 
@@ -237,10 +222,10 @@ int getCompleteMessage(int sockCli)
 ### changeSetting
 
 ```cpp
-void changeSetting(bool debug,bool isLongCon,bool isAuto=true,unsigned senMaxLen=1)
+void changeSetting(bool debug,bool isLongCon,bool isAuto=true,unsigned maxSendLen=1)
 ```
 
-- Change the settings, the first is whether to debug mode, the second is whether to long link, the third is whether to enable the default path recognition, the fourth is the send buffer max size, the unit is **M**
+- Change the settings, the first is whether to debug mode, the second is whether to long link, the third is whether to enable the default path recognition, the fourth is the maximum size of the send buffer, the unit is **M**
 
 ### stopServer
 
@@ -250,3 +235,11 @@ inline void stopServer()
 
 - stop the server from running
 - the run function will end
+
+#### resetServer
+
+```cpp
+inline void resetServer()
+```
+
+- Clear all routing information

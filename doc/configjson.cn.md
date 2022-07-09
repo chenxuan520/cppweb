@@ -19,7 +19,7 @@
 
 - 服务器运行模式
 
-- 只能为"MULTIPLEXING" or "FORK" or"THREAD"
+- 只能为"MULTIPLEXING" or "FORK" or"THREAD" or "REACTOR"
 
 ### long connect
 
