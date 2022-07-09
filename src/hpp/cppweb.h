@@ -2980,13 +2980,13 @@ public:
 		RouteInfo():nowRoute(NULL),recText(NULL),sendBuffer(NULL),staticLen(0),recLen(0),isContinue(false){};
 	};
 private:
-	char ask[512];
+	std::string askPath;
 	char* pfind;
 	const char* error;
 	const char* connect;
 	const char* serverName;
 public:
-	RouteInfo info;
+	RouteInfo info;//all route infomation
 	Datagram gram;//default gram to create gram
 	Request req;//default request to use by user
 	std::unordered_map<std::string,std::string> head;//default head toadd middleware
@@ -2994,8 +2994,6 @@ public:
 	std::unordered_map<std::string,void*> setGet;//set var and get var in route
 	DealHttp()
 	{
-		for(int i=0;i<512;i++)
-			ask[i]=0;
 		pfind=NULL;
 		error=NULL;
 		connect="keep-alive";
@@ -3120,6 +3118,26 @@ private:
 		fclose(fp);
 		return len;
 	}
+	const char* findBackString(char* local,int len,std::string& buffer)
+	{
+		buffer.clear();
+		char* ptemp=local+len+1;
+		char* pend=NULL;
+		while(1)//95 _ 
+			if((*ptemp>47&&*ptemp<58)||(*ptemp>96&&*ptemp<123)||(*ptemp>64&&*ptemp<91)||*ptemp==95||*ptemp==37)
+				break;
+			else
+				ptemp++;
+		pend=ptemp;
+		while(1)//46 . 47 / 45 - 43 + 37 % 63 ?
+			if((*pend>90&&*pend<97&&*pend!=95)||(*pend<48&&*pend!=46&&*pend!=47&&*pend!=45&&*pend!=43&&*pend!=37)||*pend>122||*pend==63)
+				break;
+			else
+				pend++;
+		for(char* pi=ptemp;pi<pend;pi++)
+			buffer+=*pi;
+		return buffer.c_str();
+	}
 	char* findBackString(char* local,int len,char* word,int maxWordLen)
 	{
 		int i=0;
@@ -3185,8 +3203,13 @@ public:
 		}
 	}
 	template<typename T>
-	void setVar(const std::string& key,const T& value){
-		T* temp=(T*)malloc(sizeof(T));
+	void setVar(const std::string& key,const T& value,bool selfDelete=false){
+		T* temp=NULL;
+		if(!selfDelete){
+			temp=(T*)malloc(sizeof(T));
+		}else{
+			temp=new T;
+		}
 		if(temp==NULL){
 			error="setvar wrong";
 			return;
@@ -3194,6 +3217,14 @@ public:
 			*temp=value;
 		}
 		setGet.insert({key,temp});
+	}
+	template<typename T>
+	void deleteVar(const std::string& key){
+		if(setGet.find(key)==setGet.end()){
+			return;
+		}else{
+			delete (T*)setGet[key];
+		}
 	}
 	void* getVar(const std::string& key){
 		if(setGet.find(key)==setGet.end()){
@@ -3232,7 +3263,7 @@ public:
 		pfind=strstr((char*)message,pneed);
 		if(pfind==NULL)
 			return NULL;
-		return this->findBackString(pfind,strlen(pneed),ask,512);
+		return this->findBackString(pfind,strlen(pneed),askPath);
 	}
 	void* customizeAddTop(void* buffer,unsigned int bufferLen,int statusNum,unsigned int contentLen,const char* contentType="application/json",const char* connection="keep-alive",const char* staEng=NULL)
 	{
@@ -3391,7 +3422,8 @@ public:
 	{
 		if(bufferLen<128)
 			return 2;
-		if(NULL==this->analysisHttpAsk((void*)message))
+		const char* ask=this->analysisHttpAsk(message);
+		if(askPath.size()==0||NULL==ask)
 			return 1;
 		int temp=0;
 		if(strcmp(ask,"HTTP/1.1")==0||strcmp(ask,"HTTP/1.0")==0)
@@ -5071,6 +5103,7 @@ private:
 		else
 		{
 			server.rec.clear();
+#ifndef _WIN32
 			if(server.model==REACTOR){
 				auto now=server.parg->getData();
 				while(now==NULL){
@@ -5082,6 +5115,7 @@ private:
 				server.pool->addTask({server.epollWorker,now});
 				return 0;
 			}
+#endif
 			int getNum=server.httpRecvAll(soc,server.rec);
 			if(getNum>0)
 			{

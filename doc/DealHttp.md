@@ -47,26 +47,118 @@ enum FileKind{
 
 - typename自定义类型,一般不用
 
+#### Datagarm 函数
+
+##### 报文函数
+
+```cpp
+inline void json(Status staCode,const std::string& data)
+inline void html(Status staCode,const std::string& data)
+inline void js(Status staCode,const std::string& data)
+inline void css(Status staCode,const std::string& data)
+inline void txt(Status staCode,const std::string& data)
+inline void image(Status staCode,const std::string& data)
+inline void file(Status staCode,const std::string& data)
+```
+
+- 参数,状态码以及数据
+
+- 函数会生成对应的http报文数据
+
+##### 状态函数
+
+```cpp
+inline void noFound()
+inline void forbidden()
+void redirect(const std::string& location,bool forever=false)
+```
+
+- 对应404,403以及重定向报文
+
 ### Request
 
 ```cpp
-    struct Request{
+    class Request{
+    public:
         std::string method;
         std::string askPath;
         std::string version;
         std::unordered_map<std::string,std::string> head;
         const char* body;
-        Request():body(NULL){};
-    };
+        const char* error;
+        bool isFull;//judge if the request be analyse
+}
 ```
 
 - 请求报文结构体
+
+#### request函数
+
+##### analysisRequest
+
+```cpp
+bool analysisRequest(const void* recvText,bool onlyTop=false)
+```
+
+- 解析请求报文,第一个参数为报文,返回是否成功
+
+- recvText一般传入http.info.recvText
+
+- request其他函数都需要先经历这个函数解析
+
+##### getWildUrl
+
+```cpp
+std::string getWildUrl(const char* route,void* recvMsg=NULL)
+```
+
+- 获取路由中携带的后续信息
+
+- 第一个是路由,第二个是报文,如果已经解析可设置为空
+
+- 返回结果
+
+##### routePairing
+
+```cpp
+bool routePairing(std::string key,std::unordered_map<std::string,std::string>& pairMap,const char* recvText=NULL)
+```
+
+- 路由匹配
+
+- 详情可见exanple
+
+##### formvalue
+
+```cpp
+std::string formValue(const std::string& key,void* buffer=NULL)
+```
+
+- 获取post报文中的表单值
+
+##### routeValue
+
+```cpp
+std::string routeValue(const std::string& key,void* buffer=NULL)
+```
+
+- 获取路由中的key Value
+
+##### createAskRequest
+
+```cpp
+    bool createAskRequest(void* buffer,unsigned buffLen)
+```
+
+- 创建请求报文
+
+- 一般客户端用
 
 ## 函数介绍
 
 ### analysisHttpAsk
 
-```
+```cpp
 const char* analysisHttpAsk(void* pask,const char* pneed="GET",int needLen=3);
 ```
 
@@ -77,6 +169,7 @@ const char* analysisHttpAsk(void* pask,const char* pneed="GET",int needLen=3);
 
 ```
 char* findBackString(char* local,int len,char* word,int maxWordLen);
+const char* findBackString(char* local,int len,std::string& buffer)
 ```
 
 - 获得指定字符串后面的字符串
