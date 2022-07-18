@@ -3029,7 +3029,7 @@ private:
 			return;
 		}
 		sprintf(ptop,"HTTP/1.1 200 OK\r\n"
-				"Server %s\r\n"
+				"Server: %s\r\n"
 				"Connection: %s\r\n",serverName,connect);
 		if(!head.empty())
 		{
@@ -3058,7 +3058,7 @@ private:
 			break;
 		   case NOFOUND:
 			sprintf(ptop,"HTTP/1.1 404 Not Found\r\n"
-					"Server %s/1.1\r\n"
+					"Server: %s/1.1\r\n"
 					"Connection: %s\r\n"
 					"Content-Type: text/plain\r\n"
 					"Content-Length:%d\r\n\r\n"
@@ -3298,7 +3298,7 @@ public:
 			break;
 		}
 		sprintf((char*)buffer,"HTTP/1.1 %d %s\r\n"
-			"Server LCserver/1.1\r\n"
+			"Server: LCserver/1.1\r\n"
 			"Connection: %s\r\n"
 			"Content-Type: %s\r\n"
 			"Content-Length: %d\r\n",statusNum,statusEng,connection,contentType,contentLen);
@@ -3710,7 +3710,7 @@ public:
 			return -1;
 		}
 		sprintf((char*)buffer,"HTTP/1.1 %d %s\r\n"
-			"Server %s\r\n"
+			"Server: %s\r\n"
 			"Connection: %s\r\n",
 			gram.statusCode,statusEng,serverName,connect);
 		if(gram.statusCode==STATUSNOFOUND)
