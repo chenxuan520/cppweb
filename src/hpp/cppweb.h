@@ -2765,7 +2765,7 @@ public:
 				this->error="error request";
 				return false;
 			}
-			sscanf(now,"%128s %512s %512s",one,two,three);
+			sscanf(now,"%127s %511s %511s",one,two,three);
 			now+=strlen(one)+strlen(two)+strlen(three)+4;
 			isFull=true;
 			req.method=one;
@@ -2775,7 +2775,7 @@ public:
 			if(!onlyTop)
 				while(end>now)
 				{
-					sscanf(now,"%512[^:]: %512[^\r]",two,three);
+					sscanf(now,"%511[^:]: %511[^\r]",two,three);
 					if(strlen(two)==512||strlen(three)==512)
 					{
 						error="head too long";
@@ -3499,7 +3499,7 @@ public:
 		if(message==NULL||key==NULL)
 			return "";
 		char temp[256]={0},method[32]={0};
-		sscanf((char*)message,"%32s%256s",method,temp);
+		sscanf((char*)message,"%31s%255s",method,temp);
 		return this->findKeyValue(key,temp);
 	}
 	const char* getWildUrl(const void* getText,const char* route,char* buffer,unsigned int maxLen)
@@ -4214,7 +4214,7 @@ public:
 		if(soc>0)
 		{
 			memset(askPath,0,sizeof(char)*256);
-			sscanf((char*)text,"%64s%255s",method,askPath);
+			sscanf((char*)text,"%63s%255s",method,askPath);
 			if(strlen(askPath)==0)
 				strcpy(askPath,"no found");
 			sprintf(buffer,"%s %s %s %s",nowTime,ServerTcpIp::getPeerIp(soc,&port),method,askPath);
