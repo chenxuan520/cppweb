@@ -288,10 +288,12 @@
 			else
 				linkTmp.href+="/"+arr[i];
 			console.log(arr[i]);
-			if(window.location.pathname.indexOf("link")==-1&&arr[i].indexOf(".")==-1)
+			if(window.location.pathname.indexOf("link")==-1&&arr[i].indexOf(".")==-1){
 				linkTmp.className="glyphicon glyphicon-folder-open";
-			else
+			}else{
 				linkTmp.className="glyphicon glyphicon-file";
+				linkTmp.download=arr[i];
+			}
 			div.appendChild(linkTmp);
 			div.appendChild(document.createElement("br"));
 		}
