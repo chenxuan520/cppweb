@@ -7,6 +7,7 @@
 #ifndef _CPPWEB_H_
 #define _CPPWEB_H_
 
+#include <cstdio>
 #ifndef _WIN32
 #include<signal.h>
 #include<netinet/in.h>
@@ -3524,8 +3525,12 @@ public:
 		int result=0;
 		if(NULL==this->getKeyLine(message,"boundary",buffer,bufferLen))
 			return 0;
-		if(NULL==this->getKeyValue(message,"filename",fileName,nameLen))
+		std::string nameStr=this->findKeyValue("filename",(char*)message);
+		if (nameStr.size()==0||nameStr.size()>=nameLen) {
 			return 0;
+		}else {
+			sprintf(fileName, "%s",nameStr.c_str());
+		}
 		if(NULL==this->getKeyValue(message,"Content-Length",tempLen,20))
 			return 0;
 		if(0>=sscanf(tempLen,"%d",&result))
