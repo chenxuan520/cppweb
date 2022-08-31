@@ -3521,19 +3521,20 @@ public:
 	}
 	int getRecFile(const void* message,unsigned messageSize,char* fileName,int nameLen,char* buffer,unsigned int bufferLen)
 	{
-		char tempLen[20]={0},*end=NULL,*top=NULL;
+		char *end=NULL,*top=NULL;
 		int result=0;
 		if(NULL==this->getKeyLine(message,"boundary",buffer,bufferLen))
 			return 0;
-		std::string nameStr=this->findKeyValue("filename",(char*)message);
-		if (nameStr.size()==0||nameStr.size()>=nameLen) {
+		std::string stdStr=this->findKeyValue("filename",(char*)message);
+		if (stdStr.size()==0||stdStr.size()>=nameLen) {
 			return 0;
 		}else {
-			sprintf(fileName, "%s",nameStr.c_str());
+			sprintf(fileName, "%s",stdStr.c_str());
 		}
-		if(NULL==this->getKeyValue(message,"Content-Length",tempLen,20))
+		stdStr=this->findKeyValue("Content-Length", (char*)message);
+		if(stdStr.size()<=0)
 			return 0;
-		if(0>=sscanf(tempLen,"%d",&result))
+		if(0>=sscanf(stdStr.c_str(),"%d",&result))
 			return 0;
 		if((top=strstr((char*)message,buffer))==NULL)
 			return 0;
