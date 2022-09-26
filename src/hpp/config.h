@@ -73,13 +73,13 @@ void proxy(HttpServer& server,DealHttp& http,int soc)
 		if(false==client.tryConnect())
 		{
 			http.gram.statusCode=DealHttp::STATUSNOFOUND;
-			LogSystem::recordRequest("connect cliwrong",soc);
+			LogSystem::recordRequest(HttpServer::INSIDEERROR,"connect cliwrong",soc);
 			return;
 		}
 		if(false==client.sendHost(server.getSenBuffer(http),strlen((char*)server.getSenBuffer(http))))
 		{
 			http.gram.statusCode=DealHttp::STATUSNOFOUND;
-			LogSystem::recordRequest("sen cliwrong",soc);
+			LogSystem::recordRequest(HttpServer::INSIDEERROR,"sen cliwrong",soc);
 			return;
 		}
 		memset(server.getSenBuffer(http),0,server.getMaxSenLen(http));
@@ -89,7 +89,7 @@ void proxy(HttpServer& server,DealHttp& http,int soc)
 		if(len<=0)
 		{
 			http.gram.statusCode=DealHttp::STATUSNOFOUND;
-			LogSystem::recordRequest("rec cliwrong",soc);
+			LogSystem::recordRequest(HttpServer::INSIDEERROR,"rec cliwrong",soc);
 			return;
 		}
 		while(len>(int)server.getMaxSenLen(http))
@@ -103,7 +103,7 @@ void proxy(HttpServer& server,DealHttp& http,int soc)
 // description:deal kill signal
 static void _dealSignalKill(int)
 {
-	LogSystem::recordRequest("server stop ",0);
+	LogSystem::recordRequest(HttpServer::SYSLOG,"server stop ",0);
 #ifndef _WIN32
 	if(ProcessCtrl::childPid!=0)
 		kill(ProcessCtrl::childPid,2);
@@ -215,7 +215,7 @@ private:
 			LogSystem::defaultName=_config.logPath.c_str();
 		if(_config.isLog)
 		{
-			server.setLog(LogSystem::recordRequest,LogSystem::recordRequest);
+			server.setLog(LogSystem::recordRequest);
 #ifndef _WIN32
 			signal(SIGINT,_dealSignalKill);
 			signal(SIGQUIT,_dealSignalKill);

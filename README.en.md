@@ -6,7 +6,7 @@
 
 **chenxuan**
 
-![dog](https://i.loli.net/2021/10/25/7pQUDsB12GE4tgx.png)
+![dog](http://cdn.androidftp.top/pic/chenxuanweb/dog.png)
 
 ## Original intention
 

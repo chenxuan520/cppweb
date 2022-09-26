@@ -7,7 +7,6 @@
 #ifndef _CPPWEB_H_
 #define _CPPWEB_H_
 
-#include <cstdio>
 #ifndef _WIN32
 #include<signal.h>
 #include<netinet/in.h>
@@ -30,6 +29,7 @@
 #include<stdarg.h>
 #include<time.h>
 #include<iostream>
+#include<cstdio>
 #include<cstdlib>
 #include<queue>
 #include<vector>
@@ -4207,23 +4207,45 @@ public:
 		strcat(now,"\n");
 		nowLen+=strlen(text)+1;
 	}
-	void operator()(const void* text,int soc)
+	void operator()(int logLevel,const void* text,int soc)
 	{
-		recordMessage(text,soc);
+		recordMessage(logLevel,text,soc);
 	}
-	void recordMessage(const void* text,int soc)
+	void recordMessage(int logLevel,const void* text,int soc)
 	{
 		static char method[64]={0},askPath[256]={0},buffer[512]={0},nowTime[48]={0};
 		int port=0;
+		const char* msg=NULL;
 		time_t now=time(NULL);
 		strftime(nowTime,48,"%Y-%m-%d %H:%M",localtime(&now));
+		switch (logLevel) {
+		case 0:
+			msg="inside_error";
+			break;
+		case 1:
+			msg="req_error";
+			break;
+		case 2:
+			msg="warning";
+			break;
+		case 3:
+			msg="info";
+			break;
+		case 4:
+			msg="sys_log";
+			break;
+		default:
+			break;
+		}
 		if(soc>0)
 		{
 			memset(askPath,0,sizeof(char)*256);
 			sscanf((char*)text,"%63s%255s",method,askPath);
-			if(strlen(askPath)==0)
-				strcpy(askPath,"no found");
-			sprintf(buffer,"%s %s %s %s",nowTime,ServerTcpIp::getPeerIp(soc,&port),method,askPath);
+			if(strlen(askPath)==0){
+				strcat(askPath,method);
+				strcat(askPath,"no found");
+			}
+			sprintf(buffer,"{\"level\":\"%s\",\"time\":\"%s\",\"ip\":\"%s\",\"method\":\"%s\",\"msg\":\"%s\"}",msg,nowTime,ServerTcpIp::getPeerIp(soc,&port),method,askPath);
 		}
 		else if(soc==-1)
 		{
@@ -4231,13 +4253,13 @@ public:
 			worker(argv);
 		}
 		else
-			sprintf(buffer,"%s localhost %s",nowTime,(char*)text);
+			sprintf(buffer,"{\"level\":\"%s\",\"time\":\"%s\",\"ip\":\"127.0.0.1\",\"method\":null\"msg\":\"%s\"}",msg,nowTime,(char*)text);
 		this->accessLog(buffer);
 	}
-	static void recordRequest(const void* text,int soc)
+	static void recordRequest(int logLevel,const void* text,int soc)
 	{
 		static LogSystem loger(defaultName);
-		loger.recordMessage(text,soc);
+		loger.recordMessage(logLevel,text,soc);
 	}
 	static bool recordFileError(const char* fileName)
 	{
@@ -4314,6 +4336,9 @@ private:
 public://main class for http server2.0
 	enum RunModel{//the server model of run
 		FORK,MULTIPLEXING,THREAD,REACTOR
+	};
+	enum LogLevel{
+		INSIDEERROR=0,REQERROR=1,WARNING=2,NORMALLOG=3,SYSLOG=4
 	};
 #ifndef _WIN32
 	enum AskType{//different ask ways in http
@@ -4415,8 +4440,7 @@ private:
 	void (*noRouteFunc)(HttpServer&,DealHttp&,int);
 	void (*clientIn)(HttpServer&,int num,const void* ip,int port);
 	void (*clientOut)(HttpServer&,int num,const void* ip,int port);
-	void (*logFunc)(const void*,int);
-	void (*logError)(const void*,int);
+	std::function<void(LogLevel,const void*,int)> logFunc;
 	Trie<RouteFuntion> trie;
 	std::string rec;
 	Buffer senBuffer;
@@ -4437,7 +4461,6 @@ public:
 		logFunc=NULL;
 		parg=NULL;
 		pnowRoute=NULL;
-		logError=NULL;
 		this->threadNum=0;
 		defaultWait=1;
 		maxLen=10;
@@ -4652,10 +4675,9 @@ public:
 	{//middleware funtion to continue default task
 		http.info.isContinue=true;
 	}
-	inline void setLog(void (*pfunc)(const void*,int),void (*errorFunc)(const void*,int))
+	inline void setLog(std::function<void(LogLevel,const void*,int)> pfunc)
 	{//log system 
 		logFunc=pfunc;
-		logError=errorFunc;
 	}
 	inline void setNoRouteFunc(void (*pfunc)(HttpServer&,DealHttp&,int))
 	{//if no pair route this will work
@@ -4667,8 +4689,8 @@ public:
 		if(!flag)
 		{
 			this->error="server:malloc get and sen wrong";
-			if(logError!=NULL)
-				logError(error,0);
+			if(logFunc!=NULL)
+				logFunc(INSIDEERROR,error,0);
 			return;
 		}
 		if(!restart)
@@ -4676,20 +4698,20 @@ public:
 			if(false==this->bondhost())
 			{
 				this->error="server:bound wrong";
-				if(logError!=NULL)
-					logError(error,0);
+				if(logFunc!=NULL)
+					logFunc(INSIDEERROR,error,0);
 				return;
 			}
 			if(false==this->setlisten())
 			{
 				this->error="server:set listen wrong";
-				if(logError!=NULL)
-					logError(error,0);
+				if(logFunc!=NULL)
+					logFunc(INSIDEERROR,error,0);
 				return;
 			}
 		}
 		if(logFunc!=NULL)
-			logFunc("server start",0);
+			logFunc(SYSLOG,"server start",0);
 		this->defaultFile=defaultFile;
 		if(isDebug)
 			messagePrint();
@@ -4889,15 +4911,13 @@ private:
 			printf("middleware\t\tfuntion set\n");
 		if(logFunc!=NULL)
 			printf("log\t\tfunction set\n");
-		if(logError!=NULL)
-			printf("error\t\tfuntion set\n");
 		if(clientIn!=NULL)
 			printf("clientIn\t\tfunction set\n");
 		if(clientOut!=NULL)
 			printf("clientout\t\tfunction set\n");
 		printf("\n");
 	}
-	int func(int num,DealHttp& http,const void* getText,Buffer& senText)
+	int gramDeal(int num,DealHttp& http,const void* getText,Buffer& senText)
 	{
 		AskType type=GET;
 		int len=0,flag=1;
@@ -4968,8 +4988,8 @@ private:
 			memset(ask,0,sizeof(char)*200);
 			if(isDebug)
 				printf("way not support\n");
-			if(logError!=NULL)
-				logError(ask,num);
+			if(logFunc!=NULL)
+				logFunc(REQERROR,error,num);
 			type=GET;
 			http.createSendMsg(DealHttp::NOFOUND,senText.buffer,senText.getMaxSize(),NULL,&len);
 			len=this->sendSocket(num,senText.buffer,len);
@@ -5062,13 +5082,13 @@ private:
 			{
 				if(isDebug)
 					printf("404 get %s wrong\n",ask);
-				if(logError!=NULL)
-					logError(ask,num);
+				if(logFunc!=NULL)
+					logFunc(REQERROR,ask,num);
 			}
 			else if(flag==2)
 			{
-				if(logError!=NULL)
-					logError("memory wrong",0);
+				if(logFunc!=NULL)
+					logFunc(REQERROR,"memory wrong",num);
 				http.createSendMsg(DealHttp::NOFOUND,senText.buffer,senText.getMaxSize(),NULL,&len);
 			}
 		}
@@ -5080,8 +5100,8 @@ private:
 		{
 			if(isDebug)
 				perror("send wrong");
-			if(logError)
-				logError(strerror(errno),num);
+			if(logFunc!=NULL)
+				logFunc(INSIDEERROR,strerror(errno),num);
 			this->cleanSocket(num);
 		}
 		else
@@ -5128,23 +5148,23 @@ private:
 				server.http.info.recLen=getNum;
 				server.http.info.recText=server.rec.c_str();
 				if(server.model==MULTIPLEXING)
-					server.func(soc,server.http,server.rec.c_str(),server.senBuffer);
+					server.gramDeal(soc,server.http,server.rec.c_str(),server.senBuffer);
 				else
 				{
 #ifndef _WIN32
 					if(fork()==0)
 					{
 						server.closeSocket(server.sock);
-						server.func(soc,server.http,server.rec.c_str(),server.senBuffer);
+						server.gramDeal(soc,server.http,server.rec.c_str(),server.senBuffer);
 						server.closeSocket(soc);
 						exit(0);
 					}
 #else
-					server.func(soc,server.http,server.rec.c_str(),server.senBuffer);
+					server.gramDeal(soc,server.http,server.rec.c_str(),server.senBuffer);
 #endif
 				}
 				if(server.logFunc!=NULL)
-					server.logFunc(server.rec.c_str(),soc);
+					server.logFunc(NORMALLOG,server.rec.c_str(),soc);
 				if(server.isLongCon==false)
 					return soc;
 			}
@@ -5180,8 +5200,8 @@ private:
 		if(false==trie.insert(nowRoute->route,nowRoute))
 		{
 			error="server:route wrong char";
-			if(logError!=NULL)
-				logError(this->error,0);
+			if(logFunc!=NULL)
+				logFunc(INSIDEERROR,error,0);
 			return false;
 		}
 		else
@@ -5226,9 +5246,9 @@ private:
 		}else{
 			argv.http.info.recLen=rec.size();
 			argv.http.info.recText=rec.c_str();
-			server.func(cli,argv.http,rec.c_str(),argv.sen);
+			server.gramDeal(cli,argv.http,rec.c_str(),argv.sen);
 			if(server.logFunc!=NULL)
-				server.logFunc(rec.c_str(),cli);
+				server.logFunc(NORMALLOG,rec.c_str(),cli);
 			rec.clear();
 			if(server.isLongCon==false){
 				server.cleanSocket(argv.soc);
@@ -5256,9 +5276,9 @@ private:
 		{
 			argv.http.info.recLen=rec.size();
 			argv.http.info.recText=rec.c_str();
-			server.func(cli,argv.http,rec.c_str(),argv.sen);
+			server.gramDeal(cli,argv.http,rec.c_str(),argv.sen);
 			if(server.logFunc!=NULL)
-				server.logFunc(rec.c_str(),cli);
+				server.logFunc(NORMALLOG,rec.c_str(),cli);
 			if(server.isLongCon==false)
 				break;
 			rec.clear();
@@ -5289,8 +5309,8 @@ private:
 				server.enlagerSenBuffer();
 			else if(flag==1)
 			{
-				if(flag==1&&server.logError!=NULL)
-					server.logError(server.error,0);
+				if(flag==1&&server.logFunc!=NULL)
+					server.logFunc(NORMALLOG,server.error,0);
 				if(server.isDebug)
 					printf("404 get %s wrong\n",buf);
 			}
@@ -5316,8 +5336,8 @@ private:
 		if(temp==NULL)
 		{
 			error="server:malloc wrong";
-			if(logError!=NULL)
-				logError(error,0);
+			if(logFunc!=NULL)
+				logFunc(INSIDEERROR,error,0);
 			oldSize/=2;
 			return old;
 		}
