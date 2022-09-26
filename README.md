@@ -6,7 +6,7 @@
 
 **chenxuan**
 
-![dog](https://i.loli.net/2021/10/25/7pQUDsB12GE4tgx.png)
+![dog](http://cdn.androidftp.top/pic/chenxuanweb/dog.png)
 
 ## 创作初衷
 
@@ -58,11 +58,11 @@
 
 #### 类关系图
 
-![class.png](https://s2.loli.net/2022/07/06/MsbRqYtZrkE45Fj.png)
+![class.png](http://cdn.androidftp.top/pic/chenxuanweb/class.png)
 
 #### 服务器图
 
-![rector.png](https://s2.loli.net/2022/07/06/6FZ1jgaUhMS972w.png)
+![rector.png](http://cdn.androidftp.top/pic/chenxuanweb/rector.png)
 
 ## 项目特点
 
