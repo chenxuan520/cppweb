@@ -4243,7 +4243,7 @@ public:
 			sscanf((char*)text,"%63s%255s",method,askPath);
 			if(strlen(askPath)==0){
 				strcat(askPath,method);
-				strcat(askPath,"no found");
+				strcat(askPath," no found");
 			}
 			sprintf(buffer,"{\"level\":\"%s\",\"time\":\"%s\",\"ip\":\"%s\",\"method\":\"%s\",\"msg\":\"%s\"}",msg,nowTime,ServerTcpIp::getPeerIp(soc,&port),method,askPath);
 		}
@@ -4260,18 +4260,6 @@ public:
 	{
 		static LogSystem loger(defaultName);
 		loger.recordMessage(logLevel,text,soc);
-	}
-	static bool recordFileError(const char* fileName)
-	{
-		FILE* fp=fopen("wrong.log","r+");
-		if(fp==NULL)
-			fp=fopen("wrong.log","w+");
-		if(fp==NULL)
-			return false;
-		fseek(fp,0,SEEK_END);
-		fprintf(fp,"open file %s wrong\n",fileName);
-		fclose(fp);
-		return true;
 	}
 	static void httpLog(const void * text,int soc)
 	{
@@ -4727,6 +4715,9 @@ public:
 			while(isContinue)
 				this->threadHttp();
 			break;
+		}
+		if (logFunc!=NULL) {
+			logFunc(SYSLOG,"server stop",0);
 		}
 	}
 	int httpSend(int num,void* buffer,int sendLen,int flag=0)

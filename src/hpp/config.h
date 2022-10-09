@@ -18,6 +18,11 @@ struct Config{
 		LoadBalance load;
 		Proxy(LoadBalance::Model model=LoadBalance::RANDOM):load(model){};
 	};
+	struct SSLConfig{
+		std::string keyPath;
+		std::string certPath;
+		std::string passwd;
+	};
 	bool isLongConnect;
 	bool isBack;
 	bool isGuard;
@@ -32,13 +37,11 @@ struct Config{
 	std::string defaultFile;
 	std::string logPath;
 	std::string model;
-	std::string keyPath;
-	std::string certPath;
-	std::string passwd;
 	std::vector<std::string> deletePath;
 	std::vector<std::pair<std::string,std::string>> replacePath;
 	std::vector<std::pair<std::string,std::string>> redirectPath;
 	std::unordered_map<std::string,Proxy> proxyMap;
+	SSLConfig sslConfig;
 	Config():isLongConnect(true),isBack(false),isGuard(false),isLog(false),isAuto(true),isDebug(true),isProxy(false),port(5200),defaultMemory(1),threadNum(0){};
 }_config;
 /***********************************************
@@ -226,13 +229,13 @@ private:
 			for(auto& now:arr)
 				now.second((*rootObj)[now.first.c_str()],server);
 #ifdef CPPWEB_OPENSSL
-		if(FileGet::getFileLen(_config.certPath.c_str())<=0||
-		   FileGet::getFileLen(_config.keyPath.c_str())<=0)
+		if(FileGet::getFileLen(_config.sslConfig.certPath.c_str())<=0||
+		   FileGet::getFileLen(_config.sslConfig.keyPath.c_str())<=0)
 		{
 			printf("cert file wrong\n");
 			exit(0);
 		}
-		server.loadKeyCert(_config.certPath.c_str(),_config.keyPath.c_str(),_config.passwd.size()==0?NULL:_config.passwd.c_str());
+		server.loadKeyCert(_config.sslConfig.certPath.c_str(),_config.sslConfig.keyPath.c_str(),_config.sslConfig.passwd.size()==0?NULL:_config.sslConfig.passwd.c_str());
 #endif
 	}
 };

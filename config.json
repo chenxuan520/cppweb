@@ -42,9 +42,11 @@
 	// "reverse proxy":[
 	// {"model":"RANDOM","path":"/try*","host":["127.0.0.1:5201","127.0.0.1:5202"],"weight":[1,3]}
 	// ],
-	"reverse proxy":[],
-	//https certificate path
-	"cert path":"./ssl/cacert.pem",
-	"cert password":"123456",
-	"key path":"./ssl/privkey.pem"
+	"ssl config":{
+		"reverse proxy":[],
+		//https certificate path
+		"cert path":"./ssl/cacert.pem",
+		"cert password":"123456",
+		"key path":"./ssl/privkey.pem"
+	}
 }

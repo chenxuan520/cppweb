@@ -453,7 +453,7 @@ int _main(ArgcDeal& arg){
 	}
 	HttpServer server(_config.port,true);//input the port bound
 	if(_config.isLog)
-		server.setLog(LogSystem::recordRequest,LogSystem::recordRequest);
+		server.setLog(LogSystem::recordRequest);
 	if(_config.isVerify)
 		server.setMiddleware(middleware);
 	server.post("/message*",nowPwdFile);
