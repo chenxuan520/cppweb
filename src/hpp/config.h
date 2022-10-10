@@ -18,6 +18,11 @@ struct Config{
 		LoadBalance load;
 		Proxy(LoadBalance::Model model=LoadBalance::RANDOM):load(model){};
 	};
+	struct SSLConfig{
+		std::string keyPath;
+		std::string certPath;
+		std::string passwd;
+	};
 	bool isLongConnect;
 	bool isBack;
 	bool isGuard;
@@ -32,13 +37,11 @@ struct Config{
 	std::string defaultFile;
 	std::string logPath;
 	std::string model;
-	std::string keyPath;
-	std::string certPath;
-	std::string passwd;
 	std::vector<std::string> deletePath;
 	std::vector<std::pair<std::string,std::string>> replacePath;
 	std::vector<std::pair<std::string,std::string>> redirectPath;
 	std::unordered_map<std::string,Proxy> proxyMap;
+	SSLConfig sslConfig;
 	Config():isLongConnect(true),isBack(false),isGuard(false),isLog(false),isAuto(true),isDebug(true),isProxy(false),port(5200),defaultMemory(1),threadNum(0){};
 }_config;
 /***********************************************
@@ -73,13 +76,13 @@ void proxy(HttpServer& server,DealHttp& http,int soc)
 		if(false==client.tryConnect())
 		{
 			http.gram.statusCode=DealHttp::STATUSNOFOUND;
-			LogSystem::recordRequest("connect cliwrong",soc);
+			LogSystem::recordRequest(HttpServer::INSIDEERROR,"connect cliwrong",soc);
 			return;
 		}
 		if(false==client.sendHost(server.getSenBuffer(http),strlen((char*)server.getSenBuffer(http))))
 		{
 			http.gram.statusCode=DealHttp::STATUSNOFOUND;
-			LogSystem::recordRequest("sen cliwrong",soc);
+			LogSystem::recordRequest(HttpServer::INSIDEERROR,"sen cliwrong",soc);
 			return;
 		}
 		memset(server.getSenBuffer(http),0,server.getMaxSenLen(http));
@@ -89,7 +92,7 @@ void proxy(HttpServer& server,DealHttp& http,int soc)
 		if(len<=0)
 		{
 			http.gram.statusCode=DealHttp::STATUSNOFOUND;
-			LogSystem::recordRequest("rec cliwrong",soc);
+			LogSystem::recordRequest(HttpServer::INSIDEERROR,"rec cliwrong",soc);
 			return;
 		}
 		while(len>(int)server.getMaxSenLen(http))
@@ -103,7 +106,7 @@ void proxy(HttpServer& server,DealHttp& http,int soc)
 // description:deal kill signal
 static void _dealSignalKill(int)
 {
-	LogSystem::recordRequest("server stop ",0);
+	LogSystem::recordRequest(HttpServer::SYSLOG,"server stop ",0);
 #ifndef _WIN32
 	if(ProcessCtrl::childPid!=0)
 		kill(ProcessCtrl::childPid,2);
@@ -215,7 +218,7 @@ private:
 			LogSystem::defaultName=_config.logPath.c_str();
 		if(_config.isLog)
 		{
-			server.setLog(LogSystem::recordRequest,LogSystem::recordRequest);
+			server.setLog(LogSystem::recordRequest);
 #ifndef _WIN32
 			signal(SIGINT,_dealSignalKill);
 			signal(SIGQUIT,_dealSignalKill);
@@ -226,13 +229,13 @@ private:
 			for(auto& now:arr)
 				now.second((*rootObj)[now.first.c_str()],server);
 #ifdef CPPWEB_OPENSSL
-		if(FileGet::getFileLen(_config.certPath.c_str())<=0||
-		   FileGet::getFileLen(_config.keyPath.c_str())<=0)
+		if(FileGet::getFileLen(_config.sslConfig.certPath.c_str())<=0||
+		   FileGet::getFileLen(_config.sslConfig.keyPath.c_str())<=0)
 		{
 			printf("cert file wrong\n");
 			exit(0);
 		}
-		server.loadKeyCert(_config.certPath.c_str(),_config.keyPath.c_str(),_config.passwd.size()==0?NULL:_config.passwd.c_str());
+		server.loadKeyCert(_config.sslConfig.certPath.c_str(),_config.sslConfig.keyPath.c_str(),_config.sslConfig.passwd.size()==0?NULL:_config.sslConfig.passwd.c_str());
 #endif
 	}
 };

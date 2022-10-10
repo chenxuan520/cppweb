@@ -161,25 +161,31 @@ void readSetting(LoadConfig& load)
 						}
 					});
 #ifdef CPPWEB_OPENSSL
-	load.findConfig("key path",[](Json::Object& obj,Config& con){
-					if(obj!=Json::npos)
-					{
-						con.keyPath=obj.strVal;
-						if(con.keyPath.find(".pem")==con.keyPath.npos)
-							printf("Warning:key format must be pem!\n");
+	load.findConfig("ssl config",[](Json::Object& obj,Config& con){
+					if (obj!=Json::npos) {
+
+						if (obj["key path"]!=Json::npos) {
+							con.sslConfig.keyPath=obj["key path"].strVal;
+							if(con.sslConfig.keyPath.find(".pem")==con.sslConfig.keyPath.npos){
+								printf("Warning:key format must be pem!\n");
+							}
+						}else{
+							printf("Warning:use ssl but not define key path,https cannot work!\n");
+						}
+
+						if (obj["cert path"]!=Json::npos) {
+							con.sslConfig.certPath=obj["cert path"].strVal;
+						}else {
+							printf("Warning:use ssl but not define cert path,https cannot work!\n");
+						}
+
+						if (obj["cert password"]!=Json::npos) {
+							con.sslConfig.passwd=obj["cert password"].strVal;
+						}
+
+					}else{
+						printf("Warning:use ssl but not define ssl config,https cannot work!\n");
 					}
-					else
-						printf("Warning:use ssl but not define key path,https cannot work!\n");
-					});
-	load.findConfig("cert path",[](Json::Object& obj,Config& con){
-					if(obj!=Json::npos)
-						con.certPath=obj.strVal;
-					else
-						printf("Warning:use ssl but not define cert path,https cannot work!\n");
-					});
-	load.findConfig("cert password",[](Json::Object& obj,Config& con){
-					if(obj!=Json::npos)
-						con.passwd=obj.strVal;
 					});
 #endif
 	readExtraSetting(load);
