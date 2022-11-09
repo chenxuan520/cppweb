@@ -237,8 +237,10 @@ void dealArgc(ArgcDeal& args)
 			exit(0);
 		kill(pid,2);
 		fclose(fp);
-		if(args.getOption("stop"))
+		if(args.getOption("stop")){
+			printf("kill %d ok\n",pid);
 			exit(0);
+		}
 		else
 		{
 			printf("wait for the port unbound...\n");
@@ -266,7 +268,7 @@ int main(int argc, char** argv)
 	args.app.usage="thank using chenxuanweb,if you have any question\n"
 		"\tsend email to 1607772321@qq.com to deal problem,thank you!\n"
 		"\t! only in linux the argv is accepted\n";
-	args.app.version="v2.0";
+	args.app.version="v1.0.1";
 	args.setOption("reload","restart the server");
 	args.setOption("stop","stop the server");
 	args.setVari("config","choose the file to be config file");
