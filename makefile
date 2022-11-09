@@ -15,6 +15,10 @@ link_ssl=-lpthread -lssl -lcrypto
 macro=-D CPPWEB_OPENSSL
 install_dir=/usr/local/include/cppweb
 
+.PHONY:ssl
+.PHONY:main
+.PHONY:debug
+
 main: $(source)
 	$(cc) -O2 $(obj_source) -o $(obj) $(link) 
 clean:

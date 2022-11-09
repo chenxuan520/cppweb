@@ -1949,6 +1949,9 @@ public:
 		SSL* ssl=NULL;
 		if(sslHash.find(num)!=sslHash.end())
 			ssl=sslHash[num];
+		if (sslExist.find(ssl)==sslExist.end()) {
+			ssl=NULL;
+		}
 		if(ssl!=NULL)
 			return SSL_write(ssl,pget,len);
 		else
