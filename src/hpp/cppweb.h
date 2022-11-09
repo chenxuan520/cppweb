@@ -49,6 +49,10 @@
 #include<openssl/err.h>
 #endif
 
+#ifndef CPPWEB_VERSION
+#define CPPWEB_VERSION "v1.0.1"
+#endif
+
 namespace cppweb{
 typedef std::unordered_map<std::string,std::string> KeyMap;
 //this class for windows 
@@ -4263,7 +4267,7 @@ public:
 			worker(argv);
 		}
 		else
-			sprintf(buffer,"{\"level\":\"%s\",\"time\":\"%s\",\"ip\":\"127.0.0.1\",\"method\":null\"msg\":\"%s\"}",msg,nowTime,(char*)text);
+			sprintf(buffer,"{\"level\":\"%s\",\"time\":\"%s\",\"ip\":\"127.0.0.1\",\"method\":null,\"msg\":\"%s\"}",msg,nowTime,(char*)text);
 		this->accessLog(buffer);
 	}
 	static void recordRequest(int logLevel,const void* text,int soc)
@@ -4708,8 +4712,11 @@ public:
 				return;
 			}
 		}
-		if(logFunc!=NULL)
-			logFunc(SYSLOG,"server start",0);
+		if(logFunc!=NULL){
+			std::string temp="server start.version:";
+			temp+=CPPWEB_VERSION;
+			logFunc(SYSLOG,temp.c_str(),0);
+		}
 		this->defaultFile=defaultFile;
 		if(isDebug)
 			messagePrint();
