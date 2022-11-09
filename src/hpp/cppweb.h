@@ -41,6 +41,7 @@
 #include<functional>
 #include<type_traits>
 #include<unordered_map>
+#include<unordered_set>
 #include<initializer_list>
 
 #ifdef CPPWEB_OPENSSL
@@ -1734,6 +1735,7 @@ protected:
 #ifdef CPPWEB_OPENSSL
 	SSL_CTX* ctx;//openssl to https struct 
 	std::unordered_map<int,SSL*> sslHash;//hash to find sock and SSL*
+	std::unordered_set<SSL*> sslExist;
 #endif
 protected:
 	int* pfdn;//pointer if file descriptor
@@ -1925,6 +1927,7 @@ public:
 		SSL_set_fd(now,cli);
 		SSL_accept(now);
 		sslHash.insert(std::pair<int,SSL*>{cli,now});
+		sslExist.insert(now);
 		return cli;
 	}
 	inline int receiveSocketSSL(int num,void* pget,int len,int=0)
@@ -1945,13 +1948,14 @@ public:
 		if(ssl!=NULL)
 			return SSL_write(ssl,pget,len);
 		else
-			return send(num,pget,len,0);
+			return -1;
 	}
 	inline int closeSSL(int cli)
 	{
 		if(sslHash.find(cli)!=sslHash.end())
 		{
 			auto temp=sslHash[cli];
+			sslExist.erase(temp);
 			sslHash.erase(sslHash.find(cli));
 			SSL_shutdown(temp);
 			SSL_free(temp);
@@ -3935,12 +3939,15 @@ public:
 		return buffer.size();
 	}
 #ifdef CPPWEB_OPENSSL
-	static int getCompleteHtmlSSL(std::string& buffer,SSL* ssl,int=0)
+	static int getCompleteHtmlSSL(std::string& buffer,SSL* ssl,int=0,std::unordered_set<SSL*>* sslExist=nullptr)
 	{
 		int len=0;
 		if(buffer.size()==0||buffer.find("\r\n\r\n")==buffer.npos)
 		{
 			do{
+				if (sslExist!=nullptr&&sslExist->find(ssl)==sslExist->end()) {
+					return -1;
+				}
 				int len=SocketApi::receiveSocket(ssl,buffer);
 				if(len<=0)
 					return len;
@@ -4213,6 +4220,9 @@ public:
 	}
 	void recordMessage(int logLevel,const void* text,int soc)
 	{
+		if (text==NULL) {
+			return;
+		}
 		static char method[64]={0},askPath[256]={0},buffer[512]={0},nowTime[48]={0};
 		int port=0;
 		const char* msg=NULL;
@@ -4736,7 +4746,7 @@ public:
 #ifndef CPPWEB_OPENSSL
 		return HttpApi::getCompleteHtml(buffer,clisoc,flag);
 #else
-		return HttpApi::getCompleteHtmlSSL(buffer,getSSL(clisoc),flag);
+		return HttpApi::getCompleteHtmlSSL(buffer,getSSL(clisoc),flag,&this->sslExist);
 #endif
 	}
 	void changeSetting(bool debug,bool isLongCon,bool isAuto=true,unsigned maxSendLen=10,unsigned sslWriteTime=5,int recvWaitTime=3)
@@ -4978,15 +4988,10 @@ private:
 		{
 			memset(ask,0,sizeof(char)*200);
 			if(isDebug)
-				printf("way not support\n");
+				printf("way not support %s\n",(char*)getText);
 			if(logFunc!=NULL)
 				logFunc(REQERROR,error,num);
-			type=GET;
-			http.createSendMsg(DealHttp::NOFOUND,senText.buffer,senText.getMaxSize(),NULL,&len);
-			len=this->sendSocket(num,senText.buffer,len);
-			if(len<=0){
-				this->cleanSocket(num);
-			}
+			this->cleanSocket(num);
 			return 0;
 		}
 		int sum=0;

@@ -23,6 +23,8 @@ ssl: $(source)
 	$(cc) -O2 $(obj_source) -o $(obj) $(macro) $(link_ssl)
 debug:
 	$(cc) -g $(obj_source) -o $(obj) $(link)
+ssldebug:
+	$(cc) -g $(obj_source) -o $(obj) $(macro) $(link_ssl)
 install:
 	mkdir $(install_dir)
 	cp $(pro_source) $(install_dir)
