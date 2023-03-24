@@ -1,0 +1,9 @@
+bin
+*.out
+*.exe
+main
+main_ssl
+old
+*.vim
+*.pid
+*.log

@@ -12,7 +12,8 @@ pro_source=./src/hpp/cppweb.h ./src/hpp/argc.h ./src/hpp/email.h
 source=./src/cpp/main.cpp ./src/hpp/cppweb.h ./src/hpp/proxy.h ./src/hpp/config.h ./src/hpp/route.h ./src/hpp/argc.h
 link=-lpthread
 link_ssl=-lpthread -lssl -lcrypto
-macro=-D CPPWEB_OPENSSL
+ssl_macro=-D CPPWEB_OPENSSL
+debug_macro=-D CPPWEB_DEBUG
 install_dir=/usr/local/include/cppweb
 
 .PHONY:ssl
@@ -23,12 +24,13 @@ main: $(source)
 	$(cc) -O2 $(obj_source) -o $(obj) $(link) 
 clean:
 	rm -f *.o 
+	rm server.pid access.log main
 ssl: $(source)
-	$(cc) -O2 $(obj_source) -o $(obj) $(macro) $(link_ssl)
+	$(cc) -O2 $(obj_source) -o $(obj) $(ssl_macro) $(link_ssl)
 debug:
-	$(cc) -g $(obj_source) -o $(obj) $(link)
+	$(cc) -g $(obj_source) -o $(obj) $(debug_macro) $(link)
 ssldebug:
-	$(cc) -g $(obj_source) -o $(obj) $(macro) $(link_ssl)
+	$(cc) -g $(obj_source) -o $(obj) $(debug_macro) $(ssl_macro) $(link_ssl)
 install:
 	mkdir $(install_dir)
 	cp $(pro_source) $(install_dir)

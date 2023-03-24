@@ -2,14 +2,14 @@
 
 - 介绍httpserver类的函数和使用
   
-  ## 类说明
+## 类说明
 1. 强烈建议您先看这个类这个是2.0版本的server,入门非常简单
 
 2. 该类private继承ServerTcpIp,但您不需要提前学其父类
    
-   ## 类定义类型
+## 类定义类型
    
-   ### RouteType
+### RouteType
    
    ```cpp
       enum RouteType{//oneway stand for like /hahah,wild if /hahah/*,static is recource static

@@ -53,6 +53,14 @@
 #define CPPWEB_VERSION "v1.0.1"
 #endif
 
+#ifndef CPPWEB_DEBUG
+#define CPPWEBDEBUG(text) std::cout<<"Debug: "<<text<<std::endl;
+#define CPPWEBASSERT(text) assert(text)
+#else
+#define CPPWEBDEBUG(text)  (void*)0
+#define CPPWEBASSERT(text) (void*)0
+#endif
+
 namespace cppweb{
 typedef std::unordered_map<std::string,std::string> KeyMap;
 //this class for windows 
@@ -2782,6 +2790,7 @@ public:
 			isFull=true;
 			req.method=one;
 			req.askPath=two;
+			req.urlDecode(req.askPath);
 			req.version=three;
 			req.body=end+4;
 			if(!onlyTop)
@@ -2886,7 +2895,7 @@ public:
 			this->method.clear();
 			this->askPath.clear();
 		}
-		void urlDecode(std::string& srcString)
+		static void urlDecode(std::string& srcString)
 		{
 			char ch=0;
 			int temp=0;
@@ -3437,6 +3446,7 @@ public:
 		const char* ask=this->analysisHttpAsk(message);
 		if(askPath.size()==0||NULL==ask)
 			return 1;
+		DealHttp::Request::urlDecode(askPath);
 		int temp=0;
 		if(strcmp(ask,"HTTP/1.1")==0||strcmp(ask,"HTTP/1.0")==0)
 			temp=this->createSendMsg(HTML,psend,bufferLen,pfirstFile,plen);
@@ -5079,7 +5089,7 @@ private:
 			{
 				strcpy(ask,http.analysisHttpAsk(getText));
 				do{
-					flag=http.autoAnalysisGet((char*)getText,senText.buffer,senText.getMaxSize(),defaultFile,&len);
+					flag=http.autoAnalysisGet((const char*)getText,senText.buffer,senText.getMaxSize(),defaultFile,&len);
 					if(flag==2&&senText.getMaxSize()<maxLen*1024*1024)
 						senText.enlargeMemory();
 				}while(flag==2&&senText.getMaxSize()<maxLen*1024*1024);
@@ -5305,11 +5315,11 @@ private:
 		int len=0,flag=0;
 		char ask[200]={0},buf[500]={0},temp[200]={0};
 		http.getAskRoute(server.recText(http),"GET",ask,200);
+		DealHttp::urlDecode(ask);
 		HttpServer::RouteFuntion& route=*server.getNowRoute(http.info.nowRoute);
 		http.getWildUrl(ask,route.route,temp,200);
 		sprintf(buf,"GET %s%s HTTP/1.1",route.pathExtra,temp);
-		do
-		{
+		do{
 			flag=http.autoAnalysisGet(buf,(char*)server.getSenBuffer(http),server.senBuffer.getMaxSize(),NULL,&len);
 			if(flag==2&&server.senBuffer.getMaxSize()<server.maxLen*1024*1024)
 				server.enlagerSenBuffer();
