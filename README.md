@@ -19,6 +19,7 @@
 ## 框架特点
 
 - 具有Linux和windows跨平台特点
+
   
   > 跨平台说明
   > 
@@ -79,45 +80,63 @@
 6. 支持html渲染
 
 7. 支持通过路由和路由组管理请求
+
    
    > 支持lam表达式
 
 8. 支持日志生成和实现,日志系统约为30万条每秒
 
 9. 具有io复用,多进程,线程池,reactor四种模式
+
    
    > io复用支持epoll(epoll只支持linux)和select模型
 
 10. 包含线程池和线程池服务器
 
 11. 支持https连接
+
     
     > 包括服务端和客户端
 
 12. 自带由框架编写的服务器
+
     
+
     1. 支持路由301转发
+
     
+
     2. 支持反向代理,负载均衡
+
        
        > 负载均衡支持轮询,随机,哈希,等四种方式
+
     
+
     3. 支持路径的替换
+
     
+
     4. 通过json配置,自定义程度高
+
     
+
     5. 自带守护进程和后台运行,宕机快速重启
 
 ## 项目说明
 
 - 该项目可用于个人搭建小网站后端服务,以及负载均衡
+
 - 本人只是一名大二的学生，框架的不足之处恳请大家通过issue发给我一定认真改进
+
 - 代码不足之处请务必联系我改进
+
 - 在使用该项目之前请阅读doc下的文档
 
 ## 搭建服务器
 
 - 在linux下, ./install.sh为安装脚本,运行就可以安装
+
 - [doc介绍](./doc/serverbuild.cn.md)
 
 ## 框架介绍
@@ -256,6 +275,7 @@ int main()
 ```
 
 - 支持中间件对报文统一处理
+
 - 支持多个中间件
 
 #### 日志设置
@@ -294,6 +314,7 @@ int main()
 ```
 
 - 通过http内置的结构体来解析
+
 - DealHttp类[介绍](./doc/DealHttp.md)
 
 #### 获取路由key值
@@ -388,6 +409,7 @@ int main()
 ```
 
 - 支持https的客户端连接
+
 - 详情见example下的例子
 
 #### 静态和删除路径
@@ -484,6 +506,10 @@ HTTP response codes:
 
 - 详情见doc目录
 
+## TODO
+
+- 零拷贝添加
+
 ## 感谢支持
 
 **logo**
@@ -493,9 +519,11 @@ HTTP response codes:
 ---
 
 [个人官网](http://chenxuanweb.top)
+
 [个人简历](http://chenxuanweb.top/resume.html)
 
 [gitee](https://gitee.com/chenxuan520/server-for-static-web)
+
 [github](https://github.com/chenxuan520/cppweb)
 
 (个人网站均运行在该框架之上)
