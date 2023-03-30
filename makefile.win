@@ -15,11 +15,12 @@ link_ssl=-lpthread -lwsock32 -lssl -lcrypto
 ssl_macro=-D CPPWEB_OPENSSL
 debug_macro=-D CPPWEB_DEBUG
 compile_option=-std=c++11
+clean_files=server.pid access.log main.exe
 
 main: $(source)
 	$(cc) -O2 $(obj_source) -o $(obj) $(link) $(compile_option)
 clean:
-	rm -f *.o 
+	rm -f $(clean_files)
 ssl: $(source)
 	$(cc) -O2 $(obj_source) -o $(obj) $(ssl_macro) $(link_ssl)
 debug:

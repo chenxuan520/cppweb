@@ -3,6 +3,7 @@ bin
 *.exe
 main
 main_ssl
+*.zip
 *.vim
 *.pid
 *.log

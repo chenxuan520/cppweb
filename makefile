@@ -15,16 +15,17 @@ link_ssl=-lpthread -lssl -lcrypto
 ssl_macro=-D CPPWEB_OPENSSL
 debug_macro=-D CPPWEB_DEBUG
 install_dir=/usr/local/include/cppweb
+clean_files=server.pid access.log main
 
 .PHONY:ssl
 .PHONY:main
 .PHONY:debug
+.PHONY:clean
 
 main: $(source)
 	$(cc) -O2 $(obj_source) -o $(obj) $(link) 
 clean:
-	rm -f *.o 
-	rm server.pid access.log main
+	rm -f $(clean_files)
 ssl: $(source)
 	$(cc) -O2 $(obj_source) -o $(obj) $(ssl_macro) $(link_ssl)
 debug:
