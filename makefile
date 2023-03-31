@@ -15,7 +15,7 @@ link_ssl=-lpthread -lssl -lcrypto
 ssl_macro=-D CPPWEB_OPENSSL
 debug_macro=-D CPPWEB_DEBUG
 install_dir=/usr/local/include/cppweb
-clean_files=server.pid access.log main
+clean_files=server.pid access.log main ./src/example/*/main
 
 .PHONY:ssl
 .PHONY:main

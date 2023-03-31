@@ -4369,7 +4369,7 @@ public://main class for http server2.0
 		RouteType type;
 		char route[128];
 		char pathExtra[128];
-		std::vector<void(*)(HttpServer&,DealHttp&,int)> pfuncs;
+		std::vector<std::function<void(HttpServer&,DealHttp&,int)>> pfuncs;
 		RouteFuntion():ask(GET),type(ONEWAY){
 			memset(route,0,128);
 			memset(pathExtra,0,128);
@@ -4872,21 +4872,21 @@ private:
 				break;
 			case STATIC:
 			case STAWILD:
-				if(arrRoute[i].pfuncs[0]==loadFile)
+				if(*arrRoute[i].pfuncs[0].target<void(*)(HttpServer&,DealHttp&,int)>()==loadFile)
 				{
 					if(arrRoute[i].type==STATIC)
 						printf("%s\t\t->\t%s\n",arrRoute[i].route,arrRoute[i].pathExtra);
 					else
 						printf("%s*\t\t->\t%s\n",arrRoute[i].route,arrRoute[i].pathExtra);
 				}
-				else if(arrRoute[i].pfuncs[0]==deleteFile)
+				else if(*arrRoute[i].pfuncs[0].target<void(*)(HttpServer&,DealHttp&,int)>()==deleteFile)
 				{
 					if(arrRoute[i].type==STATIC)
 						printf("%s\t\t->\tdelete\n",arrRoute[i].route);
 					else
 						printf("%s*\t\t->\tdelete\n",arrRoute[i].route);
 				}
-				else if(arrRoute[i].pfuncs[0]==rediectGram)
+				else if(*arrRoute[i].pfuncs[0].target<void(*)(HttpServer&,DealHttp&,int)>()==rediectGram)
 				{
 					if(arrRoute[i].type==STATIC)
 						printf("%s\t\t->\t%s\n",arrRoute[i].route,arrRoute[i].pathExtra);
@@ -4938,11 +4938,11 @@ private:
 			printf("clientout\t\tfunction set\n");
 		printf("\n");
 	}
-	int gramDeal(int num,DealHttp& http,const void* getText,Buffer& senText)
+	int dealGram(int num,DealHttp& http,const void* getText,Buffer& senText)
 	{
 		AskType type=GET;
 		int len=0,flag=1;
-		char ask[200]={0};
+		char ask[256]={0};
 		http.info.recText=getText;
 		http.info.nowRoute=NULL;
 		http.info.staticLen=0;
@@ -5032,10 +5032,8 @@ private:
 		{
 			pnowRoute=tempRoute;
 			http.info.nowRoute=tempRoute;
-			if(tempRoute!=NULL){
-				sum=tempRoute->pfuncs.size();
-				pfunc=tempRoute->pfuncs[0];
-			}
+			sum=tempRoute->pfuncs.size();
+			pfunc=*tempRoute->pfuncs[0].target<void(*)(HttpServer&,DealHttp&,int)>();
 		}
 		if(pfunc!=NULL||noRouteFunc!=NULL)
 		{
@@ -5164,14 +5162,14 @@ private:
 				server.http.info.recLen=getNum;
 				server.http.info.recText=server.rec.c_str();
 				if(server.model==MULTIPLEXING)
-					server.gramDeal(soc,server.http,server.rec.c_str(),server.senBuffer);
+					server.dealGram(soc,server.http,server.rec.c_str(),server.senBuffer);
 				else
 				{
 #ifndef _WIN32
 					if(fork()==0)
 					{
 						server.closeSocket(server.sock);
-						server.gramDeal(soc,server.http,server.rec.c_str(),server.senBuffer);
+						server.dealGram(soc,server.http,server.rec.c_str(),server.senBuffer);
 						server.closeSocket(soc);
 						exit(0);
 					}
@@ -5262,7 +5260,7 @@ private:
 		}else{
 			argv.http.info.recLen=rec.size();
 			argv.http.info.recText=rec.c_str();
-			server.gramDeal(cli,argv.http,rec.c_str(),argv.sen);
+			server.dealGram(cli,argv.http,rec.c_str(),argv.sen);
 			if(server.logFunc!=NULL)
 				server.logFunc(NORMALLOG,rec.c_str(),cli);
 			rec.clear();
@@ -5292,7 +5290,7 @@ private:
 		{
 			argv.http.info.recLen=rec.size();
 			argv.http.info.recText=rec.c_str();
-			server.gramDeal(cli,argv.http,rec.c_str(),argv.sen);
+			server.dealGram(cli,argv.http,rec.c_str(),argv.sen);
 			if(server.logFunc!=NULL)
 				server.logFunc(NORMALLOG,rec.c_str(),cli);
 			if(server.isLongCon==false)

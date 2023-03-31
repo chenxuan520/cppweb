@@ -29,7 +29,7 @@ void getValue(HttpServer&,DealHttp& http,int)
 int main()  
 {  
 	HttpServer server(5200,true);//input the port bound
-	server.all("/root",func);
+	server.get("/root",func);
 	server.get("/get*",getValue);
 	server.run("./api.html");
 	if(server.lastError()!=NULL)
