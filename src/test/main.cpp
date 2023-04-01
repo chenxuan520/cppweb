@@ -1,15 +1,8 @@
 #include "test.h"
 #include "../hpp/cppweb.h"
-#include <cstdio>
+#include "dealhttp_test.h"
 
-TEST(TestDealHttp, urldecode){
-	std::string temp="/ji%E7%A7%AF%E6%9E%81";
-	cppweb::DealHttp::Request::urlDecode(temp);
-	DEBUG(temp);
-	MUST_EQUAL(temp, "/ji积极");
-}
-
-TEST(TestForHeader, RunTest0){
+TEST(TestForHeader, RunTest){
 	MUST_EQUAL(1, 1);
 }
 

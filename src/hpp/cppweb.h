@@ -53,11 +53,17 @@
 #define CPPWEB_VERSION "v1.0.1"
 #endif
 
-#ifndef CPPWEB_DEBUG
-#define CPPWEBDEBUG(text) std::cout<<"Debug: "<<text<<std::endl;
+//for message print
+#define CPPWEBERROR(text)  std::cout<<"\033[31m"<<"[ERROR]:"<<text<<"\033[0m"<<std::endl;
+#define CPPWEBINFO(text)   std::cout<<"\033[32m"<<"[INFO]:"<<text<<"\033[0m"<<std::endl;
+#define CPPWEBSYSTEM(text) std::cout<<"\033[34m"<<"[SYSTEM]:"<<text<<"\033[0m"<<std::endl;
+#ifdef CPPWEB_DEBUG
+#define CPPWEBDEBUG(text) std::cout<<"\033[33m"<<"[DEBUG]:"<<text<<"\033[0m"<<std::endl;
+#define CPPWEBFATAL(text) std::cout<<"\033[35m"<<"[FATAL]:"<<text<<"\033[0m"<<std::endl;exit(-1);
 #define CPPWEBASSERT(text) assert(text)
 #else
 #define CPPWEBDEBUG(text)  (void*)0
+#define CPPWEBFATAL(text)  (void*)0
 #define CPPWEBASSERT(text) (void*)0
 #endif
 
@@ -4961,29 +4967,33 @@ private:
 		if(strstr(ask,"GET")!=NULL)
 		{
 			http.getAskRoute(getText,"GET",ask,200);
-			if(isDebug)
-				printf("Get url:%s\n",ask);
+			if(isDebug){
+				CPPWEBINFO("GET URL:"<<ask);
+			}
 			type=GET;
 		}
 		else if(strstr(ask,"POST")!=NULL)
 		{
 			http.getAskRoute(getText,"POST",ask,200);
-			if(isDebug)
-				printf("POST url:%s\n",ask);
+			if(isDebug){
+				CPPWEBINFO("POST URL:"<<ask);
+			}
 			type=POST;
 		}
 		else if(strstr(ask,"PUT")!=NULL)
 		{
 			http.getAskRoute(getText,"PUT",ask,200);
-			if(isDebug)
-				printf("PUT url:%s\n",ask);
+			if(isDebug){
+				CPPWEBINFO("PUT URL:"<<ask);
+			}
 			type=PUT;
 		}
 		else if(strstr(ask,"DELETE")!=NULL)
 		{
 			http.getAskRoute(getText,"DELETE",ask,200);
-			if(isDebug)
-				printf("DELETE url:%s\n",ask);
+			if(isDebug){
+				CPPWEBINFO("DELETE URL:"<<ask);
+			}
 #ifndef _WIN32
 			type=DELETE;
 #else
@@ -4993,22 +5003,25 @@ private:
 		else if(strstr(ask,"OPTIONS")!=NULL)
 		{
 			http.getAskRoute(getText,"OPTIONS",ask,200);
-			if(isDebug)
-				printf("OPTIONS url:%s\n",ask);
+			if(isDebug){
+				CPPWEBINFO("OPTIONS URL:"<<ask);
+			}
 			type=OPTIONS;
 		}
 		else if(strstr(ask,"CONNECT")!=NULL)
 		{
 			http.getAskRoute(getText,"CONNECT",ask,200);
-			if(isDebug)
-				printf("CONNECT url:%s\n",ask);
+			if(isDebug){
+				CPPWEBINFO("CONNECT URL:"<<ask);
+			}
 			type=CONNECT;
 		}
 		else 
 		{
 			memset(ask,0,sizeof(char)*200);
-			if(isDebug)
-				printf("way not support %s\n",(char*)getText);
+			if(isDebug){
+				CPPWEBERROR("WAY NOT SUPPORT "<<(char*)getText);
+			}
 			if(logFunc!=NULL)
 				logFunc(REQERROR,error,num);
 			this->cleanSocket(num);
@@ -5081,8 +5094,9 @@ private:
 		}
 		else if(isAutoAnalysis)
 		{
-			if(isDebug)
-				printf("http:%s\n",http.analysisHttpAsk(getText));
+			if(isDebug){
+				CPPWEBINFO("HTTP "<<http.analysisHttpAsk(getText));
+			}
 			if(http.analysisHttpAsk(getText)!=NULL)
 			{
 				strcpy(ask,http.analysisHttpAsk(getText));
@@ -5094,8 +5108,9 @@ private:
 			}
 			if(flag==1)
 			{
-				if(isDebug)
-					printf("404 get %s wrong\n",ask);
+				if(isDebug){
+					CPPWEBERROR("404 GET "<<ask<<"wrong");
+				}
 				if(logFunc!=NULL)
 					logFunc(REQERROR,ask,num);
 			}
@@ -5120,8 +5135,9 @@ private:
 		}
 		else
 		{
-			if(isDebug)
-				printf("200 ok send success\n\n");
+			if(isDebug){
+				CPPWEBINFO("200 send success\n");
+			}
 		}
 		return 0;
 	}
