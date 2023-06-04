@@ -8,6 +8,7 @@
 #include <iostream>
 #include <utility>
 #include <vector>
+#include <functional>
 
 //base class
 class _test_base{
@@ -38,6 +39,14 @@ std::vector<std::pair<_test_base*, std::string>> _test_base::test_arr;
 //test name
 #define CPPWEB_TEST_NAME_CREATE(test_group,test_name) test_group##test_name##_create
 #define CPPWEB_TEST_NAME(test_group,test_name) test_group##test_name##_cppweb
+#define CPPWEB_TEST_INIT_NAME_CREATE(init_name) init_name##_init##_create
+#define CPPWEB_TEST_INIT_NAME(init_name) init_name##_init
+
+//test init function,run before all test example
+#define INIT(init_name)                                                              \
+	int CPPWEB_TEST_INIT_NAME(init_name)();                                          \
+	auto CPPWEB_TEST_INIT_NAME_CREATE(init_name)=CPPWEB_TEST_INIT_NAME(init_name)(); \
+	int CPPWEB_TEST_INIT_NAME(init_name)()
 
 //test function for users
 #define TEST(test_group,test_name)                                                        \
@@ -61,11 +70,11 @@ std::vector<std::pair<_test_base*, std::string>> _test_base::test_arr;
 	if(one!=two){FATAL(one<<" "<<CPPWEBCONNECTSTR(!= two));}
 #define MUST_TRUE(flag,text)\
 	if(!(flag)){FATAL(text);}
-#define SKIP()      TESTYELLOW("[SKIP]");return;
+#define SKIP()      TESTYELLOW("[SKIP] in ["<<_FILE_LINE_MSG_<<"] : ");return;
 #define DEBUG(text) TESTYELLOW("[DEBUG] in ["<<_FILE_LINE_MSG_<<"] : "<<text)
 #define ERROR(text) TESTCAR("[ERROR] in ["<<_FILE_LINE_MSG_<<"] : "<<text)\
 	_CLASS_FAIL_
-#define PANIC(text) TESTRED(text);exit(-1);
+#define PANIC(text) TESTRED("[PANIC] in ["<<_FILE_LINE_MSG_<<"] : "<<text);exit(-1);
 
 //the main function
 #define RUN                                                \
