@@ -23,6 +23,7 @@ int _test_base::success=0;
 int _test_base::fail=0;
 std::vector<std::pair<_test_base*, std::string>> _test_base::test_arr;
 
+// TODO: add stderr to filter //
 //print kinds of color
 #define TESTRED(text)     std::cout<<"\033[31m"<<text<<"\033[0m"<<std::endl;
 #define TESTGREEN(text)   std::cout<<"\033[32m"<<text<<"\033[0m"<<std::endl;
@@ -41,12 +42,23 @@ std::vector<std::pair<_test_base*, std::string>> _test_base::test_arr;
 #define CPPWEB_TEST_NAME(test_group,test_name) test_group##test_name##_cppweb
 #define CPPWEB_TEST_INIT_NAME_CREATE(init_name) init_name##_init##_create
 #define CPPWEB_TEST_INIT_NAME(init_name) init_name##_init
+#define CPPWEB_TEST_END_NAME_CREATE(end_name) end_name##_end##_create
+#define CPPWEB_TEST_END_NAME(end_name) end_name##_end
 
 //test init function,run before all test example
 #define INIT(init_name)                                                              \
 	int CPPWEB_TEST_INIT_NAME(init_name)();                                          \
 	auto CPPWEB_TEST_INIT_NAME_CREATE(init_name)=CPPWEB_TEST_INIT_NAME(init_name)(); \
 	int CPPWEB_TEST_INIT_NAME(init_name)()
+
+//test end function,run after all test example
+#define END(end_name)                                                     \
+	class CPPWEB_TEST_END_NAME(end_name){                                 \
+	public:                                                               \
+		~CPPWEB_TEST_END_NAME(end_name)();                                \
+	};                                                                    \
+	CPPWEB_TEST_END_NAME(end_name) CPPWEB_TEST_END_NAME_CREATE(end_name); \
+	CPPWEB_TEST_END_NAME(end_name)::~CPPWEB_TEST_END_NAME(end_name)()
 
 //test function for users
 #define TEST(test_group,test_name)                                                        \
@@ -62,19 +74,19 @@ std::vector<std::pair<_test_base*, std::string>> _test_base::test_arr;
 	void CPPWEB_TEST_NAME(test_group,test_name)::TestBody()
 
 //some function for debug and judge
+#define SKIP()      TESTYELLOW("[SKIP] in ["<<_FILE_LINE_MSG_<<"] : ");return;
+#define DEBUG(text) TESTYELLOW("[DEBUG] in ["<<_FILE_LINE_MSG_<<"] : "<<text)
+#define ERROR(text) TESTCAR("[ERROR] in ["<<_FILE_LINE_MSG_<<"] : "<<text)\
+	_CLASS_FAIL_
 #define FATAL(text) TESTRED("[FATAL] in ["<<_FILE_LINE_MSG_<<"] : "<<text)\
 	_CLASS_FAIL_;return;
+#define PANIC(text) TESTRED("[PANIC] in ["<<_FILE_LINE_MSG_<<"] : "<<text);exit(-1);
 #define EXPECT_EQ(result,expect)\
 	if (result!=expect){FATAL(CPPWEBCONNECTSTR(result want get expect but get)<<" "<<result)}
 #define MUST_EQUAL(one,two)\
 	if(one!=two){FATAL(one<<" "<<CPPWEBCONNECTSTR(!= two));}
 #define MUST_TRUE(flag,text)\
 	if(!(flag)){FATAL(text);}
-#define SKIP()      TESTYELLOW("[SKIP] in ["<<_FILE_LINE_MSG_<<"] : ");return;
-#define DEBUG(text) TESTYELLOW("[DEBUG] in ["<<_FILE_LINE_MSG_<<"] : "<<text)
-#define ERROR(text) TESTCAR("[ERROR] in ["<<_FILE_LINE_MSG_<<"] : "<<text)\
-	_CLASS_FAIL_
-#define PANIC(text) TESTRED("[PANIC] in ["<<_FILE_LINE_MSG_<<"] : "<<text);exit(-1);
 
 //the main function
 #define RUN                                                \
@@ -93,5 +105,5 @@ std::vector<std::pair<_test_base*, std::string>> _test_base::test_arr;
 		TESTBLUE("Total Run:"<<base.success+base.fail)     \
 		TESTBLUE("Success Run:"<<base.success)             \
 		TESTBLUE("Fail Run:"<<base.fail)                   \
-		return 0;                                          \
+		return base.fail;                                  \
 	}
