@@ -7,3 +7,5 @@ main_ssl
 *.vim
 *.pid
 *.log
+build
+CMakeLists.txt

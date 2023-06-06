@@ -161,13 +161,13 @@ public:
 	{
 		DealHttp::Request req;
 		http.analysisRequest(req, server.recText(http));
-		char top[128] = {0}, end[128] = {0}, ip[32] = {0};
+		char top[128] = {0}, end[128] = {0};
 		DealHttp::dealUrl(req.askPath.c_str(), top, end, 128, 128);
 		req.askPath = end;
 		http.createAskRequest(req, server.getSenBuffer(http), server.getMaxSenLen(http));
-		ClientTcpIp::getDnsIp(top, ip, 32);
+		auto serverIP=ClientTcpIp::getDnsIp(top);
 		char *sen = (char *)server.getSenBuffer(http);
-		ClientTcpIp client(ip, 80);
+		ClientTcpIp client(serverIP, 80);
 		if (client.tryConnect() == false)
 		{
 			http.gram.statusCode = DealHttp::STATUSNOFOUND;
@@ -197,10 +197,10 @@ public:
 		DealHttp::Request req;
 		int port = 0;
 		http.analysisRequest(req, http.info.recText);
-		char buffer[2048] = {0}, ip[32] = {0};
+		char buffer[2048] = {0};
 		sscanf(req.askPath.c_str(), "%[^:]:%d", buffer, &port);
-		ClientTcpIp::getDnsIp(buffer, ip, 32);
-		ClientTcpIp client(ip, port);
+		auto serverIP=ClientTcpIp::getDnsIp(buffer);
+		ClientTcpIp client(serverIP, port);
 		if (false == client.tryConnect())
 		{
 			http.gram.statusCode = DealHttp::STATUSNOFOUND;

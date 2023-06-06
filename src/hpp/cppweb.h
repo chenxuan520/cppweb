@@ -2409,10 +2409,8 @@ class ClientTcpIp{
 private:
 	int sock;//myself
 	sockaddr_in addrC;//server information
-	char ip[128];//server Ip
-	char* hostip;//host ip
-	char* hostname;//host name
-	char selfIp[128];
+	std::string connectIP;
+	std::string selfIP;
 	const char* error;
 	bool isHttps;
 #ifdef CPPWEB_OPENSSL
@@ -2420,80 +2418,51 @@ private:
 	SSL_CTX* ctx;
 #endif
 public:
-	ClientTcpIp(const char* hostIp,unsigned short port)
-	{
-		memset(ip,0,128);
-		memset(selfIp,0,128);
+	ClientTcpIp(){
 		error=NULL;
 		isHttps=false;
-		hostip=(char*)malloc(sizeof(char)*50);
-		if(hostip==NULL)
-		{
-			error="malloc wrong";
-			return;
-		}
-		memset(hostip,0,sizeof(char)*50);
-		hostname=(char*)malloc(sizeof(char)*50);
-		if(hostname==NULL)
-		{
-			error="malloc wrong";
-			return;
-		}		
-		memset(hostname,0,sizeof(char)*50);
-		if(hostIp!=NULL)
-			strcpy(ip,hostIp);
 		sock=socket(AF_INET,SOCK_STREAM,0);
-		if(hostIp!=NULL)
-			addrC.sin_addr.s_addr=inet_addr(hostIp);
-		addrC.sin_family=AF_INET;//af_intt IPv4
-		addrC.sin_port=htons(port);
+	}
+	ClientTcpIp(const std::string& connectIP,unsigned short connectPort):ClientTcpIp(){
+		this->connectIP=connectIP;
+		addrC.sin_addr.s_addr=inet_addr(connectIP.c_str());
+		addrC.sin_family=AF_INET;//af_inet IPv4
+		addrC.sin_port=htons(connectPort);
 #ifdef CPPWEB_OPENSSL
 		ssl=NULL;
 		ctx=NULL;
 #endif
 	}
-	~ClientTcpIp()
-	{
+	~ClientTcpIp(){
 #ifdef CPPWEB_OPENSSL
-		if(ssl!=NULL)
-		{
+		if(ssl!=NULL){
 			SSL_shutdown(ssl);
 			SSL_free(ssl);	
 		}
 		if(ctx!=NULL)
 			SSL_CTX_free(ctx);
 #endif
-		if(hostip!=NULL)
-			free(hostip);
-		if(hostname!=NULL)
-			free(hostname);
 #ifndef _WIN32
 		close(sock);
 #else
 		closesocket(sock);
 #endif
 	}
-	void addHostIp(const char* ip,unsigned short port=0)
-	{
-		if(ip==NULL)
-			return;
-		strcpy(this->ip,ip);
-		addrC.sin_addr.s_addr=inet_addr(ip);
+	void addHostIp(const std::string& connectIP,unsigned short port=0){
+		this->connectIP=connectIP;
+		addrC.sin_addr.s_addr=inet_addr(connectIP.c_str());
 		if(port!=0)
 			addrC.sin_port=htons(port);
 	}
-	bool tryConnect()
-	{
+	bool tryConnect(){
 		if(SocketApi::tryConnect(sock,(sockaddr*)&addrC,sizeof(sockaddr))==-1)
 			return false;
 		return true;
 	}
-	inline int getSocket()
-	{
+	inline int getSocket(){
 		return sock;
 	}
-	inline int receiveHost(void* prec,int len,int flag=0)
-	{
+	inline int receiveHost(void* prec,int len,int flag=0){
 #ifdef CPPWEB_OPENSSL
 		if(isHttps)
 			return SocketApi::receiveSocket(ssl,prec,len,flag);
@@ -2501,8 +2470,7 @@ public:
 #endif
 			return SocketApi::receiveSocket(sock,prec,len,flag);
 	}
-	int receiveHost(std::string& buffer,int flag=0)
-	{
+	int receiveHost(std::string& buffer,int flag=0){
 #ifdef CPPWEB_OPENSSL
 		if(isHttps)
 			return SocketApi::receiveSocket(ssl,buffer,flag);
@@ -2510,8 +2478,7 @@ public:
 #endif
 			return SocketApi::receiveSocket(sock,buffer,flag);
 	}
-	inline int sendHost(const void* ps,int len,int flag=0)
-	{
+	inline int sendHost(const void* ps,int len,int flag=0){
 #ifdef CPPWEB_OPENSSL
 		if(isHttps)
 			return SocketApi::sendSocket(ssl,ps,len,flag);
@@ -2519,16 +2486,22 @@ public:
 #endif
 			return SocketApi::sendSocket(sock,(char*)ps,len,flag);
 	}
-	bool disconnectHost()
-	{
+	inline int sendHost(const std::string& data,int flag=0){
+#ifdef CPPWEB_OPENSSL
+		if(isHttps)
+			return SocketApi::sendSocket(ssl,data.c_str(),data.size(),flag);
+		else
+#endif
+			return SocketApi::sendSocket(sock,data.c_str(),data.size(),flag);
+	}
+	bool disconnectHost(){
 #ifndef _WIN32
 		close(sock);
 #else
 		closesocket(sock);
 #endif
 #ifdef CPPWEB_OPENSSL
-		if(ssl!=NULL)
-		{
+		if(ssl!=NULL){
 			SSL_shutdown(ssl);
 			SSL_free(ssl);	
 		}
@@ -2539,85 +2512,71 @@ public:
 			return false;
 		return true;
 	}
-	char* getSelfIp()
-	{
+	std::string getSelfIp(){
 		char name[300]={0};
 		gethostname(name,300);
 		hostent* phost=gethostbyname(name);
 		in_addr addr;
 		char* p=phost->h_addr_list[0];
 		memcpy(&addr.s_addr,p,phost->h_length);
-		memset(selfIp,0,sizeof(char)*100);
-		memcpy(selfIp,inet_ntoa(addr),strlen(inet_ntoa(addr)));
-		return selfIp;
+		return inet_ntoa(addr);
 	}
-	char* getSelfName(char* hostname,unsigned int bufferLen)
-	{
+	std::string getSelfName(){
 		char name[300]={0};
-		gethostname(name,300);
-		if(strlen(name)>=bufferLen)
-			return NULL;
-		memcpy(hostname,name,strlen(name));
-		return hostname;
+		int result=gethostname(name,300);
+		if (result!=0) {
+			error="get host name wrong";
+			return "";
+		}
+		return name;
 	}
-	inline const char* lastError()
-	{
+	inline const char* lastError(){
 		return error;
 	}
 #ifdef CPPWEB_OPENSSL
-	bool tryConnectSSL()
-	{
+	bool tryConnectSSL(){
 		isHttps=true;
 		const SSL_METHOD* meth=SSLv23_client_method();
-		if(false==this->tryConnect())
-		{
+		if(false==this->tryConnect()){
 			error="connect wrong";
 			return false;
 		}
-		if(meth==NULL)
-		{
+		if(meth==NULL){
 			error="ssl init wrong";
 			return false;
 		}
 		ctx=SSL_CTX_new(meth);
-		if(ctx==NULL)
-		{
+		if(ctx==NULL){
 			error="ssl new wrong";
 			return false;
 		}
 		ssl=SSL_new(ctx);
-		if(NULL==ssl)
-		{
+		if(NULL==ssl){
 			error="ssl new wrong";
 			return false;
 		}
 		SSL_set_fd(ssl,sock);
 		int ret=SSL_connect(ssl);
-		if(ret==-1)
-		{
+		if(ret==-1){
 			error="ssl connect wrong";
 			return false;
 		}
 		return true;
 	}
-	inline SSL* getSSL()
-	{
+	inline SSL* getSSL(){
 		return ssl;
 	}
 #endif
 public:
-	static bool getDnsIp(const char* name,char* ip,unsigned int ipMaxLen)
-	{
-		hostent* phost=gethostbyname(name);
-		if(phost==NULL)
-			return false;
+	static std::string getDnsIp(const std::string& domain){
+		hostent* phost=gethostbyname(domain.c_str());
+		if (phost==nullptr) {
+			return "";
+		}
 		in_addr addr;
 		char* p=phost->h_addr_list[0];
 		memcpy(&addr.s_addr,p,phost->h_length);
-		if(strlen(inet_ntoa(addr))>=ipMaxLen)
-			return false;
-		strcpy(ip,inet_ntoa(addr));
-		return true;
+		return inet_ntoa(addr);
 	}
 };
 /*******************************
@@ -2719,6 +2678,50 @@ public:
 			statusCode=staCode;
 			body=data;
 			fileLen=data.size();
+		}
+	};
+	class Response{
+	public:
+		int statusCode;
+		std::string version;
+		std::string statusStr;
+		std::string body;
+		std::unordered_map<std::string,std::string> head;
+		const char* error;
+		Response():statusCode(0),error(nullptr){};
+		bool analysisResponse(const std::string& recvText){
+			if(recvText=="")
+			{
+				error="null input";
+				return false;
+			}
+			char one[512]={0},three[512]={0};
+			int statusCode=-1;
+			const char* now=(char*)recvText.c_str(),*end=strstr(now,"\r\n\r\n");
+			if(strstr(now,"\r\n\r\n")==NULL)
+			{
+				this->error="error request";
+				return false;
+			}
+			sscanf(now,"%127s %d %511s",one,&statusCode,three);
+			now+=strlen(one)+std::to_string(statusCode).size()+strlen(three)+4;
+			this->version=one;
+			this->statusCode=statusCode;
+			this->statusStr=three;
+			this->body=end+4;
+			while(end>now)
+			{
+				sscanf(now,"%511[^:]: %511[^\r]",one,three);
+				if(strlen(one)==512||strlen(three)==512)
+				{
+					error="head too long";
+					return false;
+				}
+				this->head.insert(std::pair<std::string,std::string>{one,three});
+				now=strchr(now,'\r');
+				now+=2;
+			}
+			return true;
 		}
 	};
 	class Request{
@@ -4336,6 +4339,14 @@ private:
 	}
 };
 const char* LogSystem::defaultName="access.log";
+/***********************************************
+* Author: chenxuan-1607772321@qq.com
+* change time:2023-06-06 20:35:26
+* description:the class for quickly to send a http request
+* example:TODO 
+***********************************************/
+class HttpClient:private ClientTcpIp{
+};
 /*******************************
  * author:chenxuan
  * class:the main class for create server
@@ -4838,7 +4849,7 @@ public:
 private:
 	void messagePrint()
 	{
-		printf("welcome to web server,the server is runing\n");
+		CPPWEBSYSTEM("welcome to web server,the server is runing");
 		switch(model)
 		{
 		case MULTIPLEXING:
@@ -5341,8 +5352,9 @@ private:
 			{
 				if(flag==1&&server.logFunc!=NULL)
 					server.logFunc(NORMALLOG,server.error,0);
-				if(server.isDebug)
-					printf("404 get %s wrong\n",buf);
+				if(server.isDebug){
+					CPPWEBERROR("404 get"<<buf<<"wrong");
+				}
 			}
 			else
 				break;

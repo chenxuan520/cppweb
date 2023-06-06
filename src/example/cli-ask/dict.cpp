@@ -5,14 +5,14 @@ using namespace cppweb;
 void dict(const char* str)
 {
 	char ip[32]={0};
-	auto flag=ClientTcpIp::getDnsIp("api.interpreter.caiyunai.com",ip,32);
-	if(flag==false)
+	auto serverIP=ClientTcpIp::getDnsIp("api.interpreter.caiyunai.com");
+	if(serverIP=="")
 	{
 		printf("dns wrong\n");
 		return ;
 	}
-	ClientTcpIp client(ip,443);
-	flag=client.tryConnectSSL();
+	ClientTcpIp client(serverIP,443);
+	auto flag=client.tryConnectSSL();
 	if(!flag)
 	{
 		printf("connect %s wrong\n",ip);
