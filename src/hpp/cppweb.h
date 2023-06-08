@@ -2736,12 +2736,14 @@ public:
 		Request():version("HTTP/1.1"),body(NULL),error(NULL),isFull(false){};
 		Request(const char* recvText,bool onlyTop=false)
 		{
-			this->analysisRequest(recvText,onlyTop);
+			this->analysisRequest(recvText);
 		}
-		std::string getWildUrl(const char* route,void* recvMsg=NULL)
+		std::string getWildUrl(const char* route)
 		{//such as /okok/lplp ,getWildUrl("/okok/")="lplp"
-			if(askPath.size()==0)
-				this->analysisRequest(recvMsg,true);
+			if(askPath.size()==0){
+				this->error="please analysisRequest first";
+				return "";
+			}
 			if(route==NULL)
 				return askPath;
 			auto pos=askPath.find(route);
@@ -2752,8 +2754,10 @@ public:
 		}
 		bool routePairing(std::string key,std::unordered_map<std::string,std::string>& pairMap,const char* recvText=NULL)
 		{
-			if(this->askPath.size()==0)
-				this->analysisRequest(recvText,true);
+			if(askPath.size()==0){
+				this->error="please analysisRequest first";
+				return "";
+			}
 			unsigned pos=0,word=0,value2=0;
 			auto value1=key.find(':');
 			if(strncmp(this->askPath.c_str(),key.c_str(),value1-1)!=0)
@@ -2779,7 +2783,7 @@ public:
 			}
 			return true;
 		}
-		bool analysisRequest(const void* recvText,bool onlyTop=false)
+		bool analysisRequest(const void* recvText)
 		{
 			if(recvText==NULL)
 			{
@@ -2802,7 +2806,6 @@ public:
 			req.urlDecode(req.askPath);
 			req.version=three;
 			req.body=end+4;
-			if(!onlyTop)
 				while(end>now)
 				{
 					sscanf(now,"%511[^:]: %511[^\r]",two,three);
@@ -2817,10 +2820,8 @@ public:
 				}
 			return true;
 		}
-		std::string formValue(const std::string& key,void* buffer=NULL)
+		std::string formValue(const std::string& key)
 		{//get form value
-			if(this->body==NULL)
-				this->analysisRequest(buffer);
 			std::string temp=key+"\\s*[=]\\s*([\\\\\\w\\%\\.\\?\\+\\-]+)",result;
 			std::cmatch getArr;
 			auto flag=std::regex_search(this->body,getArr,std::regex(temp));
@@ -2829,10 +2830,12 @@ public:
 			result=getArr[1];
 			return result;
 		}
-		std::string routeValue(const std::string& key,void* buffer=NULL)
+		std::string queryValue(const std::string& key,void* buffer=NULL)
 		{//get kay value in route
-			if(this->askPath.size()==0)
-				this->analysisRequest(buffer);
+			if(askPath.size()==0){
+				this->error="please analysisRequest first";
+				return "";
+			}
 			std::string temp=key+"\\s*[=]\\s*([\\\\\\w\\%\\.\\?\\+\\-]+)",result;
 			std::cmatch getArr;
 			auto flag=std::regex_search(this->askPath.c_str(),getArr,std::regex(temp));
@@ -3587,9 +3590,9 @@ public:
 		buffer[i+1]=0;
 		return result;
 	}
-	bool analysisRequest(Request& req,const void* recvText,bool onlyTop=false)
+	bool analysisRequest(Request& req,const void* recvText)
 	{
-		bool flag=req.analysisRequest(recvText,onlyTop);
+		bool flag=req.analysisRequest(recvText);
 		if(flag)
 			return true;
 		else
@@ -5041,8 +5044,7 @@ private:
 		int sum=0;
 		void(*pfunc)(HttpServer&,DealHttp&,int)=NULL;
 		RouteFuntion* tempRoute=trie.search(ask,[=](const RouteFuntion* now,bool isLast)->bool{
-					if(now->ask==ALL||now->ask==type)
-					{
+					if(now->ask==ALL||now->ask==type){
 						if(isLast&&(now->type==STATIC||now->type==ONEWAY))
 							return true;
 						else if(now->type==WILD||now->type==STAWILD)
@@ -5066,7 +5068,7 @@ private:
 				http.gram.clear();
 				http.req.clear();
 				http.clean();
-				http.req.analysisRequest(http.info.recText,true);
+				auto flag=http.req.analysisRequest(http.info.recText);
 				if(pfunc!=NULL){
 					for(auto& now:tempRoute->pfuncs){
 						now(*this,http,num);

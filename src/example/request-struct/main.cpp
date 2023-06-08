@@ -13,7 +13,7 @@ void func(HttpServer&,DealHttp& http,int)
 void getValue(HttpServer&,DealHttp& http,int)
 {
 	http.req.analysisRequest(http.info.recText);
-	auto value=http.req.routeValue("key");
+	auto value=http.req.queryValue("key");
 	std::cout<<"get:"<<http.req.getWildUrl("/get")<<std::endl;
 	http.req.urlDecode(value);
 	Json json;
