@@ -1,7 +1,8 @@
 #pragma once
-#include <iostream>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
-#include <ctime>
+#include <time.h>
 class CheckMemory{
 private:
 	struct Node{
@@ -173,7 +174,7 @@ void* Malloc_now(size_t size)
 		checkMemory.insert(temp,size);
 	return temp;
 }
-void Free_now(void* ptr)
+inline void Free_now(void* ptr)
 {
 	checkMemory.erase(ptr);
 	free(ptr);

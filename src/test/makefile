@@ -9,4 +9,4 @@ link_ssl=-lpthread -lssl -lcrypto
 .PHONY:main
 
 main: $(source)
-	$(cc) -O2 $(obj_source) -o $(obj) $(link) $(link_ssl)
+	$(cc) -g $(obj_source) -o $(obj) $(link) $(link_ssl)

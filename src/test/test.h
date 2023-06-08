@@ -23,14 +23,17 @@ int _test_base::success=0;
 int _test_base::fail=0;
 std::vector<std::pair<_test_base*, std::string>> _test_base::test_arr;
 
-// TODO: add stderr to filter //
+// std out or stderr
+#define TESTSTDOUT(text) std::cout<<text<<std::endl;
+#define TESTSTDERR(text) std::cerr<<text<<std::endl;
+
 //print kinds of color
-#define TESTRED(text)     std::cout<<"\033[31m"<<text<<"\033[0m"<<std::endl;
-#define TESTGREEN(text)   std::cout<<"\033[32m"<<text<<"\033[0m"<<std::endl;
-#define TESTYELLOW(text)  std::cout<<"\033[33m"<<text<<"\033[0m"<<std::endl;
-#define TESTBLUE(text)    std::cout<<"\033[34m"<<text<<"\033[0m"<<std::endl;
-#define TESTCAR(text)     std::cout<<"\033[35m"<<text<<"\033[0m"<<std::endl;
-#define TESTCYAN(text)    std::cout<<"\033[36m"<<text<<"\033[0m"<<std::endl;
+#define TESTRED(text)     "\033[31m"<<text<<"\033[0m"
+#define TESTGREEN(text)   "\033[32m"<<text<<"\033[0m"
+#define TESTYELLOW(text)  "\033[33m"<<text<<"\033[0m"
+#define TESTBLUE(text)    "\033[34m"<<text<<"\033[0m"
+#define TESTCAR(text)     "\033[35m"<<text<<"\033[0m"
+#define TESTCYAN(text)    "\033[36m"<<text<<"\033[0m"
 
 //util macro
 #define CPPWEBCONNECTSTR(...) #__VA_ARGS__
@@ -74,36 +77,45 @@ std::vector<std::pair<_test_base*, std::string>> _test_base::test_arr;
 	void CPPWEB_TEST_NAME(test_group,test_name)::TestBody()
 
 //some function for debug and judge
-#define SKIP()      TESTYELLOW("[SKIP] in ["<<_FILE_LINE_MSG_<<"] : ");return;
-#define DEBUG(text) TESTYELLOW("[DEBUG] in ["<<_FILE_LINE_MSG_<<"] : "<<text)
-#define ERROR(text) TESTCAR("[ERROR] in ["<<_FILE_LINE_MSG_<<"] : "<<text)\
+#define SKIP()      TESTSTDOUT(TESTYELLOW("[SKIP] in ["<<_FILE_LINE_MSG_<<"] : "));return;
+#define DEBUG(text) TESTSTDOUT(TESTYELLOW("[DEBUG] in ["<<_FILE_LINE_MSG_<<"] : "<<text))
+#define ERROR(text) TESTSTDERR(TESTCAR("[ERROR] in ["<<_FILE_LINE_MSG_<<"] : "<<text))\
 	_CLASS_FAIL_
-#define FATAL(text) TESTRED("[FATAL] in ["<<_FILE_LINE_MSG_<<"] : "<<text)\
+#define FATAL(text) TESTSTDERR(TESTRED("[FATAL] in ["<<_FILE_LINE_MSG_<<"] : "<<text))\
 	_CLASS_FAIL_;return;
-#define PANIC(text) TESTRED("[PANIC] in ["<<_FILE_LINE_MSG_<<"] : "<<text);exit(-1);
+#define PANIC(text) TESTSTDERR(TESTRED("[PANIC] in ["<<_FILE_LINE_MSG_<<"] : "<<text));exit(-1);
 #define EXPECT_EQ(result,expect)\
 	if (result!=expect){FATAL(CPPWEBCONNECTSTR(result want get expect but get)<<" "<<result)}
-#define MUST_EQUAL(one,two)\
-	if(one!=two){FATAL(one<<" "<<CPPWEBCONNECTSTR(!= two));}
+#define MUST_EQUAL(result,expect)\
+	if(result!=expect){FATAL(result<<" "<<CPPWEBCONNECTSTR(!= expect));}
 #define MUST_TRUE(flag,text)\
 	if(!(flag)){FATAL(text);}
 
+//for argc message
+static void (*__test_argc_funcpr__)(int argc,char* argv[])=nullptr;
+static void __test_deal_argc__(int argc,char** argv);
+#define ARGC_FUNC static auto __test__temp__argc__=(__test_argc_funcpr__=__test_deal_argc__);\
+												   void __test_deal_argc__(int argc,char* argv[])
+
 //the main function
-#define RUN                                                \
-	int main(){                                            \
-		_test_base base;                                   \
-		for (int i = 0; i < base.test_arr.size(); i++) {   \
-			TESTCYAN("Runing:"<<base.test_arr[i].second);  \
-			base.test_arr[i].first->TestBody();            \
-			if(base.test_arr[i].first->result){            \
-				TESTGREEN("Result:PASS");                  \
-			}else{                                         \
-				TESTRED("Result:Fail");                    \
-			}                                              \
-			std::cout<<std::endl;                          \
-		}                                                  \
-		TESTBLUE("Total Run:"<<base.success+base.fail)     \
-		TESTBLUE("Success Run:"<<base.success)             \
-		TESTBLUE("Fail Run:"<<base.fail)                   \
-		return base.fail;                                  \
+#define RUN                                                           \
+	int main(int argc,char* argv[]){                                  \
+		if (__test_argc_funcpr__!=nullptr) {                          \
+			__test_argc_funcpr__(argc,argv);                          \
+		}                                                             \
+		_test_base base;                                              \
+		for (int i = 0; i < base.test_arr.size(); i++) {              \
+			TESTSTDOUT(TESTCYAN("Runing:"<<base.test_arr[i].second)); \
+			base.test_arr[i].first->TestBody();                       \
+			if(base.test_arr[i].first->result){                       \
+				TESTSTDOUT(TESTGREEN("Result:PASS"));                 \
+			}else{                                                    \
+				TESTSTDOUT(TESTRED("Result:Fail"));                   \
+			}                                                         \
+			std::cout<<std::endl;                                     \
+		}                                                             \
+		TESTSTDOUT(TESTBLUE("Total Run:"<<base.success+base.fail))    \
+		TESTSTDOUT(TESTBLUE("Success Run:"<<base.success))            \
+		TESTSTDERR(TESTBLUE("Fail Run:"<<base.fail))                  \
+		return base.fail;                                             \
 	}
