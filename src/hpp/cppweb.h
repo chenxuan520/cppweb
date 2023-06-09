@@ -3,7 +3,7 @@
 //THIS PROGRAM IS FREE SOFTWARE. IS LICENSED UNDER AGPL
 //
 //Copyright (c) 2022 chenxuan
-/* #define CPPWEB_OPENSSL */
+// #define CPPWEB_OPENSSL
 #ifndef _CPPWEB_H_
 #define _CPPWEB_H_
 
@@ -82,8 +82,7 @@ typedef std::unordered_map<std::string,std::string> KeyMap;
 ***********************************************/
 class WSAinit{
 public:
-	WSAinit()
-	{
+	WSAinit(){
 		WSADATA wsa;//web server api data
 		if(WSAStartup(MAKEWORD(2,2),&wsa)!=0)
 		{
@@ -91,8 +90,7 @@ public:
 			exit(0);
 		}
 	}
-	~WSAinit()
-	{
+	~WSAinit(){
 		WSACleanup();
 	}
 }_wsaInit;
@@ -107,8 +105,7 @@ private:
 	SocketApi()=delete;
 	SocketApi(const SocketApi&)=delete;
 public:
-	static inline int setSocWriteWait(int fd,unsigned sec,unsigned msec=0)
-	{
+	static inline int setSocWriteWait(int fd,unsigned sec,unsigned msec=0){
 		if(sec==0&&msec==0)
 			return 0;
 		struct timeval tv; 
@@ -120,24 +117,21 @@ public:
 		return setsockopt(fd,SOL_SOCKET,SO_SNDTIMEO,(const char*)&tv,sizeof(struct timeval));
 #endif
 	}
-	static inline int setSockWriteSize(int fd,int size)
-	{
+	static inline int setSockWriteSize(int fd,int size){
 #ifndef _WIN32
 		return setsockopt(fd,SOL_SOCKET,SO_SNDBUF,&size,sizeof(int));
 #else
 		return setsockopt(fd,SOL_SOCKET,SO_SNDBUF,(const char*)&size,sizeof(int));
 #endif
 	}
-	static inline int setSockReadSize(int fd,int size)
-	{
+	static inline int setSockReadSize(int fd,int size){
 #ifndef _WIN32
 		return setsockopt(fd,SOL_SOCKET,SO_RCVBUF,&size,sizeof(int));
 #else
 		return setsockopt(fd,SOL_SOCKET,SO_RCVBUF,(const char*)&size,sizeof(int));
 #endif
 	}
-	static inline int setSocReadWait(int fd,unsigned sec,unsigned msec=0)
-	{
+	static inline int setSocReadWait(int fd,unsigned sec,unsigned msec=0){
 		if(sec==0&&msec==0)
 			return 0;
 		struct timeval tv; 
@@ -149,20 +143,17 @@ public:
 		return setsockopt(fd,SOL_SOCKET,SO_RCVTIMEO,(const char*)&tv,sizeof(struct timeval));
 #endif
 	}
-	static inline int setDeferAccept(int fd,int timeout=5)
-	{
+	static inline int setDeferAccept(int fd,int timeout=5){
 #ifndef _WIN32
 		return setsockopt(fd,IPPROTO_TCP,TCP_DEFER_ACCEPT,&timeout,sizeof(int));
 #else
 		return setsockopt(fd,IPPROTO_TCP,TCP_DEFER_ACCEPT,(const char*)&timeout,sizeof(int));
 #endif
 	}
-	static inline int receiveSocket(int fd,void* buffer,size_t len,int flag=0)
-	{
+	static inline int receiveSocket(int fd,void* buffer,size_t len,int flag=0){
 		return recv(fd,(char*)buffer,len,flag);
 	}
-	static int recvSockBorder(int fd,std::string& buffer,const char* border,int flag=0)
-	{
+	static int recvSockBorder(int fd,std::string& buffer,const char* border,int flag=0){
 		if(border==NULL||strlen(border)==0)
 			return -1;
 		char firstCh=border[0],now=0,temp[1024]={0};
@@ -201,8 +192,7 @@ public:
 		free(left);
 		return buffer.size();
 	}
-	static int recvSockSize(int fd,std::string& buffer,size_t needSize,int flag=0)
-	{
+	static int recvSockSize(int fd,std::string& buffer,size_t needSize,int flag=0){
 		if(needSize==0)
 			return -1;
 		char* pbuffer=(char*)malloc(sizeof(char)*needSize+1);
@@ -216,8 +206,7 @@ public:
 		free(pbuffer);
 		return len;
 	}
-	static int receiveSocket(int fd,std::string& buffer,int flag=0)
-	{
+	static int receiveSocket(int fd,std::string& buffer,int flag=0){
 		char temp[1024]={0};
 		int len=0;
 		do{
@@ -230,28 +219,22 @@ public:
 		}while(len==1024);
 		return buffer.size()>0?buffer.size():len;
 	}
-	static inline int sendSocket(int fd,const void* buffer,size_t len,int flag=0)
-	{
+	static inline int sendSocket(int fd,const void* buffer,size_t len,int flag=0){
 		return send(fd,(const char*)buffer,len,flag);
 	}
-	static inline int tryConnect(int fd,const sockaddr* addr,socklen_t len)
-	{
+	static inline int tryConnect(int fd,const sockaddr* addr,socklen_t len){
 		return connect(fd,addr,len);
 	}
-	static inline int bindSocket(int fd,const sockaddr* addr,socklen_t len)
-	{
+	static inline int bindSocket(int fd,const sockaddr* addr,socklen_t len){
 		return bind(fd,addr,len);
 	}
-	static inline int acceptSocket(int fd,sockaddr* addr,socklen_t* plen)
-	{
+	static inline int acceptSocket(int fd,sockaddr* addr,socklen_t* plen){
 		return accept(fd,addr,plen);
 	}
-	static inline int listenSocket(int fd,int backLog)
-	{
+	static inline int listenSocket(int fd,int backLog){
 		return listen(fd,backLog);
 	}
-	static inline int closeSocket(int fd)
-	{
+	static inline int closeSocket(int fd){
 #ifndef _WIN32
 		return close(fd);
 #else
@@ -259,16 +242,13 @@ public:
 #endif
 	}
 #ifdef CPPWEB_OPENSSL
-	static inline int sendSocket(SSL* ssl,const void* buffer,size_t len,int=0)
-	{
+	static inline int sendSocket(SSL* ssl,const void* buffer,size_t len,int=0){
 		return SSL_write(ssl,buffer,len);
 	}
-	static inline int receiveSocket(SSL* ssl,void* buffer,size_t len,int=0)
-	{
+	static inline int receiveSocket(SSL* ssl,void* buffer,size_t len,int=0){
 		return SSL_read(ssl,buffer,len);
 	}
-	static int receiveSocket(SSL* ssl,std::string& buffer,int=0)
-	{
+	static int receiveSocket(SSL* ssl,std::string& buffer,int=0){
 		char temp[1024]={0};
 		int len=0;
 		buffer.clear();
@@ -284,8 +264,7 @@ public:
 		}while(len==1024);
 		return buffer.size()>0?buffer.size():len;
 	}
-	static int recvSockSize(SSL* ssl,std::string& buffer,size_t needSize,int=0)
-	{
+	static int recvSockSize(SSL* ssl,std::string& buffer,size_t needSize,int=0){
 		char now=0,temp[1024]={0};
 		unsigned all=0;
 		int len=0,size=0;
@@ -1563,20 +1542,17 @@ Json::Object Json::npos;
 class ProcessCtrl{
 public:
 	static int childPid;
-	static int backGround()
-	{
+	static int backGround(){
 		int pid=0;
 #ifndef _WIN32
-		if((pid=fork())!=0)
-		{
+		if((pid=fork())!=0){
 			printf("process pid=%d\n",pid);
 			exit(0);
 		}
 #endif
 		return pid;
 	}
-	static void guard()
-	{
+	static void guard(){
 #ifndef _WIN32
 		signal(SIGINT,endGuard);
 		signal(SIGQUIT,endGuard);
@@ -1597,8 +1573,7 @@ public:
 	}
 private:
 #ifndef _WIN32
-	static void endGuard(int)
-	{
+	static void endGuard(int){
 		if(ProcessCtrl::childPid!=0)
 			kill(ProcessCtrl::childPid,2);
 		exit(0);
@@ -1621,16 +1596,14 @@ private:
 		Node* next[77];
 		bool stop;
 		T* data;
-		Node()
-		{
+		Node(){
 			for(unsigned i=0;i<77;i++)
 				next[i]=NULL;
 			stop=false;
 		}
 	};
 	Node* root;
-	void cleanMemory(Node* root)
-	{
+	void cleanMemory(Node* root){
 		for(unsigned i=0;i<77;i++)
 			if(root->next[i]!=NULL)
 				cleanMemory(root->next[i]);
@@ -1684,8 +1657,7 @@ public:
 		}
 		return NULL;
 	}
-	bool check(const char* word,T* data=NULL)
-	{
+	bool check(const char* word,T* data=NULL){
 		Node* temp=root;
 		for(unsigned i=0;word[i]!=0;i++)
 		{
@@ -1702,8 +1674,7 @@ public:
 			temp->data=data;
 		return true;
 	}
-	void clean()
-	{
+	void clean(){
 		cleanMemory(root);
 		root=new Node;
 	}
@@ -1720,7 +1691,7 @@ public:
 ***********************************************/
 class ServerTcpIp{
 public:
-	enum Thing{
+	enum Event{
 		CPPOUT=0,CPPIN=1,CPPSAY=2,
 	};
 private:
@@ -1739,8 +1710,6 @@ protected:
 	int readTime;//useful only in ssl model,for read time
 	bool reuseAddr;//if reuse the addr
 	bool edgeTrigger;//if open epoll edge trigger
-	char* hostip;//host IP 
-	char* hostname;//host name
 	const char* error;//error hapen
 	sockaddr_in addr;//IPv4 of host;
 	sockaddr_in client;//IPv4 of client;
@@ -1755,69 +1724,8 @@ protected:
 	std::unordered_map<int,SSL*> sslHash;//hash to find sock and SSL*
 	std::unordered_set<SSL*> sslExist;
 #endif
-protected:
-	int* pfdn;//pointer if file descriptor
-	int fdNumNow;//num of fd now
-	int fdMax;//fd max num
 public:
-	bool addFd(int addsoc)//add file des criptor
-	{
-		bool flag=false;
-		for(int i=0;i<fdNumNow;i++)
-		{
-			if(pfdn[i]==0)
-			{
-				pfdn[i]=addsoc;
-				flag=true;//has free room
-				break;
-			}
-		}
-		if(flag==false)//no free room
-		{
-			if(fdNumNow>=fdMax)
-			{
-				pfdn=(int*)realloc(pfdn,sizeof(int)*(fdMax+32));//try to realloc
-				if(pfdn==NULL)
-					return false;
-				fdMax+=31;
-			}
-			pfdn[fdNumNow]=addsoc;
-			fdNumNow++;
-		}
-		return true;
-	}
-	bool deleteFd(int clisoc)//delete
-	{
-		for(int i=0;i<fdNumNow;i++)
-		{
-			if(pfdn[i]==clisoc)
-			{
-				pfdn[i]=0;
-				return true;
-			}
-		}
-		return false;
-	}
-	bool getFd(int* array,int* pcount,int arrayLen)//get epoll array
-	{
-		if(fdNumNow!=0)
-			*pcount=fdNumNow;
-		else
-			return false;
-		for(int i=0;i<fdNumNow&&i<arrayLen;i++)
-			array[i]=pfdn[i];
-		return true;
-	}
-	bool findFd(int cliSoc)//find if socket is connect
-	{
-		for(int i=0;i<fdNumNow;i++)
-			if(pfdn[i]==cliSoc)
-				return true;
-		return false;
-	}
-public:
-	ServerTcpIp(unsigned short port=5200,int epollNum=1,int wait=5)
-	{//port is bound ,epollNum is if open epoll model,wait is listen socket max wait
+	ServerTcpIp(unsigned short port=5200,int epollNum=1,int wait=5){//port is bound ,epollNum is if open epoll model,wait is listen socket max wait
 		sock=socket(AF_INET,SOCK_STREAM,0);//AF=addr family internet
 		addr.sin_addr.s_addr=htonl(INADDR_ANY);//inaddr_any
 		addr.sin_family=AF_INET;//af_intt IPv4
@@ -1831,16 +1739,6 @@ public:
 		reuseAddr=true;
 		edgeTrigger=false;
 		error=NULL;
-		hostip=(char*)malloc(sizeof(char)*200);
-		if(hostip==NULL)
-			error="hostip worng";
-		else
-			memset(hostip,0,sizeof(char)*200);
-		hostname=(char*)malloc(sizeof(char)*300);
-		if(hostname==NULL)
-			error="hostname wrong";
-		else
-			memset(hostname,0,sizeof(char)*300);
 		FD_ZERO(&fdClients);//clean fdClients;
 		runMode=MODEP2P;
 #ifndef _WIN32
@@ -1850,17 +1748,10 @@ public:
 		else
 			memset(pevent,0,sizeof(epoll_event)*512);
 		memset(&nowEvent,0,sizeof(epoll_event));
-		pfdn=(int*)malloc(sizeof(int)*64);
-		if(pfdn==NULL)
-			error="pfdn wrong";
-		else
-			memset(pfdn,0,sizeof(int)*64);
 #ifndef _WIN32
 		signal(SIGPIPE, SIG_IGN);
 #endif
 #endif
-		fdNumNow=0;
-		fdMax=64;
 #ifdef CPPWEB_OPENSSL
 #if OPENSSL_VERSION_NUMBER < 0x1010001fL
 		SSL_load_error_strings();
@@ -1881,8 +1772,7 @@ public:
 							SSL_OP_NO_SESSION_RESUMPTION_ON_RENEGOTIATION);
 #endif
 	}
-	virtual ~ServerTcpIp()//clean server
-	{
+	virtual ~ServerTcpIp(){//clean server
 #ifndef _WIN32
 		close(sock);
 		close(sockC);
@@ -1894,51 +1784,39 @@ public:
 		closesocket(sockC);
 		closesocket(epfd);
 #endif
-		if(pfdn!=NULL)
-			free(pfdn);
-		if(hostip!=NULL)
-			free(hostip);
-		if(hostname!=NULL)
-			free(hostname);
 #ifdef CPPWEB_OPENSSL
 		if(ctx!=NULL)
 			SSL_CTX_free(ctx);
 #endif
 	}
 #ifdef CPPWEB_OPENSSL
-	inline SSL* getSSL(int sock)
-	{
+	inline SSL* getSSL(int sock){
 		if(sslHash.find(sock)==sslHash.end())
 			return NULL;
 		else
 			return sslHash[sock];
 	}
-	bool loadCertificate(const char* certPath,const char* keyPath,const char* passwd=NULL)
-	{
+	bool loadCertificate(const char* certPath,const char* keyPath,const char* passwd=NULL){
 		if(ctx==NULL)
 			return false;
-		if(SSL_CTX_use_certificate_chain_file(ctx,certPath)!=1)
-		{
+		if(SSL_CTX_use_certificate_chain_file(ctx,certPath)!=1) {
 			error="cert load wrong";
 			return false;
 		}
 		if(passwd!=NULL)
 			SSL_CTX_set_default_passwd_cb_userdata(ctx,(void*)passwd);
-		if(SSL_CTX_use_PrivateKey_file(ctx,keyPath,SSL_FILETYPE_PEM)!=1)
-		{
+		if(SSL_CTX_use_PrivateKey_file(ctx,keyPath,SSL_FILETYPE_PEM)!=1) {
 			error="key load wrong";
 			return false;
 		}
 		return true;
 	}
-	int acceptSocketSSL(sockaddr_in& newaddr)
-	{
+	int acceptSocketSSL(sockaddr_in& newaddr) {
 		int cli=accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
 		SocketApi::setSocWriteWait(cli,writeTime);
 		SocketApi::setSocReadWait(cli,readTime);
 		SSL* now=SSL_new(ctx);
-		if(now==NULL)
-		{
+		if(now==NULL) {
 			error="ssl new wrong";
 			return cli;
 		}
@@ -1948,8 +1826,7 @@ public:
 		sslExist.insert(now);
 		return cli;
 	}
-	inline int receiveSocketSSL(int num,void* pget,int len,int=0)
-	{
+	inline int receiveSocketSSL(int num,void* pget,int len,int=0) {
 		SSL* ssl=NULL;
 		if(sslHash.find(num)!=sslHash.end())
 			ssl=sslHash[num];
@@ -1958,8 +1835,7 @@ public:
 		else
 			return recv(num,pget,len,0);
 	}
-	inline int sendSocketSSL(int num,const void* pget,int len,int=0)
-	{
+	inline int sendSocketSSL(int num,const void* pget,int len,int=0) {
 		SSL* ssl=NULL;
 		if(sslHash.find(num)!=sslHash.end())
 			ssl=sslHash[num];
@@ -1971,8 +1847,7 @@ public:
 		else
 			return -1;
 	}
-	inline int closeSSL(int cli)
-	{
+	inline int closeSSL(int cli) {
 		if(sslHash.find(cli)!=sslHash.end())
 		{
 			auto temp=sslHash[cli];
@@ -1988,10 +1863,8 @@ public:
 #endif
 	}
 #endif
-	inline bool bondhost()//bond myself first
-	{
-		if(reuseAddr)
-		{
+	inline bool bondhost(){//bond myself first
+		if(reuseAddr){
 			int optval=1;
 #ifndef _WIN32
 			setsockopt(sock,SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
@@ -2001,8 +1874,7 @@ public:
 			return false;
 		return true;
 	}
-	inline void setPort(unsigned short port)//change the port bound
-	{
+	inline void setPort(unsigned short port){//change the port bound
 		addr.sin_port=htons(port);
 	}
 	bool setlisten()//set listem to accept second
@@ -2018,8 +1890,7 @@ public:
 		fd_count=sock;
 		return true;
 	}
-	inline int acceptSocket(sockaddr_in& newaddr)
-	{
+	inline int acceptSocket(sockaddr_in& newaddr){
 #ifndef CPPWEB_OPENSSL
 		return accept(sock,(sockaddr*)&newaddr,(socklen_t*)&sizeAddr);
 #else
@@ -2043,8 +1914,7 @@ public:
 		return this->receiveSocketSSL(clisoc,pget,len,flag);
 #endif
 	}
-	int receiveSocket(int cliSoc,std::string& buffer,int flag=0)
-	{
+	int receiveSocket(int cliSoc,std::string& buffer,int flag=0){
 		char temp[1024]={0};
 		buffer.clear();
 		int len=receiveSocket(cliSoc,temp,1024,flag);
@@ -2059,8 +1929,7 @@ public:
 		}
 		return buffer.size();
 	}
-	inline int sendOne(const void* psen,int len)//model one
-	{
+	inline int sendOne(const void* psen,int len){//model one
 		return send(sockC,(char*)psen,len,0);
 	}
 	inline int sendSocket(int socCli,const void* psen,int len,int flag=0)//send by socket
@@ -2071,8 +1940,7 @@ public:
 		return sendSocketSSL(socCli,psen,len,flag);
 #endif
 	}
-	inline int closeSocket(int socCli)
-	{
+	inline int closeSocket(int socCli){
 #ifndef CPPWEB_OPENSSL
 #ifndef _WIN32
 		return close(socCli);
@@ -2083,8 +1951,7 @@ public:
 		return closeSSL(socCli);
 #endif
 	}
-	int cleanSocket(int socCli)
-	{
+	int cleanSocket(int socCli){
 		if(runMode==MODEEPO)
 		{
 #ifndef _WIN32
@@ -2099,12 +1966,10 @@ public:
 			return closeSocket(socCli);
 		return closeSocket(socCli);
 	}
-	inline const char* lastError()
-	{
+	inline const char* lastError(){
 		return this->error;
 	}
-	void selectModel(int (*pfunc)(Thing,int,ServerTcpIp&,void*),void* argv)
-	{
+	void selectModel(int (*pfunc)(Event,int,ServerTcpIp&,void*),void* argv){
 		runMode=MODESEL;
 		fd_set temp=fdClients;
 #ifndef _WIN32
@@ -2208,10 +2073,10 @@ public:
 #endif
 	}
 #ifndef _WIN32
-	bool selectModel(void* pget,int len,void* pneed,int (*pfunc)(Thing ,int ,int,void* ,void*,ServerTcpIp& ))
+	bool selectModel(void* pget,int len,void* pneed,int (*pfunc)(Event ,int ,int,void* ,void*,ServerTcpIp& ))
 	{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
 		fd_set temp=fdClients;
-		Thing pthing=CPPOUT;
+		Event pthing=CPPOUT;
 		runMode=MODESEL;
 		int sign=select(fd_count+1,&temp,NULL,NULL,NULL);
 		if(sign>0)
@@ -2275,14 +2140,13 @@ public:
 		return true;
 	}
 #endif
-	char* getHostName()//get self name
+	std::string getHostName()//get self name
 	{
 		char name[300]={0};
 		gethostname(name,300);
-		memcpy(hostname,name,300);
-		return hostname;
+		return name;
 	}
-	char* getHostIp()//get self ip
+	std::string getHostIp()//get self ip
 	{
 		char name[300]={0};
 		gethostname(name,300);
@@ -2290,13 +2154,9 @@ public:
 		in_addr addr;
 		char* p=phost->h_addr_list[0];
 		memcpy(&addr.s_addr,p,phost->h_length);
-		memset(hostip,0,sizeof(char)*200);
-		if(strlen(inet_ntoa(addr))>=200)
-			return NULL;
-		memcpy(hostip,inet_ntoa(addr),strlen(inet_ntoa(addr)));
-		return hostip;
+		return inet_ntoa(addr);
 	}
-	static const char* getPeerIp(int cliSoc,int* pcliPort)//get ip and port by socket
+	static std::string getPeerIp(int cliSoc,int* pcliPort)//get ip and port by socket
 	{
 		sockaddr_in cliAddr={0,0,{0},{0}};
 		int len=sizeof(cliAddr);
@@ -2305,7 +2165,7 @@ public:
 		*pcliPort=cliAddr.sin_port;
 		return inet_ntoa(cliAddr.sin_addr); 
 	}
-	void epollModel(int (*pfunc)(Thing,int,ServerTcpIp&,void*),void* argv)
+	void epollModel(int (*pfunc)(Event,int,ServerTcpIp&,void*),void* argv)
 	{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
 #ifndef _WIN32
 		runMode=MODEEPO;
@@ -2351,9 +2211,9 @@ public:
 #endif
 	}
 #ifndef _WIN32
-	bool epollModel(void* pget,int len,void* pneed,int (*pfunc)(Thing,int ,int ,void* ,void*,ServerTcpIp& ))
+	bool epollModel(void* pget,int len,void* pneed,int (*pfunc)(Event,int ,int ,void* ,void*,ServerTcpIp& ))
 	{//pthing is 0 out,1 in,2 say pnum is the num of soc,pget is rec,len is the max len of pget,pneed is others things
-		Thing thing=CPPSAY;
+		Event thing=CPPSAY;
 		runMode=MODEEPO;
 		int eventNum=epoll_wait(epfd,pevent,512,-1);
 		for(int i=0;i<eventNum;i++)
@@ -2690,16 +2550,14 @@ public:
 		const char* error;
 		Response():statusCode(0),error(nullptr){};
 		bool analysisResponse(const std::string& recvText){
-			if(recvText=="")
-			{
+			if(recvText==""){
 				error="null input";
 				return false;
 			}
 			char one[512]={0},three[512]={0};
 			int statusCode=-1;
 			const char* now=(char*)recvText.c_str(),*end=strstr(now,"\r\n\r\n");
-			if(strstr(now,"\r\n\r\n")==NULL)
-			{
+			if(strstr(now,"\r\n\r\n")==NULL){
 				this->error="error request";
 				return false;
 			}
@@ -2709,8 +2567,7 @@ public:
 			this->statusCode=statusCode;
 			this->statusStr=three;
 			this->body=end+4;
-			while(end>now)
-			{
+			while(end>now){
 				sscanf(now,"%511[^:]: %511[^\r]",one,three);
 				if(strlen(one)==512||strlen(three)==512)
 				{
@@ -2726,6 +2583,17 @@ public:
 	};
 	class Request{
 	public:
+#ifndef _WIN32
+		enum AskType{//different ask ways in http
+			GET,POST,PUT,DELETE,OPTIONS,CONNECT,ALL,
+		};
+#else
+		enum AskType{//different ask ways in http
+			GET,POST,PUT,WINDELETE,OPTIONS,CONNECT,ALL,
+		};
+#endif
+	public:
+		AskType type;
 		std::string method;
 		std::string askPath;
 		std::string version;
@@ -2734,12 +2602,10 @@ public:
 		const char* error;
 		bool isFull;//judge if the request be analyse
 		Request():version("HTTP/1.1"),body(NULL),error(NULL),isFull(false){};
-		Request(const char* recvText,bool onlyTop=false)
-		{
+		Request(const char* recvText){
 			this->analysisRequest(recvText);
 		}
-		std::string getWildUrl(const char* route)
-		{//such as /okok/lplp ,getWildUrl("/okok/")="lplp"
+		std::string getWildUrl(const char* route){//such as /okok/lplp ,getWildUrl("/okok/")="lplp"
 			if(askPath.size()==0){
 				this->error="please analysisRequest first";
 				return "";
@@ -2752,8 +2618,7 @@ public:
 			else
 				return std::string(askPath.c_str()+strlen(route)+pos);
 		}
-		bool routePairing(std::string key,std::unordered_map<std::string,std::string>& pairMap,const char* recvText=NULL)
-		{
+		bool routePairing(std::string key,std::unordered_map<std::string,std::string>& pairMap,const char* recvText=NULL){
 			if(askPath.size()==0){
 				this->error="please analysisRequest first";
 				return "";
@@ -2783,8 +2648,7 @@ public:
 			}
 			return true;
 		}
-		bool analysisRequest(const void* recvText)
-		{
+		bool analysisRequest(const void* recvText){
 			if(recvText==NULL)
 			{
 				error="null input";
@@ -2793,12 +2657,20 @@ public:
 			Request& req=*this;
 			char one[128]={0},two[512]={0},three[512]={0};
 			const char* now=(char*)recvText,*end=strstr(now,"\r\n\r\n");
-			if(strstr(now,"\r\n\r\n")==NULL)
-			{
+			if(strstr(now,"\r\n\r\n")==NULL){
 				this->error="error request";
 				return false;
 			}
-			sscanf(now,"%127s %511s %511s",one,two,three);
+			int getNum=sscanf(now,"%127s %511s %511s",one,two,three);
+			if (getNum!=3) {
+				error="ask wrong";
+				return false;
+			}
+			type=getAskType(one);
+			if (type==ALL) {
+				error="get type wrong";
+				return false;
+			}
 			now+=strlen(one)+strlen(two)+strlen(three)+4;
 			isFull=true;
 			req.method=one;
@@ -2806,22 +2678,20 @@ public:
 			req.urlDecode(req.askPath);
 			req.version=three;
 			req.body=end+4;
-				while(end>now)
+			while(end>now){
+				sscanf(now,"%511[^:]: %511[^\r]",two,three);
+				if(strlen(two)==512||strlen(three)==512)
 				{
-					sscanf(now,"%511[^:]: %511[^\r]",two,three);
-					if(strlen(two)==512||strlen(three)==512)
-					{
-						error="head too long";
-						return false;
-					}
-					req.head.insert(std::pair<std::string,std::string>{two,three});
-					now=strchr(now,'\r');
-					now+=2;
+					error="head too long";
+					return false;
 				}
+				req.head.insert(std::pair<std::string,std::string>{two,three});
+				now=strchr(now,'\r');
+				now+=2;
+			}
 			return true;
 		}
-		std::string formValue(const std::string& key)
-		{//get form value
+		std::string formValue(const std::string& key){//get form value
 			std::string temp=key+"\\s*[=]\\s*([\\\\\\w\\%\\.\\?\\+\\-]+)",result;
 			std::cmatch getArr;
 			auto flag=std::regex_search(this->body,getArr,std::regex(temp));
@@ -2830,8 +2700,7 @@ public:
 			result=getArr[1];
 			return result;
 		}
-		std::string queryValue(const std::string& key,void* buffer=NULL)
-		{//get kay value in route
+		std::string queryValue(const std::string& key,void* buffer=NULL){//get kay value in route
 			if(askPath.size()==0){
 				this->error="please analysisRequest first";
 				return "";
@@ -2844,15 +2713,13 @@ public:
 			result=getArr[1];
 			return result;
 		}
-		std::string getCookie(const std::string& key,const void* buffer=NULL)
-		{
+		std::string getCookie(const std::string& key,const void* buffer=NULL){
 			if(this->head.find("Cookie")!=this->head.end())
 				return DealHttp::findKeyValue(key,this->head["Cookie"].c_str());
 			else
 				return DealHttp::getCookie(buffer,key.c_str());
 		}
-		bool createAskRequest(void* buffer,unsigned buffLen)
-		{
+		bool createAskRequest(void* buffer,unsigned buffLen){
 			Request& req=*this;
 			if(buffLen<200)
 			{
@@ -2897,8 +2764,7 @@ public:
 				strcat((char*)buffer,req.body);
 			return true;
 		}
-		void clear()
-		{
+		void clear(){
 			this->isFull=false;
 			this->body=NULL;
 			this->error=NULL;
@@ -2907,8 +2773,7 @@ public:
 			this->method.clear();
 			this->askPath.clear();
 		}
-		static void urlDecode(std::string& srcString)
-		{
+		static void urlDecode(std::string& srcString){
 			char ch=0;
 			int temp=0;
 			unsigned int srcLen=srcString.size();
@@ -2938,8 +2803,7 @@ public:
 			free(buffer);
 			return;
 		}
-		std::string hexStrToUtf8(const std::string& src)
-		{
+		std::string hexStrToUtf8(const std::string& src){
 			std::string result;
 			unsigned pos=0;
 			auto func=[](const std::string& src)->std::string{
@@ -2976,8 +2840,7 @@ public:
 			}
 			return result;
 		}
-		std::string createAskRequest()
-		{
+		std::string createAskRequest(){
 			Request& req=*this;
 			if(req.head.find("Host")==req.head.end())
 			{
@@ -3001,6 +2864,23 @@ public:
 			if(req.body!=NULL)
 				result+=req.body;
 			return result;
+		}
+		AskType getAskType(const std::string& ask){
+			if (ask=="GET") {
+				return GET;
+			}else if(ask=="POST") {
+				return POST;
+			}else if (ask=="OPTIONS") {
+				return OPTIONS;
+			}else if (ask=="PUT") {
+				return PUT;
+			}else if (ask=="DELETE") {
+#ifndef _WIN32
+				return DELETE;
+#endif
+			}else {
+				return ALL;
+			}
 		}
 	};
 	struct RouteInfo{
@@ -3818,12 +3698,15 @@ public:
 		sscanf(temp+strlen(askWay)+1,format,buffer);
 		return buffer;
 	}
-	void changeSetting(const char* connectStatus,const char* serverName)
-	{
-		if(serverName==NULL||connectStatus==NULL)
-			return;
+	void setLongConnect(bool status){
+		if (status) {
+			this->connect="keep-alive";
+		}else {
+			this->connect="Close";
+		}
+	}
+	inline void setServerName(const char* serverName){
 		this->serverName=serverName;
-		this->connect=connectStatus;
 	}
 	inline const char* lastError()
 	{
@@ -4284,7 +4167,7 @@ public:
 				strcat(askPath,method);
 				strcat(askPath," no found");
 			}
-			sprintf(buffer,"{\"level\":\"%s\",\"time\":\"%s\",\"ip\":\"%s\",\"method\":\"%s\",\"msg\":\"%s\"}",msg,nowTime,ServerTcpIp::getPeerIp(soc,&port),method,askPath);
+			sprintf(buffer,"{\"level\":\"%s\",\"time\":\"%s\",\"ip\":\"%s\",\"method\":\"%s\",\"msg\":\"%s\"}",msg,nowTime,ServerTcpIp::getPeerIp(soc,&port).c_str(),method,askPath);
 		}
 		else if(soc==-1)
 		{
@@ -4312,7 +4195,7 @@ public:
 		DealHttp::Request req;
 		http.analysisRequest(req,text);
 		time_t now=time(NULL);
-		fprintf(fp,"%s %s %s %s\n",ctime(&now),ServerTcpIp::getPeerIp(soc,&port),req.method.c_str(),req.askPath.c_str());
+		fprintf(fp,"%s %s %s %s\n",ctime(&now),ServerTcpIp::getPeerIp(soc,&port).c_str(),req.method.c_str(),req.askPath.c_str());
 		fclose(fp);
 		return ;
 	}
@@ -4375,22 +4258,13 @@ public://main class for http server2.0
 	enum LogLevel{
 		INSIDEERROR=0,REQERROR=1,WARNING=2,NORMALLOG=3,SYSLOG=4
 	};
-#ifndef _WIN32
-	enum AskType{//different ask ways in http
-		GET,POST,PUT,DELETE,OPTIONS,CONNECT,ALL,
-	};
-#else
-	enum AskType{//different ask ways in http
-		GET,POST,PUT,WINDELETE,OPTIONS,CONNECT,ALL,
-	};
-#endif
 	struct RouteFuntion{//inside struct,pack for handle
-		AskType ask;
+		DealHttp::Request::AskType ask;
 		RouteType type;
 		char route[128];
 		char pathExtra[128];
 		std::vector<std::function<void(HttpServer&,DealHttp&,int)>> pfuncs;
-		RouteFuntion():ask(GET),type(ONEWAY){
+		RouteFuntion():ask(DealHttp::Request::GET),type(ONEWAY){
 			memset(route,0,128);
 			memset(pathExtra,0,128);
 		};
@@ -4414,43 +4288,35 @@ public://main class for http server2.0
 		HttpServer& server;
 		Group(HttpServer& ser,const char* gropa):group(gropa),server(ser){};
 		Group(const Group& old):group(old.group),server(old.server){}
-		inline bool get(const char* route,std::initializer_list<void(*)(HttpServer&,DealHttp&,int)> pfuncs)
-		{
+		inline bool get(const char* route,std::initializer_list<void(*)(HttpServer&,DealHttp&,int)> pfuncs){
 			std::string group=this->group+route;
 			return server.get(group.c_str(),pfuncs);
 		}
-		inline bool post(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
-		{
+		inline bool post(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int)){
 			std::string group=this->group+route;
 			return server.post(group.c_str(),pfunc);
 		}
-		inline bool all(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
-		{
+		inline bool all(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int)){
 			std::string group=this->group+route;
 			return server.all(group.c_str(),pfunc);
 		}
-		inline bool routeHandle(AskType ask,const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
-		{
+		inline bool routeHandle(DealHttp::Request::AskType ask,const char* route,void (*pfunc)(HttpServer&,DealHttp&,int)){
 			std::string group=this->group+route;
 			return server.routeHandle(ask,group.c_str(),pfunc);
 		}
-		inline bool get(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
-		{
+		inline bool get(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int)){
 			std::string group=this->group+route;
 			return server.get(group.c_str(),pfunc);
 		}
-		inline bool post(const char* route,std::initializer_list<void(*)(HttpServer&,DealHttp&,int)> pfuncs)
-		{
+		inline bool post(const char* route,std::initializer_list<void(*)(HttpServer&,DealHttp&,int)> pfuncs){
 			std::string group=this->group+route;
 			return server.post(group.c_str(),pfuncs);
 		}
-		inline bool all(const char* route,std::initializer_list<void(*)(HttpServer&,DealHttp&,int)> pfuncs)
-		{
+		inline bool all(const char* route,std::initializer_list<void(*)(HttpServer&,DealHttp&,int)> pfuncs){
 			std::string group=this->group+route;
 			return server.all(group.c_str(),pfuncs);
 		}
-		inline bool routeHandle(AskType ask,const char* route,std::initializer_list<void(*)(HttpServer&,DealHttp&,int)> pfuncs)
-		{
+		inline bool routeHandle(DealHttp::Request::AskType ask,const char* route,std::initializer_list<void(*)(HttpServer&,DealHttp&,int)> pfuncs){
 			std::string group=this->group+route;
 			return server.routeHandle(ask,group.c_str(),pfuncs);
 		}
@@ -4484,9 +4350,7 @@ private:
 	DealHttp http;
 	Pool<ThreadArg>* parg;
 public:
-	HttpServer(unsigned port,bool debug=false,RunModel serverModel=MULTIPLEXING,unsigned threadNum=5)
-		:ServerTcpIp(port),model(serverModel)
-	{
+	HttpServer(unsigned port,bool debug=false,RunModel serverModel=MULTIPLEXING,unsigned threadNum=5):ServerTcpIp(port),model(serverModel){
 		arrRoute.resize(16);
 		pool=NULL;
 		noRouteFunc=NULL;
@@ -4507,10 +4371,8 @@ public:
 		isLongCon=true;
 		isContinue=true;
 		isAutoAnalysis=true;
-		if(this->model==THREAD||this->model==REACTOR)
-		{
-			if(threadNum==0)
-			{
+		if(this->model==THREAD||this->model==REACTOR){
+			if(threadNum==0){
 				error="thread num is zero";
 				return;
 			}
@@ -4536,18 +4398,15 @@ public:
 	HttpServer(const HttpServer& server)=delete;
 #ifdef CPPWEB_OPENSSL
 	//load cert and key,and they must be pem format(such as key.pem,cert.pem)
-	inline bool loadKeyCert(const char* certPath,const char* keyPath,const char* passwd=NULL)
-	{
+	inline bool loadKeyCert(const char* certPath,const char* keyPath,const char* passwd=NULL){
 		return loadCertificate(certPath,keyPath,passwd);
 	}
 	//get ssl connection for socket fd
-	inline SSL* getSocSSL(int fd)
-	{
+	inline SSL* getSocSSL(int fd){
 		return this->getSSL(fd);
 	}
 #endif
-	void changeModel(RunModel model,unsigned threadNum=5)
-	{//change model for server
+	void changeModel(RunModel model,unsigned threadNum=5){//change model for server
 		if(this->model==model&&model!=THREAD&&model!=REACTOR)
 			return;
 		this->model=model;
@@ -4582,11 +4441,10 @@ public:
 			signal(SIGCHLD,sigCliDeal);
 #endif
 	}
-	inline bool routeHandle(AskType ask,const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
-	{//add route handle in all ask type
+	inline bool routeHandle(DealHttp::Request::AskType ask,const char* route,void (*pfunc)(HttpServer&,DealHttp&,int)){//add route handle in all ask type
 		return routeHandle(ask,route,{pfunc});
 	}
-	bool routeHandle(AskType ask,const char* route,const std::initializer_list<void(*)(HttpServer&,DealHttp&,int)>& pfuncs){
+	bool routeHandle(DealHttp::Request::AskType ask,const char* route,const std::initializer_list<void(*)(HttpServer&,DealHttp&,int)>& pfuncs){
 		if(strlen(route)>100)
 			return false;
 		RouteFuntion* nowRoute=addRoute();
@@ -4606,15 +4464,14 @@ public:
 			nowRoute->type=ONEWAY;
 		return insertTrie(nowRoute);
 	}
-	bool redirect(const char* route,const char* location)
-	{//301 redirect
+	bool redirect(const char* route,const char* location){//301 redirect
 		if(strlen(route)>100)
 			return false;
 		RouteFuntion* nowRoute=addRoute();
 		if(nowRoute==NULL)
 			return false;
 		nowRoute->type=STATIC;
-		nowRoute->ask=ALL;
+		nowRoute->ask=DealHttp::Request::ALL;
 		strcpy(nowRoute->route,route);
 		strcpy(nowRoute->pathExtra,location);
 		if(nowRoute->route[strlen(nowRoute->route)-1]=='*')
@@ -4625,15 +4482,14 @@ public:
 		nowRoute->pfuncs.push_back(rediectGram);
 		return insertTrie(nowRoute);
 	}
-	bool loadStatic(const char* route,const char* staticFile)
-	{//load file such as / -> index.html
+	bool loadStatic(const char* route,const char* staticFile){//load file such as / -> index.html
 		if(strlen(route)>100)
 			return false;
 		RouteFuntion* nowRoute=addRoute();
 		if(nowRoute==NULL)
 			return false;
 		nowRoute->type=STATIC;
-		nowRoute->ask=GET;
+		nowRoute->ask=DealHttp::Request::GET;
 		strcpy(nowRoute->route,route);
 		strcpy(nowRoute->pathExtra,staticFile);
 		if(nowRoute->route[strlen(nowRoute->route)-1]=='*')
@@ -4644,15 +4500,14 @@ public:
 		nowRoute->pfuncs.push_back(loadFile);
 		return insertTrie(nowRoute);
 	}
-	bool deletePath(const char* route)
-	{// forbidden the file path
+	bool deletePath(const char* route){// forbidden the file path
 		if(strlen(route)>100&&route!=NULL)
 			return false;
 		RouteFuntion* nowRoute=addRoute();
 		if(nowRoute==NULL)
 			return false;
 		nowRoute->type=STAWILD;
-		nowRoute->ask=GET;
+		nowRoute->ask=DealHttp::Request::GET;
 		if(route[0]=='.'&&route[1]=='/'&&strlen(route)>2)
 			strcpy(nowRoute->route,route+2);
 		else if(route[0]!='/')
@@ -4665,61 +4520,47 @@ public:
 		nowRoute->pfuncs.push_back(deleteFile);
 		return insertTrie(nowRoute);
 	}
-	inline Group createGroup(const char* route)
-	{//create route group
+	inline Group createGroup(const char* route){//create route group
 		Group temp(*this,route);
 		return temp;
 	}
-	inline bool get(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
-	{//add routeHandle and ask type is get
-		return routeHandle(GET,route,pfunc);
+	inline bool get(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int)){//add routeHandle and ask type is get
+		return routeHandle(DealHttp::Request::GET,route,pfunc);
 	}
-	inline bool get(const char* route,std::initializer_list<void(*)(HttpServer&,DealHttp&,int)> pfuncs)
-	{//add routeHandle and ask type is get
-		return routeHandle(GET,route,pfuncs);
+	inline bool get(const char* route,std::initializer_list<void(*)(HttpServer&,DealHttp&,int)> pfuncs){//add routeHandle and ask type is get
+		return routeHandle(DealHttp::Request::GET,route,pfuncs);
 	}
-	inline bool post(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
-	{//the same to last funtion
-		return routeHandle(POST,route,pfunc);
+	inline bool post(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int)){//the same to last funtion
+		return routeHandle(DealHttp::Request::POST,route,pfunc);
 	}
-	inline bool post(const char* route,std::initializer_list<void(*)(HttpServer&,DealHttp&,int)> pfuncs)
-	{//the same to last funtion
-		return routeHandle(POST,route,pfuncs);
+	inline bool post(const char* route,std::initializer_list<void(*)(HttpServer&,DealHttp&,int)> pfuncs){//the same to last funtion
+		return routeHandle(DealHttp::Request::POST,route,pfuncs);
 	}
-	inline bool all(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int))
-	{//receive all ask type
-		return routeHandle(ALL,route,pfunc);
+	inline bool all(const char* route,void (*pfunc)(HttpServer&,DealHttp&,int)){//receive all ask type
+		return routeHandle(DealHttp::Request::ALL,route,pfunc);
 	}
-	inline bool all(const char* route,std::initializer_list<void(*)(HttpServer&,DealHttp&,int)> pfuncs)
-	{//receive all ask type
-		return routeHandle(ALL,route,pfuncs);
+	inline bool all(const char* route,std::initializer_list<void(*)(HttpServer&,DealHttp&,int)> pfuncs){//receive all ask type
+		return routeHandle(DealHttp::Request::ALL,route,pfuncs);
 	}
-	inline void clientInHandle(void (*pfunc)(HttpServer&,int num,const void* ip,int port))
-	{//when client in ,it will be call
+	inline void clientInHandle(void (*pfunc)(HttpServer&,int num,const void* ip,int port)){//when client in ,it will be call
 		clientIn=pfunc;
 	}
-	inline void clientOutHandle(void (*pfunc)(HttpServer&,int num,const void* ip,int port))
-	{//when client out ,itwill be call
+	inline void clientOutHandle(void (*pfunc)(HttpServer&,int num,const void* ip,int port)){//when client out ,itwill be call
 		clientOut=pfunc;
 	}
-	void setMiddleware(void (*pfunc)(HttpServer&,DealHttp&,int))
-	{//middleware funtion after get text it will be called
+	void setMiddleware(void (*pfunc)(HttpServer&,DealHttp&,int)){//middleware funtion after get text it will be called
 		middlewares.push_back(pfunc);
 	}
-	inline void continueNext(DealHttp& http)
-	{//middleware funtion to continue default task
+	inline void continueNext(DealHttp& http){//middleware funtion to continue default task
 		http.info.isContinue=true;
 	}
-	inline void setLog(std::function<void(LogLevel,const void*,int)> pfunc)
-	{//log system 
+	inline void setLog(std::function<void(LogLevel,const void*,int)> pfunc){//log system 
 		logFunc=pfunc;
 	}
-	inline void setNoRouteFunc(void (*pfunc)(HttpServer&,DealHttp&,int))
-	{//if no pair route this will work
+	inline void setNoRouteFunc(void (*pfunc)(HttpServer&,DealHttp&,int)){//if no pair route this will work
 		noRouteFunc=pfunc;
 	}
-	void run(const char* defaultFile=NULL,bool restart=false)
-	{//server begin to run
+	void run(const char* defaultFile=NULL,bool restart=false){//server begin to run
 		auto flag=senBuffer.resize(1024*1024);
 		if(!flag)
 		{
@@ -4770,16 +4611,13 @@ public:
 			logFunc(SYSLOG,"server stop",0);
 		}
 	}
-	int httpSend(int num,void* buffer,int sendLen,int flag=0)
-	{
+	int httpSend(int num,void* buffer,int sendLen,int flag=0){
 		return this->sendSocket(num,buffer,sendLen,flag);
 	}
-	int httpRecv(int num,void* buffer,int bufferLen,int flag=0)
-	{
+	int httpRecv(int num,void* buffer,int bufferLen,int flag=0){
 		return this->receiveSocket(num,buffer,bufferLen,flag);
 	}
-	int httpRecv(int num,std::string& buffer,int flag=0)
-	{
+	int httpRecv(int num,std::string& buffer,int flag=0){
 		return this->receiveSocket(num,buffer,flag);
 	}
 	int httpRecvAll(int clisoc,std::string& buffer,int flag=0){
@@ -4789,9 +4627,13 @@ public:
 		return HttpApi::getCompleteHtmlSSL(buffer,getSSL(clisoc),flag,&this->sslExist);
 #endif
 	}
-	void changeSetting(bool debug,bool isLongCon,bool isAuto=true,unsigned maxSendLen=10,unsigned sslWriteTime=5,int recvWaitTime=3)
-	{//change setting
+	inline void setDebug(bool debug){
 		this->isDebug=debug;
+	}
+	inline void setLongConnect(bool status){
+		http.setLongConnect(status);
+	}
+	void changeSetting(bool debug,bool isLongCon,bool isAuto=true,unsigned maxSendLen=10,unsigned sslWriteTime=5,int recvWaitTime=3){//change setting
 		this->isLongCon=isLongCon;
 		this->isAutoAnalysis=isAuto;
 		this->defaultWait=recvWaitTime;
@@ -4800,49 +4642,38 @@ public:
 		if(sslWriteTime!=0)
 			this->writeTime=sslWriteTime;
 	}
-	inline const void* recText(const DealHttp& http)
-	{//get the recv text;
+	inline const void* recText(const DealHttp& http){//get the recv text;
 		return (void*)http.info.recText;
 	}
-	inline int getRecLen(const DealHttp& http)
-	{//get the recv text len
+	inline int getRecLen(const DealHttp& http){//get the recv text len
 		return http.info.recLen;
 	}
-	inline const char* lastError()
-	{//get the error of server
+	inline const char* lastError(){//get the error of server
 		return error;
 	}
-	inline void disconnect(int soc)
-	{//active dicconnect socket
+	inline void disconnect(int soc){//active dicconnect socket
 		this->cleanSocket(soc);
 	}
-	inline void* getSenBuffer(const DealHttp& http)
-	{//get the sen buffer
+	inline void* getSenBuffer(const DealHttp& http){//get the sen buffer
 		return http.info.sendBuffer->buffer;
 	}
-	inline unsigned getMaxSenLen(const DealHttp& http)
-	{//get sen buffer size
+	inline unsigned getMaxSenLen(const DealHttp& http){//get sen buffer size
 		return http.info.sendBuffer->getMaxSize();
 	}
-	inline void stopServer()
-	{//stop server run;
+	inline void stopServer(){//stop server run;
 		this->isContinue=false;
 	}
-	inline void resetServer()
-	{//delete all the route
+	inline void resetServer(){//delete all the route
 		this->trie.clean();
 		this->arrRoute.clear();
 	}
-	inline RouteFuntion* getNowRoute()
-	{//get the now route;
+	inline RouteFuntion* getNowRoute(){//get the now route;
 		return pnowRoute;
 	}
-	inline RouteFuntion* getNowRoute(const void* message)
-	{//thread model to get now route
+	inline RouteFuntion* getNowRoute(const void* message){//thread model to get now route
 		return (RouteFuntion*)message;
 	}
-	inline void* enlagerSenBuffer()
-	{//Proactively scale up sen buffer
+	inline void* enlagerSenBuffer(){//Proactively scale up sen buffer
 		auto flag=this->senBuffer.enlargeMemory();
 		if(!flag){
 			return NULL;
@@ -4850,8 +4681,7 @@ public:
 		return this->senBuffer.buffer;
 	}
 private:
-	void messagePrint()
-	{
+	void messagePrint(){
 		CPPWEBSYSTEM("welcome to web server,the server is runing");
 		switch(model)
 		{
@@ -4919,29 +4749,29 @@ private:
 			}
 			switch(arrRoute[i].ask)
 			{
-			case GET:
+			case DealHttp::Request::GET:
 				printf("GET\n");
 				break;
-			case POST:
+			case DealHttp::Request::POST:
 				printf("POST\n");
 				break;
-			case ALL:
+			case DealHttp::Request::ALL:
 				printf("All\n");
 				break;
-			case PUT:
+			case DealHttp::Request::PUT:
 				printf("PUT\n");
 				break;
 #ifndef _WIN32
-			case DELETE:
+			case DealHttp::Request::DELETE:
 #else
 			case WINDELETE:
 #endif
 				printf("DELETE\n");
 				break;
-			case OPTIONS:
+			case DealHttp::Request::OPTIONS:
 				printf("OPTIONS\n");
 				break;
-			case CONNECT:
+			case DealHttp::Request::CONNECT:
 				printf("CONNECT\n");
 				break;
 			}
@@ -4958,9 +4788,8 @@ private:
 			printf("clientout\t\tfunction set\n");
 		printf("\n");
 	}
-	int dealGram(int num,DealHttp& http,const void* getText,Buffer& senText)
-	{
-		AskType type=GET;
+	int dealGram(int num,DealHttp& http,const void* getText,Buffer& senText){
+		DealHttp::Request::AskType type=DealHttp::Request::GET;
 		int len=0,flag=1;
 		char ask[256]={0};
 		http.info.recText=getText;
@@ -4968,8 +4797,6 @@ private:
 		http.info.staticLen=0;
 		http.info.isContinue=false;
 		http.info.sendBuffer=&senText;
-		if(isLongCon==false)
-			http.changeSetting("Close","LCserver/1.1");
 		for(auto& middle:middlewares){
 			middle(*this,http,num);
 			if(!http.info.isContinue){
@@ -4984,7 +4811,7 @@ private:
 			if(isDebug){
 				CPPWEBINFO("GET URL:"<<ask);
 			}
-			type=GET;
+			type=DealHttp::Request::GET;
 		}
 		else if(strstr(ask,"POST")!=NULL)
 		{
@@ -4992,7 +4819,7 @@ private:
 			if(isDebug){
 				CPPWEBINFO("POST URL:"<<ask);
 			}
-			type=POST;
+			type=DealHttp::Request::POST;
 		}
 		else if(strstr(ask,"PUT")!=NULL)
 		{
@@ -5000,7 +4827,7 @@ private:
 			if(isDebug){
 				CPPWEBINFO("PUT URL:"<<ask);
 			}
-			type=PUT;
+			type=DealHttp::Request::PUT;
 		}
 		else if(strstr(ask,"DELETE")!=NULL)
 		{
@@ -5009,7 +4836,7 @@ private:
 				CPPWEBINFO("DELETE URL:"<<ask);
 			}
 #ifndef _WIN32
-			type=DELETE;
+			type=DealHttp::Request::DELETE;
 #else
 			type=WINDELETE;
 #endif
@@ -5020,7 +4847,7 @@ private:
 			if(isDebug){
 				CPPWEBINFO("OPTIONS URL:"<<ask);
 			}
-			type=OPTIONS;
+			type=DealHttp::Request::OPTIONS;
 		}
 		else if(strstr(ask,"CONNECT")!=NULL)
 		{
@@ -5028,7 +4855,7 @@ private:
 			if(isDebug){
 				CPPWEBINFO("CONNECT URL:"<<ask);
 			}
-			type=CONNECT;
+			type=DealHttp::Request::CONNECT;
 		}
 		else 
 		{
@@ -5043,8 +4870,10 @@ private:
 		}
 		int sum=0;
 		void(*pfunc)(HttpServer&,DealHttp&,int)=NULL;
-		RouteFuntion* tempRoute=trie.search(ask,[=](const RouteFuntion* now,bool isLast)->bool{
-					if(now->ask==ALL||now->ask==type){
+		std::string route=ask;
+		route=route.substr(0,route.find_first_of('?'));
+		RouteFuntion* tempRoute=trie.search(route.c_str(),[=](const RouteFuntion* now,bool isLast)->bool{
+					if(now->ask==DealHttp::Request::ALL||now->ask==type){
 						if(isLast&&(now->type==STATIC||now->type==ONEWAY))
 							return true;
 						else if(now->type==WILD||now->type==STAWILD)
@@ -5154,7 +4983,7 @@ private:
 		}
 		return 0;
 	}
-	static int epollHttp(Thing thing,int soc,ServerTcpIp&,void* pserver)
+	static int epollHttp(Event thing,int soc,ServerTcpIp&,void* pserver)
 	{
 		HttpServer& server=*(HttpServer*)pserver;
 		int port=0;
@@ -5282,7 +5111,7 @@ private:
 		if(flag<0){
 			if(server.clientOut!=NULL){
 				int port=0;
-				strcpy((char*)server.senBuffer.buffer,server.getPeerIp(cli,&port));
+				strcpy((char*)server.senBuffer.buffer,server.getPeerIp(cli,&port).c_str());
 				server.clientOut(server,cli,server.senBuffer.buffer,port);
 			}
 			server.cleanSocket(argv.soc);
@@ -5330,7 +5159,7 @@ private:
 		if(server.clientOut!=NULL)
 		{
 			int port=0;
-			strcpy((char*)server.senBuffer.buffer,server.getPeerIp(cli,&port));
+			strcpy((char*)server.senBuffer.buffer,server.getPeerIp(cli,&port).c_str());
 			server.clientOut(server,cli,server.senBuffer.buffer,port);
 		}
 		server.closeSocket(cli);

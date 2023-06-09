@@ -64,7 +64,7 @@ void proxy(HttpServer& server,DealHttp& http,int soc)
 		if(now.getNowModel()!=LoadBalance::HASH)
 			strNow=now.getServer();
 		else
-			strNow=now.getHashServer(ServerTcpIp::getPeerIp(soc,&temp));
+			strNow=now.getHashServer(ServerTcpIp::getPeerIp(soc,&temp).c_str());
 		sscanf(strNow.c_str(),"%[^:]:%d",ip,&port);
 		memset(server.getSenBuffer(http),0,server.getMaxSenLen(http));
 		DealHttp::Request req;
@@ -200,7 +200,7 @@ private:
 		if(_config.isProxy)
 		{
 			server.all("http://*",ForwardProxy::httpProxy);
-			server.routeHandle(HttpServer::CONNECT,"*",ForwardProxy::httpsProxy);
+			server.routeHandle(cppweb::DealHttp::Request::CONNECT,"*",ForwardProxy::httpsProxy);
 		}
 		if(_config.model=="THREAD"&&_config.threadNum!=0)
 			server.changeModel(HttpServer::THREAD,_config.threadNum);
