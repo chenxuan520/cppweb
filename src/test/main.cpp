@@ -12,5 +12,3 @@ INIT(init){
 TEST(TestForHeader, RunTest){
 	MUST_EQUAL(1, 1);
 }
-
-RUN

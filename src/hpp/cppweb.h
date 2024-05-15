@@ -2282,11 +2282,11 @@ public:
 		error=NULL;
 		isHttps=false;
 		sock=socket(AF_INET,SOCK_STREAM,0);
+		addrC.sin_family=AF_INET;//af_inet IPv4
 	}
 	ClientTcpIp(const std::string& connectIP,unsigned short connectPort):ClientTcpIp(){
 		this->connectIP=connectIP;
 		addrC.sin_addr.s_addr=inet_addr(connectIP.c_str());
-		addrC.sin_family=AF_INET;//af_inet IPv4
 		addrC.sin_port=htons(connectPort);
 #ifdef CPPWEB_OPENSSL
 		ssl=NULL;
