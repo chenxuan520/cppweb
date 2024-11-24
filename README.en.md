@@ -1,3 +1,7 @@
+# Attention: cppweb has been refactored and upgraded to [cppnet](https://github.com/chenxuan520/cppnet), and this repository will soon be discontinued.
+
+- The cppweb code history is relatively heavy, and the implementation is not elegant enough, without automated testing and other issues, so it took a little time to refactor it into cppnet.
+
 # cppweb framework introduction
 
 #### Introduction in [English](./README.en.md)

@@ -1,3 +1,7 @@
+# 注意: cppweb 已经重构升级为 [cppnet](https://github.com/chenxuan520/cppnet) , 该仓库即将停止维护
+
+- cppweb 代码历史包裹比较重,而且实现得不够优雅, 没有自动化测试等问题, 因此花费了一点时间重新重构成为 cppnet
+
 # cppweb框架介绍
 
 #### Introduction in [English](./README.en.md)
